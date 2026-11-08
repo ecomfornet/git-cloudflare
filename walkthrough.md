@@ -173,3 +173,37 @@ In this update:
    - Selecting an account updates organization and repository name.
    - Clicked `🏢 Verify Org`: successfully displayed verified active status banner (`✅ Organization 'annadeco' is verified and active on GitHub! Plan: free`).
    - Verified 0 JavaScript runtime errors in browser console.
+
+
+---
+
+## 9. The Nordroom Scandinavian Design System & Default Theme (Template 2)
+
+**Milestones N1–N4 Verification Summary**:
+- **Design Inspiration**: Seeded the acclaimed minimalist aesthetic and spatial storytelling of **The Nordroom** ([thenordroom.com](https://www.thenordroom.com/)) into **Template 2** (`nordic-studio`).
+- **Elevation to Default Theme**:
+  - `BuildConfig.theme`: Defaulted to `"nordic-studio"` across `app/config.py`, `pseo_config.json`, and `pseo_config.example.json`.
+  - In Step 2 of the Dashboard, **Model 2 · The Nordroom** is now selected by default with a dedicated `⭐ Default Theme` badge.
+- **The Nordroom Homepage Hub (`render_nordic_studio_hub`)**:
+  - **Centered Masthead**: Elegant uppercase tracking-widest branding (`THE NORDROOM`) flanked by room categories (`LIVING ROOM`, `BEDROOM`, `KITCHEN`, `BATHROOM`, `GARDEN & OUTDOOR`, `SMALL SPACES`, `COLOR TRENDS`).
+  - **Dynamic Cover Story**: Pulls dynamically from the latest ingested article (`posts[0]`) with 16:9 / 3:2 photography, teak category kicker, 40px serif headline (`Cormorant Garamond`), 2-line architectural lede, and byline `By Rachel • 4 Min Read`. Both image and title are clickable links!
+  - **Curated Room Taxonomy**: 6 clean room showcases with curated guide counts (**zero ugly raw slugs**).
+  - **3-Column Scandinavian Feed**: Clean 4:3 cards with hover scale, teak kicker, serif titles, short excerpts, and `Read Tour →` links.
+  - **Newsletter Dispatch**: Clean linen subscription box for weekly Scandinavian home tours.
+  - **4-Column Footer**: Curated room tours, design styles, and social/copyright links.
+- **The Nordroom Single Article Guide (`render_nordic_studio_layout`)**:
+  - **Header & Footer Continuity**: Shares the exact same The Nordroom masthead, room navigation, and 4-column footer.
+  - **Centered 740px Reading Pane**: Max-width strictly constrained to `740px` for optimal legibility and reading comfort.
+  - **Post Meta & Headline**: Clean category kicker (`CATEGORY • 5 MIN READ • UPDATED 2026`), high-impact `Cormorant Garamond` serif headline, 2-line italic lede, author byline (`By Rachel` or configured author) with circular monogram avatar, and `📌 Save to Pinterest` button.
+  - **Hero Photography**: 16:10 rounded image with photo credit caption.
+  - **Zero Robotic Filler**: 100% removal of artificial checklist boxes (e.g. `Step 1: Draft floor plan...`).
+  - **Prose Elegance**: 18px body font (`Plus Jakarta Sans`), 1.8 line height, and classic drop cap on the first paragraph.
+  - **Related Guides Grid**: 3 clean Scandinavian post cards with clickable images and titles (zero slugs).
+
+### Visual Verification
+
+````carousel
+![The Nordroom Homepage Hub](file:///C:/Users/mouni/.gemini/antigravity/brain/c74d76e0-2737-467a-9b30-b696007f0f5f/thenordroom_hub_preview.png)
+<!-- slide -->
+![The Nordroom Single Article Guide](file:///C:/Users/mouni/.gemini/antigravity/brain/c74d76e0-2737-467a-9b30-b696007f0f5f/thenordroom_article_preview.png)
+````
