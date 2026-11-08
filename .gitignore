@@ -1,0 +1,47 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Distribution / packaging / build outputs
+dist/
+distoos/
+build/
+*.egg-info/
+my-worker/public/*
+!my-worker/public/.gitkeep
+
+# Scraped project data & manifests (except gitkeep)
+scraped_data/*/
+*.log
+
+# Dynamic scraped project image caches (preserve core static assets)
+assets/*
+!assets/images/
+!assets/images/**
+
+# Scratch & temporary development scripts
+scratch/*
+!scratch/.gitkeep
+
+# Testing & Browser automation artifacts
+.playwright-mcp/
+test_results/
+*.png
+
+# Environments & Local Configuration
+.env
+.venv/
+env/
+venv/
+ENV/
+
+# IDE & Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db

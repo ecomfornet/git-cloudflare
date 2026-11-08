@@ -1,0 +1,1158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>stylesdays pSEO Multi-Cloud Hub — Cloudflare &amp; GitHub</title>
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Playfair+Display:ital,wght@0,600;0,700;1,600&display=swap" rel="stylesheet">
+  
+  <link rel="stylesheet" href="style.css?v=3.2">
+</head>
+<body>
+
+  <!-- Consolidated 2-Row Sticky Command Bar (Zero Vertical Waste) -->
+  <header class="app-header compact-command-bar">
+    <!-- Row 1: Brand + Platform Switcher + Quick Telemetry & Status -->
+    <div class="command-row-1">
+      <div class="brand-section">
+        <div class="brand-logo" title="stylesdays pSEO Platform">S</div>
+        <div class="brand-title">stylesdays <span class="brand-sub">pSEO Hub</span></div>
+        <div class="brand-divider"></div>
+        <div id="selectedPlatformBadge" class="platform-selected-badge cf" title="Active Deployment Platform · Click to toggle Cloudflare / GitHub">
+          <span class="platform-badge-dot"></span>
+          <span class="platform-badge-icon" id="selectedPlatformIcon">🟧</span>
+          <span class="platform-badge-text" id="selectedPlatformText">Cloudflare Edge</span>
+          <span class="platform-switch-hint" style="font-size: 0.68rem; opacity: 0.75; margin-left: 0.2rem; background: rgba(255, 255, 255, 0.08); padding: 0.1rem 0.35rem; border-radius: 4px;">⇄ Switch</span>
+        </div>
+      </div>
+
+      <!-- Project Selector & Quick New Project Trigger -->
+      <div class="project-selector-wrapper" style="display: inline-flex; align-items: center; gap: 0.45rem; margin-left: 0.75rem;">
+        <span style="font-size: 0.72rem; color: #94A3B8; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;">📁 Project:</span>
+        <select id="selectActiveProject" class="form-control" style="width: 150px; height: 30px; font-size: 0.78rem; padding: 0.2rem 0.5rem; background: #1E293B; color: #F8FAFC; border: 1px solid #334155; border-radius: 6px; cursor: pointer;">
+          <option value="stylesdays">stylesdays</option>
+        </select>
+        <button type="button" id="btnNewProject" class="btn btn-primary btn-xs" style="height: 30px; font-weight: 600; padding: 0.2rem 0.65rem; display: inline-flex; align-items: center; gap: 0.25rem;">
+          <span>+ New Project</span>
+        </button>
+      </div>
+
+      <!-- Settings in Top-Right (Decluttered: Settings Only) -->
+      <div class="header-meta">
+        <button type="button" id="btnOpenSettings" class="btn btn-primary btn-sm" title="Open Cloudflare &amp; GitHub Platform Settings" style="display: inline-flex; align-items: center; gap: 0.35rem; font-weight: 600;">
+          <span>⚙️ Settings</span>
+        </button>
+
+        <!-- Hidden elements for test and script compatibility -->
+        <div style="display: none;" aria-hidden="true">
+          <div id="cfStatusBadge" class="status-indicator cf" title="Cloudflare Workers Edge Status · Click to configure" style="cursor: pointer;">
+            <span class="status-dot cf-dot"></span>
+            <span id="cfStatusText">Cloudflare: Ready</span>
+          </div>
+          <div id="gitStatusBadge" class="status-indicator" title="GitHub Pages Git Data Status · Click to configure" style="cursor: pointer;">
+            <span class="status-dot"></span>
+            <span id="gitStatusText">GitHub: Ready</span>
+          </div>
+          <button id="quickBuildBtn" class="btn btn-secondary btn-sm" title="Instant Static Site Rebuild">⚡ Quick Build</button>
+          <button type="button" id="platformSelectCf" data-platform="cloudflare"></button>
+          <button type="button" id="platformSelectGh" data-platform="github"></button>
+          <button type="button" id="platformSelectSplit" data-platform="split"></button>
+          <button type="button" id="platformSelectDual" data-platform="dual"></button>
+          <button class="tab-btn active" data-tab="tab-deploy" data-platform="cloudflare" id="tabBtnCloudflare"></button>
+          <button class="tab-btn" data-tab="tab-deploy" data-platform="github" id="tabBtnGithub"></button>
+          <button class="tab-btn" data-tab="tab-themes" id="tabBtnThemes"></button>
+          <button class="tab-btn" data-tab="tab-ingest" id="tabBtnIngest"></button>
+          <button class="tab-btn" data-tab="tab-posts" id="tabBtnPosts"></button>
+          <button class="tab-btn" data-tab="tab-preview" id="tabBtnPreview"></button>
+          <a id="cockpitCfUrlLink" href="https://gardenhome.laurainsley01.workers.dev" target="_blank" rel="noopener"></a>
+          <a id="cockpitGhUrlLink" href="https://annadeco.github.io" target="_blank" rel="noopener"></a>
+          <a id="cfLiveUrlPreview" href="https://gardenhome.laurainsley01.workers.dev" target="_blank" rel="noopener"></a>
+          <strong id="cockpitCfWorker">gardenhome</strong>
+          <strong id="cockpitCfSubdomain">laurainsley01</strong>
+          <strong id="cockpitTheme">pinterest-mag</strong>
+          <code id="cockpitOutputDir">dist/gardenhome</code>
+          <a id="cockpitGhRepoText" href="https://annadeco.github.io" target="_blank" rel="noopener"></a>
+          <strong id="cockpitGhRepo">annadeco.github.io</strong>
+          <strong id="cockpitGhBranch">main</strong>
+        </div>
+      </div>
+    </div>
+
+    <!-- Row 2: Inline Telemetry Metrics Ribbon -->
+    <div class="command-row-2">
+      <!-- Compact Inline Telemetry Ribbon (Replaces Bloated Stats Cards) -->
+      <div class="telemetry-ribbon">
+        <div class="telemetry-pill" title="Total Ingested Manifest Posts">
+          <span class="telemetry-label">Posts:</span>
+          <strong id="statTotalPosts" class="telemetry-value">0</strong>
+        </div>
+        <div class="telemetry-pill" title="Optimized WebP Image Assets">
+          <span class="telemetry-label">Assets:</span>
+          <strong id="statProjectAssets" class="telemetry-value" style="color: #10B981;">0</strong>
+        </div>
+        <div class="telemetry-pill" title="New / Custom Edited Posts">
+          <span class="telemetry-label">Diff:</span>
+          <span id="statNewPosts" style="color: #38BDF8; font-weight: 700;">+0</span> /
+          <span id="statCustomPosts" style="color: #F59E0B; font-weight: 700;">0 custom</span>
+        </div>
+        <div class="telemetry-pill" title="Active Curated Visual Theme Model">
+          <span class="telemetry-label">Model:</span>
+          <code id="statTheme" class="telemetry-model">editorial-warm</code>
+        </div>
+        <div class="telemetry-pill target-pill" id="statPlatformCard" title="Target Deployment Edge Destination">
+          <a id="statTargetUrl" class="target-link" href="https://gardenhome.laurainsley01.workers.dev" target="_blank" rel="noopener">
+            https://gardenhome.laurainsley01.workers.dev ↗
+          </a>
+        </div>
+        <!-- Hidden elements for test & script compatibility -->
+        <span id="statUpdatedPosts" style="display: none;">0</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Interactive Compact Stepper Bar -->
+  <section class="stepper-section compact-stepper" aria-label="Pipeline Stepper">
+    <div class="stepper-container">
+      <div class="pipeline-stepper">
+        <div class="step-card active" id="stepCardIngest" data-target="tab-ingest" title="Step 1: Content Ingestion">
+          <span class="step-badge active-badge">01</span>
+          <span class="step-title">Ingest</span>
+        </div>
+        <div class="step-connector"></div>
+        <div class="step-card" id="stepCardThemes" data-target="tab-themes" title="Step 2: Theme Models &amp; Design">
+          <span class="step-badge">02</span>
+          <span class="step-title">Models</span>
+        </div>
+        <div class="step-connector"></div>
+        <div class="step-card" id="stepCardPosts" data-target="tab-posts" title="Step 3: Catalog &amp; Articles">
+          <span class="step-badge">03</span>
+          <span class="step-title">Catalog</span>
+        </div>
+        <div class="step-connector"></div>
+        <div class="step-card" id="stepCardDeploy" data-target="tab-deploy" title="Step 4: Build &amp; Deploy Cockpit">
+          <span class="step-badge">04</span>
+          <span class="step-title">Deploy</span>
+        </div>
+        <!-- Hidden elements for backward compatibility -->
+        <span id="stepPlatformBadge" style="display: none;">04</span>
+        <span id="stepPlatformTitle" style="display: none;">Deploy Cockpit</span>
+        <span id="stepPlatformDesc" style="display: none;">Edge Deployment</span>
+        <div id="stepCardPlatform" data-target="tab-deploy" style="display: none;"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Main Content Areas (Calculated Proportional Layouts) -->
+  <main class="app-main compact-main">
+
+    <!-- ================================================================= -->
+    <!-- ================================================================= -->
+    <!-- TAB 1: DEDICATED PRODUCTION DEPLOYMENT WORKSPACE                  -->
+    <!-- ================================================================= -->
+    <section id="tab-deploy" class="tab-pane">
+
+      <!-- =============================================================== -->
+      <!-- WORKSPACE 1: DEDICATED CLOUDFLARE EDGE PLATFORM (ACTIVE)       -->
+      <!-- =============================================================== -->
+      <div id="workspaceCloudflare" class="platform-workspace">
+        <!-- Single Focused Cloudflare SaaS Cockpit Card -->
+        <div id="cockpitCardCf" class="saas-card">
+          <!-- Operations Grid (2 Balanced Columns) -->
+          <div class="operations-grid">
+            <!-- Left Column: Compilation & Optimization -->
+            <div class="operation-col">
+              <div class="operation-title">
+                <span>🔨</span>
+                <span>Static Site Compilation</span>
+              </div>
+              <p class="operation-desc">Generate static HTML, multi-tier sitemaps, robots.txt, and optimized WebP images.</p>
+              <div class="operation-btn-group">
+                <button type="button" id="triggerBuildBtn" class="btn btn-primary btn-md">
+                  🔨 Build Static Site
+                </button>
+                <button type="button" id="optimizeWebpBtn" class="btn btn-secondary btn-md" title="Optimize images to 16:10 WebP">
+                  🖼️ WebP Optimizer (69%)
+                </button>
+              </div>
+              <button type="button" id="syncAssetsSettingsBtn" class="btn btn-secondary btn-sm" style="width: 100%; margin-top: 0.5rem;">
+                🔄 Sync Image Assets to Project
+              </button>
+            </div>
+
+            <!-- Right Column: Edge Production Deployment -->
+            <div class="operation-col deploy-col">
+              <div class="operation-title">
+                <span>🚀</span>
+                <span>Edge Production Deployment</span>
+              </div>
+              <p class="operation-desc">Direct upload to Cloudflare Pages / Workers static assets binding.</p>
+              <div class="dry-run-control">
+                <label class="checkbox-label" for="deployCfDryRun">
+                  <input type="checkbox" id="deployCfDryRun">
+                  <div>
+                    <strong>Dry Run Simulation</strong>
+                    <div class="checkbox-hint">Simulate payload verification without altering live edge</div>
+                  </div>
+                </label>
+              </div>
+              <button type="button" id="triggerCfDeployBtn" class="btn btn-cloudflare btn-lg" style="width: 100%; margin-top: 0.75rem;">
+                🚀 Deploy to Cloudflare Edge
+              </button>
+            </div>
+          </div>
+
+          <!-- Step Navigation Footer -->
+          <div class="step-nav-footer">
+            <button type="button" class="btn btn-secondary btn-sm" onclick="switchTab('tab-posts')">
+              <span>← Back to Catalog</span>
+            </button>
+            <button type="button" class="btn btn-primary btn-sm" onclick="switchTab('tab-preview')">
+              <span>Proceed to Live Preview →</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- =============================================================== -->
+      <!-- WORKSPACE 2: DEDICATED GITHUB PAGES PLATFORM                    -->
+      <!-- =============================================================== -->
+      <div id="workspaceGithub" class="platform-workspace" style="display: none;">
+        <!-- Single Focused GitHub SaaS Cockpit Card -->
+        <div id="cockpitCardGh" class="saas-card">
+          <!-- Operations Grid (2 Balanced Columns) -->
+          <div class="operations-grid">
+            <!-- Left Column: Compilation & Asset Staging -->
+            <div class="operation-col">
+              <div class="operation-title">
+                <span>🔨</span>
+                <span>Static Site Compilation</span>
+              </div>
+              <p class="operation-desc">Generate static HTML and stage assets for GitHub Git tree assembly.</p>
+              <div class="operation-btn-group">
+                <button type="button" id="triggerBuildGhBtn" class="btn btn-primary btn-md">
+                  🔨 Build for GitHub
+                </button>
+                <button type="button" id="syncAssetsDeployBtn" class="btn btn-secondary btn-md">
+                  🖼️ Sync Assets
+                </button>
+              </div>
+            </div>
+
+            <!-- Right Column: Git Data API Production Deployment -->
+            <div class="operation-col deploy-col">
+              <div class="operation-title">
+                <span>🚀</span>
+                <span>Git Data API Deployment</span>
+              </div>
+              <p class="operation-desc">Create atomic single-commit and update branch reference.</p>
+              <div class="dry-run-control">
+                <label class="checkbox-label" for="deployDryRun">
+                  <input type="checkbox" id="deployDryRun">
+                  <div>
+                    <strong>Dry Run Simulation</strong>
+                    <div class="checkbox-hint">Simulate Git tree assembly without creating remote commit</div>
+                  </div>
+                </label>
+              </div>
+              <button type="button" id="triggerDeployBtn" class="btn btn-success btn-lg" style="width: 100%; margin-top: 0.75rem;">
+                🚀 Deploy to GitHub Pages
+              </button>
+            </div>
+          </div>
+
+          <!-- Step Navigation Footer -->
+          <div class="step-nav-footer">
+            <button type="button" class="btn btn-secondary btn-sm" onclick="switchTab('tab-posts')">
+              <span>← Back to Catalog</span>
+            </button>
+            <button type="button" class="btn btn-primary btn-sm" onclick="switchTab('tab-preview')">
+              <span>Proceed to Live Preview →</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Hidden compatibility elements for test runner & script integrity -->
+      <div style="display: none;">
+        <div id="deployCockpitGrid" class="deploy-cockpit-grid view-single-cf"></div>
+        <button type="button" id="viewToggleCf" data-view="cf"></button>
+        <button type="button" id="viewToggleGh" data-view="gh"></button>
+        <button type="button" id="viewToggleBoth" data-view="both"></button>
+        <button type="button" id="triggerDualDeployBtn"></button>
+        <button type="button" id="heroCfDeployBtn"></button>
+        <strong id="splitCfWorkerName">gardenhome</strong>
+        <button type="button" id="splitBtnBuildCf" onclick="document.getElementById('triggerBuildBtn').click();"></button>
+        <button type="button" id="splitBtnDeployCf" onclick="document.getElementById('triggerCfDeployBtn').click();"></button>
+        <button type="button" id="heroGhDeployBtn"></button>
+        <strong id="splitGhRepoName">annadeco.github.io</strong>
+        <button type="button" id="splitBtnBuildGh" onclick="document.getElementById('triggerBuildGhBtn').click();"></button>
+        <button type="button" id="splitBtnDeployGh" onclick="document.getElementById('triggerDeployBtn').click();"></button>
+      </div>
+
+      <!-- Hidden compatibility stubs for legacy tab selectors -->
+      <div id="tab-cloudflare" style="display: none;"></div>
+      <div id="tab-github" style="display: none;"></div>
+      <div id="tab-split" style="display: none;"></div>
+    </section>
+
+    <!-- ================================================================= -->
+    <!-- TAB 4: THEME MODELS & VISUAL ARCHITECTURE                         -->
+    <!-- ================================================================= -->
+    <section id="tab-themes" class="tab-pane">
+      <form id="buildOptionsForm">
+        <!-- Compact Brand & Custom Logo Bar -->
+        <div class="logo-quick-banner compact-logo-banner">
+          <div style="display: flex; align-items: center; gap: 0.85rem;">
+            <div id="quickLogoPreviewBox" class="compact-logo-box"></div>
+            <div>
+              <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <span id="quickBrandNameDisplay" style="font-weight: 700; font-size: 0.95rem; color: #F8FAFC;">Anna Deco</span>
+                <span id="quickLogoStatusBadge" class="theme-badge" style="font-size: 0.62rem; padding: 0.1rem 0.4rem;">Emblem</span>
+              </div>
+              <div id="quickTaglineDisplay" style="font-size: 0.72rem; color: #94A3B8;">Curated Interior Design &amp; Architectural Aesthetic</div>
+            </div>
+          </div>
+
+          <div style="display: flex; align-items: center; gap: 0.4rem;">
+            <label class="btn btn-primary btn-xs" style="cursor: pointer;">
+              <span>📁 Import Custom Logo</span>
+              <input type="file" id="quickLogoFileInput" accept="image/png,image/jpeg,image/webp,image/svg+xml" style="display: none;">
+            </label>
+            <button type="button" id="quickBtnResetLogo" class="btn btn-secondary btn-xs" style="color: #FCA5A5;">
+              <span>🔄 Reset</span>
+            </button>
+            <button type="button" id="btnOpenThemePreview" class="btn btn-secondary btn-xs">
+              <span>👁️ Viewport Preview</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 3 Curated Visual Theme Models (Compact Gallery) -->
+        <div class="card compact-card" style="margin-bottom: 0.85rem;">
+          <div class="card-compact-header">
+            <span class="tag-badge" style="background: rgba(56, 189, 248, 0.15); color: #38BDF8; border: 1px solid rgba(56, 189, 248, 0.3);">
+              1. CURATED VISUAL MODELS (CLICK TO CHOOSE)
+            </span>
+            <span style="font-size: 0.72rem; color: #38BDF8;">Renders cleanly on both Cloudflare &amp; GitHub</span>
+          </div>
+
+          <div class="theme-card-grid compact-theme-grid" id="themePreviewGallery" style="margin-top: 0.5rem;">
+            <!-- Model 1 -->
+            <div class="theme-card active" data-theme="editorial-warm">
+              <div class="theme-card-header">
+                <span class="theme-badge" style="background: rgba(230, 0, 35, 0.15); color: #FF4D6D; border: 1px solid rgba(230, 0, 35, 0.3);">
+                  Model 1 · Kinfolk Journal
+                </span>
+                <button type="button" class="btn-preview-theme" data-theme="editorial-warm" title="Preview">👁️ Preview</button>
+              </div>
+              <div class="theme-card-mockup" style="background: #FAF8F5; color: #1C1917; border-color: #E7E2DA; padding: 0.45rem;">
+                <div style="font-family: 'Playfair Display', Georgia, serif; font-size: 0.72rem; font-weight: 700;">Editorial Warm Serif</div>
+                <div style="font-size: 0.58rem; color: #78716C;">Linen bedding &bull; Ivory cards &bull; Pinterest red</div>
+              </div>
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.2rem;">
+                <div class="theme-swatches">
+                  <span class="swatch" style="background: #FAF8F5;"></span>
+                  <span class="swatch" style="background: #1C1917;"></span>
+                  <span class="swatch" style="background: #E60023;"></span>
+                </div>
+                <span style="font-size: 0.68rem; color: #94A3B8; font-family: var(--font-mono);">Playfair</span>
+              </div>
+            </div>
+
+            <!-- Model 2 -->
+            <div class="theme-card" data-theme="nordic-studio">
+              <div class="theme-card-header">
+                <span class="theme-badge" style="background: rgba(15, 118, 110, 0.15); color: #2DD4BF; border: 1px solid rgba(15, 118, 110, 0.3);">
+                  Model 2 · Minimalist Scandi
+                </span>
+                <button type="button" class="btn-preview-theme" data-theme="nordic-studio" title="Preview">👁️ Preview</button>
+              </div>
+              <div class="theme-card-mockup" style="background: #F3F5F4; color: #0F172A; border-color: #E2E8F0; padding: 0.45rem;">
+                <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-size: 0.72rem; font-weight: 700;">Nordic Architectural Sans</div>
+                <div style="font-size: 0.58rem; color: #64748B;">Cool mist &bull; Slate navy &bull; Deep teal</div>
+              </div>
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.2rem;">
+                <div class="theme-swatches">
+                  <span class="swatch" style="background: #F3F5F4;"></span>
+                  <span class="swatch" style="background: #0F172A;"></span>
+                  <span class="swatch" style="background: #0F766E;"></span>
+                </div>
+                <span style="font-size: 0.68rem; color: #94A3B8; font-family: var(--font-mono);">Jakarta</span>
+              </div>
+            </div>
+
+            <!-- Model 3 -->
+            <div class="theme-card" data-theme="pinterest-mag">
+              <div class="theme-card-header">
+                <span class="theme-badge" style="background: rgba(190, 18, 60, 0.15); color: #FB7185; border: 1px solid rgba(190, 18, 60, 0.3);">
+                  Model 3 · Pin Discovery
+                </span>
+                <button type="button" class="btn-preview-theme" data-theme="pinterest-mag" title="Preview">👁️ Preview</button>
+              </div>
+              <div class="theme-card-mockup" style="background: #FFFDF9; color: #18181B; border-color: #F3E8E2; padding: 0.45rem;">
+                <div style="font-family: 'Playfair Display', serif; font-style: italic; font-size: 0.72rem; font-weight: 700;">Pinterest Mag Italic</div>
+                <div style="font-size: 0.58rem; color: #71717A;">High-CTR save tags &bull; Ruby accents</div>
+              </div>
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.2rem;">
+                <div class="theme-swatches">
+                  <span class="swatch" style="background: #FFFDF9;"></span>
+                  <span class="swatch" style="background: #18181B;"></span>
+                  <span class="swatch" style="background: #BE123C;"></span>
+                </div>
+                <span style="font-size: 0.68rem; color: #94A3B8; font-family: var(--font-mono);">Playfair Italic</span>
+              </div>
+            </div>
+          </div>
+
+          <select id="cfgTheme" class="form-control" style="display: none;">
+            <option value="editorial-warm">Editorial Warm</option>
+            <option value="nordic-studio">Nordic Studio</option>
+            <option value="pinterest-mag">Pinterest Mag</option>
+          </select>
+        </div>
+
+        <!-- 2. Routing Architecture (Compact Pills) -->
+        <div class="card compact-card" style="margin-bottom: 0.85rem;">
+          <div class="card-compact-header">
+            <span class="tag-badge" style="background: rgba(16, 185, 129, 0.15); color: #34D399; border: 1px solid rgba(16, 185, 129, 0.3);">
+              2. DIRECTORY &amp; URL ROUTING ARCHITECTURE
+            </span>
+            <span style="font-size: 0.72rem; color: #10B981;">Non-404 intermediate index pages auto-built</span>
+          </div>
+
+          <div class="routing-card-grid compact-routing-grid" id="routingPreviewGallery" style="margin-top: 0.5rem;">
+            <div class="routing-card active" data-routing="single">
+              <div style="display: flex; justify-content: space-between;"><strong style="font-size: 0.82rem;">Flat Root</strong><span class="routing-badge">Single</span></div>
+              <div class="routing-tree" style="margin-top: 0.25rem;">/&lt;slug&gt;/index.html</div>
+            </div>
+            <div class="routing-card" data-routing="category_slug">
+              <div style="display: flex; justify-content: space-between;"><strong style="font-size: 0.82rem;">Category Hub</strong><span class="routing-badge">Cluster</span></div>
+              <div class="routing-tree" style="margin-top: 0.25rem;">/&lt;cat&gt;/&lt;slug&gt;/index.html</div>
+            </div>
+            <div class="routing-card" data-routing="parent_slug">
+              <div style="display: flex; justify-content: space-between;"><strong style="font-size: 0.82rem;">Parent Section</strong><span class="routing-badge">Silo</span></div>
+              <div class="routing-tree" style="margin-top: 0.25rem;">/&lt;parent&gt;/&lt;slug&gt;/index.html</div>
+            </div>
+            <div class="routing-card" data-routing="silo_nested">
+              <div style="display: flex; justify-content: space-between;"><strong style="font-size: 0.82rem;">Guides Hierarchy</strong><span class="routing-badge">Deep</span></div>
+              <div class="routing-tree" style="margin-top: 0.25rem;">/guides/&lt;parent&gt;/&lt;slug&gt;/</div>
+            </div>
+          </div>
+
+          <select id="cfgRoutingMode" class="form-control" style="display: none;">
+            <option value="single">Single Slug: /&lt;slug&gt;/index.html</option>
+            <option value="category_slug">Category Slug: /&lt;category-slug&gt;/&lt;slug&gt;/index.html</option>
+            <option value="parent_slug">Parent Slug: /&lt;parent-slug&gt;/&lt;slug&gt;/index.html</option>
+            <option value="silo_nested">Silo Nested: /guides/&lt;parent-slug&gt;/&lt;slug&gt;/index.html</option>
+          </select>
+        </div>
+
+        <!-- 3. Branding, Credentials & pSEO Options -->
+        <div class="card compact-card">
+          <div class="dashboard-grid three-cols" style="gap: 0.75rem;">
+            <div class="form-group compact-group">
+              <label class="form-label" for="cfgBrandName">Brand Name</label>
+              <input type="text" id="cfgBrandName" class="form-control" value="Anna Deco">
+            </div>
+            <div class="form-group compact-group">
+              <label class="form-label" for="cfgBrandTagline">Header Tagline</label>
+              <input type="text" id="cfgBrandTagline" class="form-control" value="Interior Design & Curated Living">
+            </div>
+            <div class="form-group compact-group">
+              <label class="form-label" for="cfgAuthorName">Author Name (E-E-A-T)</label>
+              <input type="text" id="cfgAuthorName" class="form-control" value="Anna Lindqvist">
+            </div>
+          </div>
+
+          <div class="dashboard-grid two-cols" style="gap: 0.75rem; margin-top: 0.5rem;">
+            <div class="form-group compact-group">
+              <label class="form-label" for="cfgAuthorBio">Professional Bio</label>
+              <input type="text" id="cfgAuthorBio" class="form-control" value="Senior Interior Architect & Kinfolk Stylist">
+            </div>
+            <div class="form-group compact-group">
+              <label class="form-label" for="cfgOutputDir">Output Directory</label>
+              <input type="text" id="cfgOutputDir" class="form-control" value="dist">
+            </div>
+          </div>
+
+          <div style="display: flex; gap: 1.25rem; margin-top: 0.65rem; flex-wrap: wrap;">
+            <label class="checkbox-label" for="cfgEnableToc" style="font-size: 0.75rem;">
+              <input type="checkbox" id="cfgEnableToc" checked>
+              <span>Table of Contents (TOC)</span>
+            </label>
+            <label class="checkbox-label" for="cfgEnableFaq" style="font-size: 0.75rem;">
+              <input type="checkbox" id="cfgEnableFaq" checked>
+              <span>Interactive FAQ + Schema.org</span>
+            </label>
+            <label class="checkbox-label" for="cfgEnableEeat" style="font-size: 0.75rem;">
+              <input type="checkbox" id="cfgEnableEeat" checked>
+              <span>E-E-A-T Trust Badge</span>
+            </label>
+          </div>
+
+          <input type="hidden" id="cfgWpApiUrl" value="stylesdays.com">
+          <input type="file" id="logoFileInput" accept="image/png,image/jpeg,image/webp,image/svg+xml" style="display: none;">
+          <button type="button" id="btnResetLogo" style="display: none;">Reset Logo</button>
+          <div id="logoPreviewBox" style="display: none;"></div>
+          <span id="logoFilenameText" style="display: none;"></span>
+          <span id="logoStatusBadge" style="display: none;"></span>
+
+          <div style="margin-top: 0.75rem;">
+            <button type="submit" class="btn btn-primary btn-sm">💾 Save Settings</button>
+          </div>
+        </div>
+      </form>
+
+      <div class="step-nav-footer">
+        <button type="button" class="btn btn-secondary btn-sm" onclick="switchTab('tab-ingest')">
+          <span>← Back to Ingestion</span>
+        </button>
+        <button type="button" class="btn btn-primary btn-sm" onclick="switchTab('tab-posts')">
+          <span>Proceed to Step 3: Catalog &amp; Articles →</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- ================================================================= -->
+    <!-- TAB 5: CONTENT INGESTION & DIFFING (50% / 50% CALCULATED)         -->
+    <!-- ================================================================= -->
+    <section id="tab-ingest" class="tab-pane active">
+      <div class="dashboard-grid two-cols" style="gap: 1rem;">
+        <!-- Ingestion Form -->
+        <div class="card compact-card">
+          <div class="card-compact-header">
+            <span class="tag-badge" style="background: rgba(59, 130, 246, 0.15); color: #60A5FA;">CONTENT INGESTION</span>
+          </div>
+          <form id="ingestionForm" style="margin-top: 0.5rem;">
+            <div class="form-group compact-group">
+              <label class="form-label" for="ingestSourceType">Source Type</label>
+              <select id="ingestSourceType" class="form-control">
+                <option value="sitemap">WordPress Sitemap XML Index</option>
+                <option value="url_list">Pasted Bulk URL List</option>
+                <option value="wp_api">WordPress REST API</option>
+              </select>
+            </div>
+
+            <div id="groupSitemapUrl" class="form-group compact-group">
+              <label class="form-label" for="ingestSitemapUrl">Sitemap URL</label>
+              <input type="url" id="ingestSitemapUrl" class="form-control" value="https://stylesdays.com/sitemap_index.xml">
+            </div>
+
+            <div id="groupUrlList" class="form-group compact-group" style="display: none;">
+              <label class="form-label" for="ingestUrlList">Pasted Bulk URLs</label>
+              <textarea id="ingestUrlList" class="form-control" rows="3" placeholder="https://stylesdays.com/post-slug/"></textarea>
+            </div>
+
+            <div class="dashboard-grid two-cols" style="gap: 0.65rem;">
+              <div class="form-group compact-group">
+                <label class="form-label" for="ingestMaxPosts">Max Posts</label>
+                <input type="number" id="ingestMaxPosts" class="form-control" value="100" min="1" max="1000">
+              </div>
+              <div class="form-group compact-group" style="padding-top: 1.25rem;">
+                <label class="checkbox-label" for="ingestDownloadImages" style="font-size: 0.75rem;">
+                  <input type="checkbox" id="ingestDownloadImages" checked>
+                  <span>Download images to assets</span>
+                </label>
+              </div>
+            </div>
+
+            <!-- Isolated Platform Target Routing Configuration in Step 1 -->
+            <div style="margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid rgba(255, 255, 255, 0.08);">
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.45rem;">
+                <span id="step1ActivePlatformTitle" style="font-size: 0.72rem; color: #94A3B8; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;">🌐 Active Deployment Target: Cloudflare Edge</span>
+              </div>
+
+              <!-- Cloudflare Deployment Target Cadre -->
+              <div id="step1TargetCadreCf" style="background: rgba(243, 128, 32, 0.04); border: 1px solid rgba(243, 128, 32, 0.2); border-radius: 8px; padding: 0.65rem; margin-bottom: 0.5rem;">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.4rem;">
+                  <span style="font-size: 0.72rem; color: #F38020; font-weight: 700; display: inline-flex; align-items: center; gap: 0.35rem;">
+                    <span>🟧 Cloudflare Edge Configuration</span>
+                  </span>
+                  <span id="step1CfStatusBadge" style="font-size: 0.68rem; color: #10B981; font-weight: 600;">● Active Platform</span>
+                </div>
+                <div class="dashboard-grid two-cols" style="gap: 0.65rem;">
+                  <div class="form-group compact-group">
+                    <label class="form-label" for="cfgCfProjectName" style="display: flex; align-items: center; gap: 0.25rem;">
+                      <span>Worker Name</span>
+                    </label>
+                    <input type="text" id="cfgCfProjectName" class="form-control" value="gardenhome" placeholder="e.g. gardenhome">
+                  </div>
+                  <div class="form-group compact-group">
+                    <label class="form-label" for="cfgCfCustomDomain">Custom Domain (Optional)</label>
+                    <input type="text" id="cfgCfCustomDomain" class="form-control" placeholder="e.g. decor.yourdomain.com">
+                  </div>
+                </div>
+              </div>
+
+              <!-- GitHub Deployment Target Cadre -->
+              <div id="step1TargetCadreGh" style="display: none; background: rgba(15, 23, 42, 0.45); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 8px; padding: 0.65rem; margin-bottom: 0.5rem;">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.35rem;">
+                  <span style="font-size: 0.72rem; color: #E2E8F0; font-weight: 700; display: inline-flex; align-items: center; gap: 0.35rem;">
+                    <span>🐙 GitHub Target Configuration</span>
+                  </span>
+                  <span id="step1GithubTokenDetectedBadge" style="font-size: 0.68rem; color: #10B981; font-weight: 600;">● Token Connected</span>
+                </div>
+
+                <div class="dashboard-grid two-cols" style="gap: 0.65rem;">
+                  <!-- Detected Organization / User -->
+                  <div class="form-group compact-group">
+                    <label class="form-label" for="cfgStep1GithubAccount" style="display: flex; align-items: center; justify-content: space-between;">
+                      <span>Detected Organization / User</span>
+                      <button type="button" id="btnRefreshStep1Orgs" class="btn btn-secondary btn-xs" title="Refresh Detected Orgs from GitHub API" style="padding: 0.1rem 0.4rem; height: 20px; font-size: 0.68rem;">🔄 Refresh</button>
+                    </label>
+                    <select id="cfgStep1GithubAccount" class="form-control" style="font-size: 0.78rem; padding: 0.3rem 0.5rem;">
+                      <option value="">🔄 Detecting organizations from saved token...</option>
+                    </select>
+                    <input type="text" id="cfgStep1GithubOwner" class="form-control" value="annadeco" placeholder="e.g. annadeco" style="margin-top: 0.3rem; font-size: 0.78rem; height: 28px;">
+                  </div>
+
+                  <!-- Repository Name & Root Domain Mode -->
+                  <div class="form-group compact-group">
+                    <label class="form-label" for="cfgStep1GithubRepo">Repository Name</label>
+                    <input type="text" id="cfgStep1GithubRepo" class="form-control" value="annadeco.github.io" placeholder="e.g. annadeco.github.io" style="font-size: 0.78rem; height: 28px;">
+                    <div style="margin-top: 0.35rem;">
+                      <label class="checkbox-label" for="cfgStep1AutoRootOrg" style="font-size: 0.72rem; color: #10B981;">
+                        <input type="checkbox" id="cfgStep1AutoRootOrg" checked>
+                        <span>Root Domain Mode (<code>&lt;org&gt;.github.io</code>)</span>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Action Buttons: Verify Org & Create Repo & Live Target Preview -->
+                <div style="display: flex; gap: 0.4rem; align-items: center; margin-top: 0.45rem; flex-wrap: wrap;">
+                  <button type="button" id="btnStep1CheckOrg" class="btn btn-secondary btn-xs" style="background: #2563EB; color: white;">
+                    🏢 Verify Org
+                  </button>
+                  <button type="button" id="btnStep1CreateRepo" class="btn btn-secondary btn-xs" style="background: #10B981; color: white;">
+                    🚀 Create Repo
+                  </button>
+                  <a id="linkStep1OpenGithubOrg" href="https://github.com/account/organizations/new?plan=free" target="_blank" rel="noopener" class="btn btn-xs" style="display: none; border: 1px solid #3B82F6; color: #60A5FA;">
+                    ↗ GitHub Page
+                  </a>
+                  <span id="step1RootDomainPreview" style="font-size: 0.72rem; color: #34D399; font-family: var(--font-mono); margin-left: auto;">Target: https://annadeco.github.io/</span>
+                </div>
+                <div id="step1OrgStatusFeedback" class="feedback-box" style="display: none; margin-top: 0.4rem;"></div>
+              </div>
+            </div>
+
+            <input type="checkbox" id="ingestForceResync" style="display: none;">
+
+            <div style="display: flex; gap: 0.5rem; margin-top: 0.75rem;">
+              <button type="button" id="scanSitemapBtn" class="btn btn-secondary btn-sm">🔍 Scan URLs</button>
+              <button type="submit" id="startIngestBtn" class="btn btn-primary btn-sm">🚀 Ingest &amp; Diff</button>
+              <button type="button" id="syncAssetsBtn" class="btn btn-secondary btn-sm">🖼️ Save Assets</button>
+            </div>
+          </form>
+        </div>
+
+        <!-- Diff Summary Box -->
+        <div class="card compact-card">
+          <div class="card-compact-header">
+            <span class="tag-badge" style="background: rgba(16, 185, 129, 0.15); color: #34D399;">MANIFEST DIFF COMPARISON</span>
+          </div>
+          <div id="diffResultsBox" style="margin-top: 0.5rem;">
+            <div style="display: flex; gap: 0.75rem; margin-bottom: 0.5rem;">
+              <span class="telemetry-pill">New: <strong id="diffNewCount" style="color: #38BDF8;">0</strong></span>
+              <span class="telemetry-pill">Updated: <strong id="diffUpdatedCount" style="color: #F59E0B;">0</strong></span>
+              <span class="telemetry-pill">Synced: <strong id="diffSyncedCount" style="color: #10B981;">0</strong></span>
+            </div>
+            <div class="table-container" style="max-height: 220px; overflow-y: auto;">
+              <table class="data-table" id="diffSummaryTable">
+                <thead>
+                  <tr><th>Status</th><th>Slug</th><th>Title</th></tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div class="step-nav-footer">
+          <span style="font-size: 0.8rem; color: #64748B;">Step 1: Ingestion &amp; Manifest Sync</span>
+          <button type="button" class="btn btn-primary btn-sm" onclick="switchTab('tab-themes')">
+            <span>Proceed to Step 2: Models &amp; Design →</span>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================================================================= -->
+    <!-- TAB 6: POST CATALOG & INLINE EDITOR                               -->
+    <!-- ================================================================= -->
+    <section id="tab-posts" class="tab-pane">
+      <div class="card compact-card">
+        <div class="card-compact-header" style="flex-wrap: wrap; gap: 0.5rem;">
+          <span class="tag-badge" style="background: rgba(148, 163, 184, 0.15); color: #F8FAFC;">POST CATALOG</span>
+          <div style="display: flex; gap: 0.4rem; margin-left: auto;">
+            <input type="text" id="postSearchInput" class="form-control" placeholder="Search title or slug..." style="width: 200px; font-size: 0.78rem; padding: 0.35rem 0.65rem;">
+            <select id="postCategoryFilter" class="form-control" style="width: 150px; font-size: 0.78rem; padding: 0.35rem 0.65rem;">
+              <option value="">All Categories</option>
+            </select>
+            <select id="postStatusFilter" class="form-control" style="width: 130px; font-size: 0.78rem; padding: 0.35rem 0.65rem;">
+              <option value="">All Statuses</option>
+              <option value="CUSTOM">Custom Edited</option>
+              <option value="SYNCED">Synced</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="table-container" style="max-height: 520px; overflow-y: auto; margin-top: 0.5rem;">
+          <table class="data-table compact-table" id="postsCatalogTable">
+            <thead>
+              <tr>
+                <th>Status</th>
+                <th>Thumbnail</th>
+                <th>Title &amp; Slug</th>
+                <th>Category</th>
+                <th>Updated</th>
+                <th>Custom?</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="postsCatalogBody">
+              <tr>
+                <td colspan="7" style="text-align: center; padding: 1.5rem; color: var(--text-secondary);">Loading manifest posts...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="step-nav-footer">
+          <button type="button" class="btn btn-secondary btn-sm" onclick="switchTab('tab-themes')">
+            <span>← Back to Models</span>
+          </button>
+          <button type="button" class="btn btn-primary btn-sm" onclick="switchTab('tab-deploy', 'cloudflare')">
+            <span>Proceed to Step 4: Deploy Cockpit →</span>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================================================================= -->
+    <!-- TAB 7: LIVE PREVIEW PANEL                                         -->
+    <!-- ================================================================= -->
+    <section id="tab-preview" class="tab-pane">
+      <div class="preview-layout compact-preview-layout">
+        <!-- Controls Column (320px) -->
+        <div class="card compact-card preview-sidebar">
+          <div class="form-group compact-group">
+            <label class="form-label" for="previewPostSelect">Select Post</label>
+            <select id="previewPostSelect" class="form-control"></select>
+          </div>
+
+          <!-- Quick Model Switcher -->
+          <div class="form-group compact-group" style="margin-top: 0.5rem;">
+            <label class="form-label" style="margin-bottom: 0.3rem;">⚡ Quick Model Switcher</label>
+            <div class="model-switcher-bar" id="modelSwitcherBar" style="display: flex; flex-direction: column; gap: 0.35rem;">
+              <button type="button" class="model-preview-btn compact-model-btn" id="modelBtn1"
+                data-theme="editorial-warm"
+                data-title="15 Bedroom Refresh Ideas: Transform Your Oasis with Linen &amp; Warmth"
+                data-excerpt="A warm, editorial-styled bedroom sanctuary using Belgian linen bedding, bouclé accents, and Playfair serif typography.">
+                <span>📖 Model 1: Editorial Warm</span>
+              </button>
+              <button type="button" class="model-preview-btn compact-model-btn" id="modelBtn2"
+                data-theme="nordic-studio"
+                data-title="20 Modern Bedroom Ideas: Transform Your Space with Architectural Style"
+                data-excerpt="An asymmetric 2-column architectural studio layout featuring technical spec drawers with room dimensions.">
+                <span>📐 Model 2: Nordic Studio</span>
+              </button>
+              <button type="button" class="model-preview-btn compact-model-btn" id="modelBtn3"
+                data-theme="pinterest-mag"
+                data-title="16 Coastal Bedroom Decor Essentials: Transform Your Beach House Space"
+                data-excerpt="A high-fashion visual pin discovery magazine with floating Save to Pinterest badge and 2-column moodboard pin cards.">
+                <span>📌 Model 3: Pinterest Mag</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Logo Mark Preview -->
+          <div style="background: rgba(15, 23, 42, 0.65); border: 1px solid rgba(56, 189, 248, 0.25); border-radius: 0.5rem; padding: 0.5rem; margin-top: 0.5rem; display: flex; align-items: center; justify-content: space-between;">
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
+              <div id="previewLogoBox" style="width: 32px; height: 32px; background: rgba(0,0,0,0.3); border-radius: 4px; display: flex; align-items: center; justify-content: center; overflow: hidden;"></div>
+              <div style="font-size: 0.72rem; color: #F1F5F9; font-weight: 600;" id="previewBrandNameDisplay">Anna Deco</div>
+            </div>
+            <label class="btn btn-primary btn-xs" style="cursor: pointer;">
+              <span>Upload</span>
+              <input type="file" id="previewLogoFileInput" accept="image/png,image/jpeg,image/webp,image/svg+xml" style="display: none;">
+            </label>
+            <button type="button" id="previewBtnResetLogo" style="display: none;">Reset</button>
+            <span id="previewLogoStatusBadge" style="display: none;"></span>
+            <span id="previewLogoFilename" style="display: none;"></span>
+          </div>
+
+          <div class="dashboard-grid two-cols" style="gap: 0.5rem; margin-top: 0.5rem;">
+            <div class="form-group compact-group">
+              <label class="form-label" for="previewThemeSelect">Theme</label>
+              <select id="previewThemeSelect" class="form-control">
+                <option value="editorial-warm">Editorial Warm</option>
+                <option value="nordic-studio">Nordic Studio</option>
+                <option value="pinterest-mag">Pinterest Mag</option>
+              </select>
+            </div>
+            <div class="form-group compact-group">
+              <label class="form-label" for="previewRoutingSelect">Routing</label>
+              <select id="previewRoutingSelect" class="form-control">
+                <option value="single">Single Slug</option>
+                <option value="category_slug">Category</option>
+                <option value="parent_slug">Parent</option>
+                <option value="silo_nested">Silo Nested</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group compact-group" style="margin-top: 0.4rem;">
+            <label class="form-label" for="previewLiveTitle">Override Headline</label>
+            <input type="text" id="previewLiveTitle" class="form-control" style="font-size: 0.78rem;">
+          </div>
+
+
+
+          <button type="button" id="refreshPreviewBtn" class="btn btn-secondary btn-sm" style="width: 100%; margin-top: 0.4rem;">🔄 Refresh</button>
+        </div>
+
+        <!-- Iframe Display Column -->
+        <div class="preview-iframe-wrapper">
+          <div class="preview-toolbar" style="padding: 0.35rem 0.75rem;">
+            <span style="font-size: 0.75rem; font-weight: 700; color: var(--text-primary);">Live Render</span>
+            <div class="viewport-btns">
+              <button class="viewport-btn active" data-width="100%">Desktop</button>
+              <button class="viewport-btn" data-width="768px">Tablet</button>
+              <button class="viewport-btn" data-width="375px">Mobile</button>
+            </div>
+          </div>
+          <div class="preview-iframe-container" style="height: 520px;">
+            <iframe id="previewIframe" class="preview-iframe" title="Theme Live Preview"></iframe>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================================================================= -->
+    <!-- COLLAPSIBLE ACTIVITY TERMINAL (120px DEFAULT HEIGHT)             -->
+    <!-- ================================================================= -->
+    <section class="terminal-section" id="terminalSection" style="margin-top: 1rem; margin-bottom: 1rem;">
+      <div class="terminal-box compact-terminal">
+        <div class="terminal-header" style="padding: 0.35rem 0.85rem;">
+          <div class="terminal-dots">
+            <span class="terminal-dot red"></span>
+            <span class="terminal-dot yellow"></span>
+            <span class="terminal-dot green"></span>
+          </div>
+          <span style="font-size: 0.75rem; font-weight: 700; color: #94A3B8;">Activity &amp; Stream</span>
+          <div class="term-filters">
+            <button type="button" class="term-filter-btn active" data-filter="all">All</button>
+            <button type="button" class="term-filter-btn" data-filter="cloudflare">🟧 CF</button>
+            <button type="button" class="term-filter-btn" data-filter="github">🐙 Git</button>
+            <button type="button" class="term-filter-btn" data-filter="build">🔨 Build</button>
+          </div>
+          <div style="display: flex; gap: 0.35rem; align-items: center;">
+            <button type="button" id="toggleTerminalSizeBtn" class="btn btn-secondary btn-xs" title="Expand / Collapse Terminal">↕ Toggle Height</button>
+            <button id="copyLogsBtn" class="btn btn-secondary btn-xs">📋 Copy</button>
+            <button id="clearLogsBtn" class="btn btn-secondary btn-xs">Clear</button>
+          </div>
+        </div>
+        <div id="terminalBody" class="terminal-body" style="height: 120px; font-size: 0.75rem; padding: 0.65rem 0.85rem;">
+[INFO] Multi-Cloud Deployment Dashboard ready. Logs stream live.
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Modal Post Editor -->
+  <div id="postEditModal" class="modal-overlay">
+    <div class="modal-content">
+      <div class="card-header">
+        <h2 class="card-title" id="modalPostSlugTitle">Edit Post</h2>
+        <button type="button" id="closeModalBtn" class="btn btn-secondary btn-sm">✕ Close</button>
+      </div>
+
+      <form id="editPostForm">
+        <input type="hidden" id="editPostSlug">
+        
+        <div class="form-group compact-group">
+          <label class="form-label" for="editPostTitle">Post Headline</label>
+          <input type="text" id="editPostTitle" class="form-control" required>
+        </div>
+
+
+
+        <div class="dashboard-grid two-cols">
+          <div class="form-group compact-group">
+            <label class="form-label" for="editPostCategory">Category Name</label>
+            <input type="text" id="editPostCategory" class="form-control">
+          </div>
+          <div class="form-group compact-group">
+            <label class="form-label" for="editPostParentSlug">Parent / Category Slug</label>
+            <input type="text" id="editPostParentSlug" class="form-control">
+          </div>
+        </div>
+
+
+
+        <div style="display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1rem;">
+          <button type="button" id="cancelEditBtn" class="btn btn-secondary btn-sm">Cancel</button>
+          <button type="submit" class="btn btn-primary btn-sm">💾 Save Changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ================================================================= -->
+  <!-- ================================================================= -->
+  <!-- CREATE NEW PROJECT MODAL (CLEAN EMPTY CATALOG GUARANTEE)          -->
+  <!-- ================================================================= -->
+  <div id="modalNewProject" class="settings-modal-overlay" aria-hidden="true" role="dialog" aria-modal="true" style="display: none;">
+    <div class="settings-modal-dialog" style="max-width: 520px;">
+      <div class="settings-modal-header">
+        <div class="settings-modal-title">
+          <span style="font-size: 1.25rem;">✨</span>
+          <div>
+            <h3>Create New Isolated Project</h3>
+            <p>Starts with a fresh, empty category list and isolated storage.</p>
+          </div>
+        </div>
+        <button type="button" id="btnCloseNewProjectModal" class="modal-close-btn" aria-label="Close Project Modal">✕</button>
+      </div>
+
+      <div class="settings-modal-body" style="padding: 1.25rem;">
+        <form id="newProjectForm">
+          <div class="form-group compact-group">
+            <label class="form-label" for="newProjName">Project Name *</label>
+            <input type="text" id="newProjName" class="form-control" placeholder="e.g. Modern Decor or gardenhome" required>
+            <span style="font-size: 0.72rem; color: #94A3B8;">Will create an isolated catalog under <code>scraped_data/&lt;slug&gt;/</code>.</span>
+          </div>
+
+          <div class="form-group compact-group" style="margin-top: 0.65rem;">
+            <label class="form-label" for="newProjPlatform">Target Platform</label>
+            <select id="newProjPlatform" class="form-control">
+              <option value="cloudflare">🟧 Cloudflare Workers Edge (Assets Binding)</option>
+              <option value="github">🐙 GitHub Pages (Git Data API)</option>
+              <option value="dual">⚡ Dual Multi-Cloud (Both Cloudflare &amp; GitHub)</option>
+            </select>
+          </div>
+
+          <div class="dashboard-grid two-cols" style="gap: 0.65rem; margin-top: 0.65rem;">
+            <div class="form-group compact-group">
+              <label class="form-label" for="newProjCfWorker">Cloudflare Worker Name</label>
+              <input type="text" id="newProjCfWorker" class="form-control" placeholder="e.g. mydecorsite">
+            </div>
+            <div class="form-group compact-group">
+              <label class="form-label" for="newProjCfDomain">Custom Domain (Optional)</label>
+              <input type="text" id="newProjCfDomain" class="form-control" placeholder="decor.domain.com">
+            </div>
+          </div>
+
+          <div class="dashboard-grid two-cols" style="gap: 0.65rem; margin-top: 0.65rem;">
+            <div class="form-group compact-group">
+              <label class="form-label" for="newProjGhOwner">GitHub Organization / User</label>
+              <select id="newProjGhOwnerSelect" class="form-control" style="font-size: 0.78rem; margin-bottom: 0.25rem;">
+                <option value="">-- Choose detected account --</option>
+              </select>
+              <input type="text" id="newProjGhOwner" class="form-control" placeholder="e.g. annadeco">
+            </div>
+            <div class="form-group compact-group">
+              <label class="form-label" for="newProjGhRepo">GitHub Repository</label>
+              <input type="text" id="newProjGhRepo" class="form-control" placeholder="e.g. annadeco.github.io">
+            </div>
+          </div>
+
+          <div class="form-group compact-group" style="margin-top: 0.65rem;">
+            <label class="form-label" for="newProjSitemapUrl">Sitemap XML URL (Optional)</label>
+            <input type="url" id="newProjSitemapUrl" class="form-control" placeholder="https://example.com/sitemap_index.xml">
+          </div>
+
+          <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 6px; padding: 0.65rem 0.75rem; margin-top: 0.75rem; font-size: 0.74rem; color: #34D399;">
+            ✓ <strong>Clean Slate Guarantee:</strong> All categories and posts from old projects are excluded. Your new project begins with 0 posts and an empty category filter.
+          </div>
+
+          <div style="display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: 1rem;">
+            <button type="button" id="btnCancelNewProject" class="btn btn-secondary btn-sm">Cancel</button>
+            <button type="submit" id="btnSubmitNewProject" class="btn btn-primary btn-sm">🚀 Create &amp; Activate Project</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOP-RIGHT PLATFORM SETTINGS MODAL (CLOUDFLARE & GITHUB CREDENTIALS)-->
+  <!-- ================================================================= -->
+  <div id="platformSettingsModal" class="settings-modal-overlay" aria-hidden="true" role="dialog" aria-modal="true">
+    <div class="settings-modal-dialog">
+      <div class="settings-modal-header">
+        <div class="settings-modal-title">
+          <span style="font-size: 1.25rem;">⚙️</span>
+          <div>
+            <h3>Platform &amp; Edge Settings</h3>
+            <p>Configure credentials, tokens, and routing for Cloudflare &amp; GitHub.</p>
+          </div>
+        </div>
+        <button type="button" id="btnCloseSettingsModal" class="modal-close-btn" aria-label="Close Settings">✕</button>
+      </div>
+
+      <div class="settings-modal-tabs">
+        <button type="button" class="settings-tab-btn active cf" id="modalTabBtnCf" data-settings-tab="settingsPaneCf">
+          <span>🟧 Cloudflare Edge</span>
+        </button>
+        <button type="button" class="settings-tab-btn gh" id="modalTabBtnGh" data-settings-tab="settingsPaneGh">
+          <span>🐙 GitHub Pages</span>
+        </button>
+      </div>
+
+      <div class="settings-modal-body">
+        <!-- PANE 1: CLOUDFLARE SETTINGS -->
+        <div id="settingsPaneCf" class="settings-pane active">
+          <div class="card-compact-header" style="margin-bottom: 0.65rem;">
+            <div class="header-tag-box">
+              <span class="tag-badge cf-tag">🟧 CLOUDFLARE CREDENTIALS &amp; ROUTING</span>
+              <span id="cfTokenStatusBadge" class="token-pill">○ Check Status</span>
+            </div>
+            <a href="https://dash.cloudflare.com" target="_blank" rel="noopener" class="btn btn-secondary btn-xs">↗ Cloudflare Dash</a>
+          </div>
+
+          <form id="cloudflareSettingsForm">
+            <div class="form-group compact-group">
+              <label class="form-label" for="cfgCfToken">API Token (Workers / Pages Edit)</label>
+              <div style="position: relative;">
+                <input type="password" id="cfgCfToken" class="form-control" placeholder="Bearer Token (User:Workers / Account:Pages)" style="padding-right: 2.2rem;">
+                <button type="button" id="toggleCfTokenEye" class="eye-toggle-btn" title="Show/Hide Token">👁</button>
+              </div>
+            </div>
+
+            <div class="dashboard-grid two-cols" style="gap: 0.65rem;">
+              <div class="form-group compact-group">
+                <label class="form-label" for="cfgCfAccountId">Account ID</label>
+                <input type="text" id="cfgCfAccountId" class="form-control" placeholder="Account ID hex string">
+              </div>
+              <div class="form-group compact-group">
+                <label class="form-label" for="cfgCfAccountSubdomain">Workers Subdomain</label>
+                <input type="text" id="cfgCfAccountSubdomain" class="form-control" placeholder="e.g. laurainsley01">
+              </div>
+            </div>
+
+            <div class="dashboard-grid two-cols" style="gap: 0.65rem;">
+              <div class="form-group compact-group">
+                <label class="form-label" for="cfgCfDeployType">Deploy Mode</label>
+                <select id="cfgCfDeployType" class="form-control">
+                  <option value="workers_assets">Workers with Static Assets (0ms)</option>
+                  <option value="pages">Cloudflare Pages Direct Upload</option>
+                </select>
+              </div>
+              <div class="form-group compact-group">
+                <label class="form-label" for="cfgCfCompatibilityDate">Compatibility Date</label>
+                <input type="text" id="cfgCfCompatibilityDate" class="form-control" value="2024-11-01">
+              </div>
+            </div>
+
+            <div style="display: flex; gap: 0.5rem; margin-top: 0.75rem; align-items: center; flex-wrap: wrap;">
+              <button type="button" id="btnVerifyCfToken" class="btn btn-cloudflare btn-sm">
+                <span>⚡ Verify Token</span>
+              </button>
+              <button type="submit" class="btn btn-primary btn-sm">
+                <span>💾 Save Cloudflare Settings</span>
+              </button>
+            </div>
+            <div id="cfStatusFeedback" class="feedback-box" style="display: none; margin-top: 0.5rem;"></div>
+          </form>
+        </div>
+
+        <!-- PANE 2: GITHUB SETTINGS -->
+        <div id="settingsPaneGh" class="settings-pane" style="display: none;">
+          <div class="card-compact-header" style="margin-bottom: 0.65rem;">
+            <div class="header-tag-box">
+              <span class="tag-badge gh-tag">🐙 GITHUB PLATFORM CREDENTIALS</span>
+              <span id="tokenStatusBadge" class="token-pill">○ Token Status</span>
+            </div>
+            <a href="https://github.com" target="_blank" rel="noopener" class="btn btn-secondary btn-xs">↗ GitHub.com</a>
+          </div>
+
+          <form id="settingsForm">
+            <div class="form-group compact-group">
+              <label class="form-label" for="cfgGithubToken">Personal Access Token (PAT: repo, admin:org)</label>
+              <div style="position: relative;">
+                <input type="password" id="cfgGithubToken" class="form-control" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" style="padding-right: 2.2rem;">
+                <button type="button" id="toggleGhTokenEye" class="eye-toggle-btn" title="Show/Hide Token">👁</button>
+              </div>
+            </div>
+
+            <div class="dashboard-grid two-cols" style="gap: 0.65rem;">
+              <div class="form-group compact-group">
+                <label class="form-label" for="cfgGithubBranch">Default Branch</label>
+                <input type="text" id="cfgGithubBranch" class="form-control" value="main">
+              </div>
+              <div class="form-group compact-group">
+                <label class="form-label" for="cfgGithubBasePath">Subpath Prefix</label>
+                <input type="text" id="cfgGithubBasePath" class="form-control" placeholder="/subpath (or leave blank)">
+              </div>
+            </div>
+
+            <div style="display: flex; gap: 0.5rem; margin-top: 0.75rem; align-items: center; flex-wrap: wrap;">
+              <button type="button" id="btnVerifyGhToken" class="btn btn-secondary btn-sm" style="display: inline-flex; align-items: center; gap: 0.35rem;">
+                <span>⚡ Test Token &amp; Detect Orgs</span>
+              </button>
+              <button type="submit" class="btn btn-primary btn-sm">
+                <span>💾 Save GitHub Settings</span>
+              </button>
+            </div>
+
+            <div id="ghStatusFeedback" class="feedback-box" style="display: none; margin-top: 0.5rem;"></div>
+
+            <!-- Hidden compatibility elements to guarantee zero script/test regressions -->
+            <div style="display: none;" aria-hidden="true">
+              <input type="text" id="cfgGithubOwner" value="annadeco">
+              <input type="text" id="cfgGithubRepo" value="annadeco.github.io">
+              <input type="checkbox" id="cfgGithubIsOrg" checked>
+              <input type="checkbox" id="cfgAutoRootOrg" checked>
+              <select id="selectGithubAccount"><option value="annadeco">annadeco</option></select>
+              <button type="button" id="btnRefreshOrgs"></button>
+              <button type="button" id="btnCheckCreateOrg"></button>
+              <button type="button" id="btnCreateRepoNow"></button>
+              <a id="linkOpenGithubOrg" href="#"></a>
+              <span id="rootDomainPreview">Target: https://annadeco.github.io/</span>
+              <div id="orgStatusFeedback"></div>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Template Live Preview -->
+  <div id="templatePreviewModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="templateModalTitle">
+    <div class="modal-content template-preview-window">
+      <div class="template-modal-header">
+        <div style="display: flex; align-items: center; gap: 0.5rem;">
+          <span style="font-size: 1.1rem;">🎨</span>
+          <h2 id="templateModalTitle" class="card-title" style="margin: 0; font-size: 1rem;">Theme Template Live Preview</h2>
+        </div>
+        <div style="display: flex; align-items: center; gap: 0.5rem;">
+          <div class="viewport-btns">
+            <button type="button" class="viewport-btn modal-vp-btn active" data-width="100%">Desktop</button>
+            <button type="button" class="viewport-btn modal-vp-btn" data-width="768px">Tablet</button>
+            <button type="button" class="viewport-btn modal-vp-btn" data-width="375px">Mobile</button>
+          </div>
+          <button type="button" id="closeTemplateModalBtn" class="btn btn-secondary btn-xs">✕ Close</button>
+        </div>
+      </div>
+      <div class="template-modal-body">
+        <iframe id="templateModalIframe" class="template-modal-iframe" title="Interactive Theme Template Live Preview"></iframe>
+      </div>
+      <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.65rem 1.25rem; background: var(--bg-secondary); border-top: 1px solid var(--border-color);">
+        <div id="templateModalMeta" style="font-size: 0.78rem; color: var(--text-secondary); font-family: var(--font-mono);">
+          Theme: <strong id="templateModalThemeBadge" style="color: #38BDF8;">Editorial Warm</strong> | Routing: <strong id="templateModalRoutingBadge" style="color: #34D399;">Single Slug</strong>
+        </div>
+        <button type="button" id="applyTemplateThemeBtn" class="btn btn-primary btn-sm">✓ Select &amp; Apply</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div id="toastContainer" class="toast-container"></div>
+
+  <script src="app.js?v=3.2"></script>
+</body>
+</html>

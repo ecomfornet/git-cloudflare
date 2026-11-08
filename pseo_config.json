@@ -1,0 +1,47 @@
+{
+  "github": {
+    "token": "",
+    "owner": "",
+    "repo": "",
+    "branch": "main",
+    "is_org": true,
+    "base_path": ""
+  },
+  "cloudflare": {
+    "api_token": "",
+    "account_id": "",
+    "project_name": "gardenhome",
+    "deployment_type": "workers_assets",
+    "custom_domain": "",
+    "compatibility_date": "2024-11-01",
+    "worker_dir": "my-worker",
+    "account_subdomain": ""
+  },
+  "ingestion": {
+    "sitemap_url": "",
+    "wp_api_url": "",
+    "max_posts": 100,
+    "download_images": true
+  },
+  "build": {
+    "theme": "editorial-warm",
+    "routing_mode": "single",
+    "output_dir": "dist"
+  },
+  "dashboard": {
+    "host": "127.0.0.1",
+    "port": 8080
+  },
+  "branding": {
+    "brand_name": "Anna Deco",
+    "tagline": "Interior Design & Curated Living",
+    "logo_path": "/assets/images/custom-logo.png",
+    "author_name": "Anna Lindqvist",
+    "author_bio": "Senior Interior Architect & Kinfolk Stylist",
+    "enable_toc": true,
+    "enable_faq": true,
+    "enable_eeat": true
+  },
+  "active_project": "default",
+  "projects": {}
+}
