@@ -2291,11 +2291,36 @@ def render_stitch_editorial_hub(
     total_posts = len(posts)
     post_items = list(posts)
 
-    # Lead Hero Post: featured cover story
-    lead_title = "The Architectural Sanctuary: Inside 5 Minimalist Living Spaces Harmonizing Raw Earth and Stone"
-    lead_excerpt = "Exploring how Nordic interior architects pair Roman travertine blocks, untamed French linen, and intentional shadow intervals to craft spaces that silence the modern auditory world."
-    lead_link = "#editorial-essay"
-    lead_img = "https://lh3.googleusercontent.com/aida-public/AB6AXuCIKFbvPzr53nLf40yg4jHGPl5BccpgtZaQIGHS3tkwqdUoU5Sr6u35YGVsmb9A_6RzdLrnIeqgvBeoBpYw9iecdKG0fc3iaLKR8qOf8spozFbI6JduIDDSfyq_DUth9BEpG-Gy14IzRw2HBupaLIyHiIDEQb_IS7elPtLKOiyrEI6c3_pftWna3paJtK9mOCDeh0fEddi_WPYYVQ1JOHv9gAIoiHm6kKxuyVUJVxbI"
+    # Lead Hero Post: dynamically bound to the latest/last ingested article
+    lead_post = post_items[0] if post_items else None
+    if lead_post:
+        hero_slug = getattr(lead_post, "slug", None) or (lead_post.get("slug") if isinstance(lead_post, dict) else "")
+        hero_title = getattr(lead_post, "title", None) or (lead_post.get("title") if isinstance(lead_post, dict) else hero_slug.replace("-", " ").title())
+        hero_excerpt = getattr(lead_post, "excerpt", None) or (lead_post.get("excerpt") if isinstance(lead_post, dict) else "")
+        hero_web_path = getattr(lead_post, "web_path", None) or (lead_post.get("web_path") if isinstance(lead_post, dict) else f"/{hero_slug}/")
+        lead_link = f"{path_prefix}{hero_web_path}" if path_prefix else hero_web_path
+        
+        hero_local_img = getattr(lead_post, "local_image_path", None) or (lead_post.get("local_image_path") if isinstance(lead_post, dict) else "")
+        hero_remote_img = getattr(lead_post, "image_url", None) or (lead_post.get("image_url") if isinstance(lead_post, dict) else "")
+        hero_img_candidate = hero_local_img or hero_remote_img
+        
+        if hero_img_candidate and (hero_img_candidate.startswith("http://") or hero_img_candidate.startswith("https://")):
+            lead_img = hero_img_candidate
+        elif hero_img_candidate:
+            clean_hero_img = hero_img_candidate.lstrip("/")
+            lead_img = f"{path_prefix}/{clean_hero_img}" if path_prefix else f"/{clean_hero_img}"
+        elif hero_slug:
+            lead_img = f"{path_prefix}/assets/images/{hero_slug}.webp" if path_prefix else f"/assets/images/{hero_slug}.webp"
+        else:
+            lead_img = "https://lh3.googleusercontent.com/aida-public/AB6AXuCIKFbvPzr53nLf40yg4jHGPl5BccpgtZaQIGHS3tkwqdUoU5Sr6u35YGVsmb9A_6RzdLrnIeqgvBeoBpYw9iecdKG0fc3iaLKR8qOf8spozFbI6JduIDDSfyq_DUth9BEpG-Gy14IzRw2HBupaLIyHiIDEQb_IS7elPtLKOiyrEI6c3_pftWna3paJtK9mOCDeh0fEddi_WPYYVQ1JOHv9gAIoiHm6kKxuyVUJVxbI"
+            
+        lead_title = hero_title or "The Architectural Sanctuary: Inside 5 Minimalist Living Spaces Harmonizing Raw Earth and Stone"
+        lead_excerpt = hero_excerpt or "Exploring how Nordic interior architects pair Roman travertine blocks, untamed French linen, and intentional shadow intervals to craft spaces that silence the modern auditory world."
+    else:
+        lead_title = "The Architectural Sanctuary: Inside 5 Minimalist Living Spaces Harmonizing Raw Earth and Stone"
+        lead_excerpt = "Exploring how Nordic interior architects pair Roman travertine blocks, untamed French linen, and intentional shadow intervals to craft spaces that silence the modern auditory world."
+        lead_link = "#editorial-essay"
+        lead_img = "https://lh3.googleusercontent.com/aida-public/AB6AXuCIKFbvPzr53nLf40yg4jHGPl5BccpgtZaQIGHS3tkwqdUoU5Sr6u35YGVsmb9A_6RzdLrnIeqgvBeoBpYw9iecdKG0fc3iaLKR8qOf8spozFbI6JduIDDSfyq_DUth9BEpG-Gy14IzRw2HBupaLIyHiIDEQb_IS7elPtLKOiyrEI6c3_pftWna3paJtK9mOCDeh0fEddi_WPYYVQ1JOHv9gAIoiHm6kKxuyVUJVxbI"
 
     # Category Pill options
     silo_cats = [
@@ -2363,21 +2388,22 @@ def render_stitch_editorial_hub(
         cards_html += f"""
         <article class="article-card group bg-surface-container-lowest rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-all flex flex-col border border-surface-container" data-cat="{data_cat}" style="{init_style}">
           <div class="relative aspect-[16/10] overflow-hidden bg-surface-container">
-            <img alt="{html_lib.escape(title_val)}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src="{img_src}" loading="lazy" decoding="async" onerror="this.onerror=null; this.src='{fallback_svg}';">
-            <span class="absolute top-3 left-3 px-3 py-1 bg-surface-container-lowest/90 backdrop-blur-md rounded font-label-sm text-label-sm uppercase tracking-wider font-semibold text-secondary">
+            <a href="{link}" class="block w-full h-full">
+              <img alt="{html_lib.escape(title_val)}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src="{img_src}" loading="lazy" decoding="async" onerror="this.onerror=null; this.src='{fallback_svg}';">
+            </a>
+            <span class="absolute top-3 left-3 px-3 py-1 bg-surface-container-lowest/90 backdrop-blur-md rounded font-label-sm text-label-sm uppercase tracking-wider font-semibold text-secondary pointer-events-none">
               {html_lib.escape(category_val)}
             </span>
-            <span class="absolute bottom-3 right-3 px-2.5 py-0.5 bg-black/65 backdrop-blur-sm rounded text-surface-container-lowest font-label-sm text-[10px] tracking-wider text-white">
+            <span class="absolute bottom-3 right-3 px-2.5 py-0.5 bg-black/65 backdrop-blur-sm rounded text-surface-container-lowest font-label-sm text-[10px] tracking-wider text-white pointer-events-none">
               {read_time}
             </span>
           </div>
           <div class="p-6 flex flex-col flex-1 justify-between">
             <div>
-              <span class="font-label-sm text-[11px] font-mono uppercase tracking-widest text-on-surface-variant block mb-2 text-stone-500">
-                {web_path_val}
-              </span>
               <h3 class="font-headline-sm text-xl text-on-surface group-hover:text-primary transition-colors mb-3 leading-snug">
-                {html_lib.escape(title_val)}
+                <a href="{link}" class="hover:underline text-inherit block">
+                  {html_lib.escape(title_val)}
+                </a>
               </h3>
               <p class="font-body-sm text-body-sm text-on-surface-variant leading-relaxed mb-4 text-stone-600 line-clamp-2">
                 {html_lib.escape(excerpt_val[:140])}...
@@ -2557,19 +2583,11 @@ def render_stitch_editorial_hub(
   <!-- TOP EDITORIAL NOTICE BAR -->
   <header class="fixed top-0 left-0 right-0 z-50 bg-surface/95 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.04)] border-b border-surface-container">
     <div class="bg-surface-container-high/70 py-1.5 px-margin-mobile lg:px-margin text-center transition-colors">
-      <div class="max-w-[1440px] mx-auto flex items-center justify-between text-on-surface-variant font-label-sm text-label-sm uppercase tracking-widest text-[11px] px-4">
-        <span class="hidden md:inline-flex items-center gap-1.5 text-secondary font-semibold">
-          <span class="w-1.5 h-1.5 rounded-full bg-secondary"></span>
-          The Spatial Journal • Vol. XII
-        </span>
-        <p class="flex-1 text-center font-label-sm text-label-sm tracking-widest text-on-surface-variant">
-          Architecture, Spatial Design & Curated Living • Issue No. 48 Autumn/Winter • 
+      <div class="max-w-[1440px] mx-auto flex items-center justify-center text-on-surface-variant font-label-sm text-label-sm uppercase tracking-widest text-[11px] px-4">
+        <p class="text-center font-label-sm text-label-sm tracking-widest text-on-surface-variant">
+          Architecture, Spatial Design & Curated Living • 
           <a class="underline underline-offset-4 hover:text-primary transition-colors font-semibold" href="#newsletter">Subscribe to Print & Digital Dispatch</a>
         </p>
-        <div class="hidden md:flex items-center gap-space-xs text-on-surface-variant">
-          <span class="material-symbols-outlined text-[14px]">auto_stories</span>
-          <span>{total_posts} Guides Published</span>
-        </div>
       </div>
     </div>
 
@@ -2635,16 +2653,6 @@ def render_stitch_editorial_hub(
             <div class="absolute inset-0 bg-gradient-to-t from-black/90 via-black/55 to-black/20"></div>
             <!-- Lead Story Metadata & Excerpt -->
             <div class="relative z-10 p-6 md:p-12 lg:p-16 max-w-4xl text-white">
-              <div class="flex flex-wrap items-center gap-3 mb-4">
-                <span class="px-3 py-1 bg-primary text-white rounded-full font-label-sm text-label-sm uppercase tracking-widest font-semibold text-xs shadow-xs">
-                  Featured Cover Story
-                </span>
-                <span class="inline-flex items-center gap-1.5 text-stone-200 font-label-sm text-label-sm uppercase tracking-wider text-xs">
-                  <span class="material-symbols-outlined text-[14px]">schedule</span> 8 Min Read
-                </span>
-                <span class="text-stone-400">•</span>
-                <span class="text-stone-200 font-label-sm text-label-sm uppercase tracking-wider text-xs">Volume 48 • Autumn/Winter</span>
-              </div>
               <h1 class="font-serif-editorial text-3xl sm:text-4xl lg:text-5xl text-white tracking-tight mb-5 leading-tight font-bold">
                 {html_lib.escape(lead_title)}
               </h1>
@@ -2688,7 +2696,6 @@ def render_stitch_editorial_hub(
         <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
           <button class="p-4 bg-surface-container-low hover:bg-surface-container border border-surface-container hover:border-outline-variant/60 rounded-xl text-left transition-all group flex flex-col justify-between" onclick="filterArticles('bedroom')">
             <div>
-              <span class="font-label-sm text-[11px] text-stone-500 block mb-1 group-hover:text-primary transition-colors">/bedroom-inspo/</span>
               <h3 class="font-serif-editorial text-base text-on-surface font-semibold leading-snug group-hover:text-primary transition-colors">Bedroom Inspo Guides</h3>
             </div>
             <span class="font-label-sm text-[11px] text-secondary font-medium mt-3 block text-emerald-800">14 curated guides available</span>
@@ -2696,7 +2703,6 @@ def render_stitch_editorial_hub(
 
           <button class="p-4 bg-surface-container-low hover:bg-surface-container border border-surface-container hover:border-outline-variant/60 rounded-xl text-left transition-all group flex flex-col justify-between" onclick="filterArticles('fire-pit')">
             <div>
-              <span class="font-label-sm text-[11px] text-stone-500 block mb-1 group-hover:text-primary transition-colors">/fire-pits/</span>
               <h3 class="font-serif-editorial text-base text-on-surface font-semibold leading-snug group-hover:text-primary transition-colors">Fire Pits & Hearths</h3>
             </div>
             <span class="font-label-sm text-[11px] text-secondary font-medium mt-3 block text-emerald-800">10 curated guides available</span>
@@ -2704,7 +2710,6 @@ def render_stitch_editorial_hub(
 
           <button class="p-4 bg-surface-container-low hover:bg-surface-container border border-surface-container hover:border-outline-variant/60 rounded-xl text-left transition-all group flex flex-col justify-between" onclick="filterArticles('patio')">
             <div>
-              <span class="font-label-sm text-[11px] text-stone-500 block mb-1 group-hover:text-primary transition-colors">/patio-design/</span>
               <h3 class="font-serif-editorial text-base text-on-surface font-semibold leading-snug group-hover:text-primary transition-colors">Patio & Pavers Guides</h3>
             </div>
             <span class="font-label-sm text-[11px] text-secondary font-medium mt-3 block text-emerald-800">21 curated guides available</span>
@@ -2712,7 +2717,6 @@ def render_stitch_editorial_hub(
 
           <button class="p-4 bg-surface-container-low hover:bg-surface-container border border-surface-container hover:border-outline-variant/60 rounded-xl text-left transition-all group flex flex-col justify-between" onclick="filterArticles('gazebo')">
             <div>
-              <span class="font-label-sm text-[11px] text-stone-500 block mb-1 group-hover:text-primary transition-colors">/gazebos-pergolas/</span>
               <h3 class="font-serif-editorial text-base text-on-surface font-semibold leading-snug group-hover:text-primary transition-colors">Gazebos & Pergolas</h3>
             </div>
             <span class="font-label-sm text-[11px] text-secondary font-medium mt-3 block text-emerald-800">13 curated guides available</span>
@@ -2720,7 +2724,6 @@ def render_stitch_editorial_hub(
 
           <button class="p-4 bg-surface-container-low hover:bg-surface-container border border-surface-container hover:border-outline-variant/60 rounded-xl text-left transition-all group flex flex-col justify-between" onclick="filterArticles('landscaping')">
             <div>
-              <span class="font-label-sm text-[11px] text-stone-500 block mb-1 group-hover:text-primary transition-colors">/landscaping-ideas/</span>
               <h3 class="font-serif-editorial text-base text-on-surface font-semibold leading-snug group-hover:text-primary transition-colors">Landscaping Ideas</h3>
             </div>
             <span class="font-label-sm text-[11px] text-secondary font-medium mt-3 block text-emerald-800">17 curated guides available</span>
@@ -2728,7 +2731,6 @@ def render_stitch_editorial_hub(
 
           <button class="p-4 bg-surface-container-low hover:bg-surface-container border border-surface-container hover:border-outline-variant/60 rounded-xl text-left transition-all group flex flex-col justify-between" onclick="filterArticles('pool')">
             <div>
-              <span class="font-label-sm text-[11px] text-stone-500 block mb-1 group-hover:text-primary transition-colors">/pool-oasis/</span>
               <h3 class="font-serif-editorial text-base text-on-surface font-semibold leading-snug group-hover:text-primary transition-colors">Pool & Backyard Oasis</h3>
             </div>
             <span class="font-label-sm text-[11px] text-secondary font-medium mt-3 block text-emerald-800">19 curated guides available</span>
@@ -2736,7 +2738,6 @@ def render_stitch_editorial_hub(
 
           <button class="p-4 bg-surface-container-low hover:bg-surface-container border border-surface-container hover:border-outline-variant/60 rounded-xl text-left transition-all group flex flex-col justify-between" onclick="filterArticles('lighting')">
             <div>
-              <span class="font-label-sm text-[11px] text-stone-500 block mb-1 group-hover:text-primary transition-colors">/curated-lighting/</span>
               <h3 class="font-serif-editorial text-base text-on-surface font-semibold leading-snug group-hover:text-primary transition-colors">Lighting & Lumens</h3>
             </div>
             <span class="font-label-sm text-[11px] text-secondary font-medium mt-3 block text-emerald-800">8 curated guides available</span>
@@ -2744,7 +2745,6 @@ def render_stitch_editorial_hub(
 
           <button class="p-4 bg-surface-container-low hover:bg-surface-container border border-surface-container hover:border-outline-variant/60 rounded-xl text-left transition-all group flex flex-col justify-between" onclick="filterArticles('essay')">
             <div>
-              <span class="font-label-sm text-[11px] text-stone-500 block mb-1 group-hover:text-primary transition-colors">/architect-essays/</span>
               <h3 class="font-serif-editorial text-base text-on-surface font-semibold leading-snug group-hover:text-primary transition-colors">Architect Essays</h3>
             </div>
             <span class="font-label-sm text-[11px] text-secondary font-medium mt-3 block text-emerald-800">15 essays published</span>
@@ -2812,7 +2812,7 @@ def render_stitch_editorial_hub(
             <div class="lg:col-span-7 flex flex-col justify-center">
               <div class="inline-flex items-center gap-2 text-primary font-label-sm text-label-sm uppercase tracking-widest font-semibold mb-3 text-xs">
                 <span class="material-symbols-outlined text-[16px]">edit_note</span>
-                Longform Architectural Essay • Volume 48
+                Longform Architectural Monograph
               </div>
               <h2 class="font-serif-editorial text-3xl sm:text-4xl text-on-surface tracking-tight mb-4 font-bold">
                 Designing for Quiet Grandeur: The Dialogue Between Volume & Earth
@@ -2911,7 +2911,7 @@ def render_stitch_editorial_hub(
               <div class="p-3 bg-stone-100 rounded-lg mb-4 flex items-center justify-between">
                 <div>
                   <span class="font-label-sm text-xs font-semibold text-stone-900 block">Issue 48: The Mineral Home</span>
-                  <span class="font-label-sm text-[10px] text-stone-500">Autumn/Winter 2025 • 248 Pages</span>
+                  <span class="font-label-sm text-[10px] text-stone-500">Quarterly Print Edition • 248 Pages</span>
                 </div>
                 <span class="material-symbols-outlined text-primary text-[24px]">menu_book</span>
               </div>
