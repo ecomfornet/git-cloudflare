@@ -33,11 +33,11 @@
     "port": 8080
   },
   "branding": {
-    "brand_name": "Anna Deco",
+    "brand_name": "Atelier Maison",
     "tagline": "Interior Design & Curated Living",
     "logo_path": "/assets/images/custom-logo.png",
-    "author_name": "Anna Lindqvist",
-    "author_bio": "Senior Interior Architect & Kinfolk Stylist",
+    "author_name": "Helene Vane",
+    "author_bio": "Senior Architectural Editor & Botanical Stylist",
     "enable_toc": true,
     "enable_faq": true,
     "enable_eeat": true

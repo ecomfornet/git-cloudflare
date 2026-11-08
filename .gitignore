@@ -32,6 +32,9 @@ test_results/
 
 # Environments & Local Configuration
 .env
+pseo_config.json
+mcp_config.json
+.agents/mcp_config.json
 .venv/
 env/
 venv/
