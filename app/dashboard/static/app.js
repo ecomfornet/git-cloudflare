@@ -1767,7 +1767,19 @@
 
 
 
-    // Always provide a Live Sample Template option so themes can be previewed immediately
+    // Always provide Front / Homepage Hub as top option so magazine hubs can be previewed immediately
+
+    const hubOpt = document.createElement('option');
+
+    hubOpt.value = '__hub__';
+
+    hubOpt.textContent = '🏛️ Front / Homepage Hub (Model 1 Kinfolk Journal)';
+
+    DOM.previewPostSelect.appendChild(hubOpt);
+
+
+
+    // Live Sample Template Post
 
     const sampleOpt = document.createElement('option');
 
@@ -2320,6 +2332,27 @@
 
 
 
+        // Check if button requested Homepage Hub preview
+        const viewMode = btn.getAttribute('data-view') || 'post';
+        if (viewMode === 'hub') {
+          if (DOM.previewPostSelect) DOM.previewPostSelect.value = '__hub__';
+          state.selectedPostSlug = '__hub__';
+          try {
+            const res = await api('/api/preview', 'POST', {
+              theme,
+              routing_mode: DOM.previewRoutingSelect ? DOM.previewRoutingSelect.value : 'single',
+              view_mode: 'hub',
+              slug: '__hub__',
+            });
+            if (res.html && DOM.previewIframe) {
+              DOM.previewIframe.srcdoc = res.html;
+            }
+          } catch (err) {
+            showToast(`Model hub preview failed: ${err.message}`, 'error');
+          }
+          return;
+        }
+
         // Get demo data for this theme
 
         const demo = THEME_DEMOS[theme];
@@ -2422,11 +2455,16 @@
 
     try {
 
+      const isHub = (slug === '__hub__');
       const payload = {
 
         theme,
 
         routing_mode: routingMode,
+
+        view_mode: isHub ? 'hub' : 'post',
+
+        slug: slug,
 
       };
 
@@ -3899,7 +3937,7 @@
 
     // Open Fullscreen Template Preview Modal
 
-    async function openTemplateModal(themeKey, routingKey) {
+    async function openTemplateModal(themeKey, routingKey, defaultView = 'hub') {
 
       const theme = themeKey || (DOM.cfgTheme && DOM.cfgTheme.value) || 'editorial-warm';
 
@@ -3908,6 +3946,19 @@
       state.modalActiveTheme = theme;
 
       state.modalActiveRouting = routing;
+
+      state.modalActiveView = defaultView || 'hub';
+
+      // Synchronize modal view toggle buttons
+      document.querySelectorAll('.modal-view-btn').forEach((btn) => {
+        if (btn.dataset.view === state.modalActiveView) {
+          btn.classList.add('active', 'btn-primary');
+          btn.classList.remove('btn-secondary');
+        } else {
+          btn.classList.remove('active', 'btn-primary');
+          btn.classList.add('btn-secondary');
+        }
+      });
 
 
 
@@ -3965,7 +4016,12 @@
 
           routing_mode: routing,
 
-          post: {
+          view_mode: state.modalActiveView,
+
+        };
+
+        if (state.modalActiveView === 'post') {
+          samplePayload.post = {
 
             slug: 'modern-room-styling-guide',
 
@@ -4001,9 +4057,8 @@
 
             ],
 
-          },
-
-        };
+          };
+        }
 
 
 
@@ -4024,6 +4079,16 @@
     }
 
 
+
+    // Modal View Toggle Triggers
+    document.querySelectorAll('.modal-view-btn').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        const view = btn.dataset.view;
+        if (!view) return;
+        openTemplateModal(state.modalActiveTheme, state.modalActiveRouting, view);
+      });
+    });
 
     // Modal Close Triggers
 

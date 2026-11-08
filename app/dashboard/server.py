@@ -723,10 +723,61 @@ class DashboardManager:
         post_data: Optional[dict[str, Any]] = None,
         theme: Optional[str] = None,
         routing_mode: Optional[str] = None,
+        view_mode: Optional[str] = None,
     ) -> str:
-        """Renders live HTML in memory for a given post and theme."""
+        """Renders live HTML in memory for a given post or homepage hub and theme."""
         theme_name = theme or self.config.build.theme
         r_mode = routing_mode or self.config.build.routing_mode
+
+        # Check if user requested homepage / hub preview
+        is_hub_request = (
+            view_mode == "hub"
+            or (isinstance(slug, str) and slug.strip("/") in ("__hub__", "hub", "index", "home", "__home__"))
+        )
+
+        if is_hub_request:
+            with self.lock:
+                all_posts_list = list(self.manifest.posts.values())
+            if not all_posts_list:
+                all_posts_list = [
+                    PostItem(
+                        slug="japanese-wabi-sabi-minimalist-living-room",
+                        title="Japanese Wabi-Sabi: 7 Intentional Living Room Concepts Celebrating Imperfection",
+                        excerpt="Explore how reclaimed cedar timbers, textured limewash, and natural flax textures shape an acoustic calm sanctuary away from modern noise.",
+                        category="Living Room",
+                        category_slug="living-room",
+                        local_image_path="https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=1200&q=80",
+                    ),
+                    PostItem(
+                        slug="minimalist-travertine-fire-pit-guide",
+                        title="Minimalist Travertine Fire Pits: Architectural Hearth Designs for Twilight Living",
+                        excerpt="How circular Roman travertine benches and low smokeless gas inserts ground evening conversation in textural harmony.",
+                        category="Fire Pits",
+                        category_slug="fire-pits",
+                        local_image_path="https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=1200&q=80",
+                    ),
+                    PostItem(
+                        slug="scandinavian-linen-bedroom-styling",
+                        title="Scandinavian Linen Bedding: Muted Palettes and Raw Oak Joinery",
+                        excerpt="Curating an earthy retreat with heavy unbleached Belgian linen, low platform oak beds, and diffused 2700K ambient illumination.",
+                        category="Bedroom Inspo",
+                        category_slug="bedroom-inspo",
+                        local_image_path="https://images.unsplash.com/photo-1598928506311-c55ded91a20c?auto=format&fit=crop&w=1200&q=80",
+                    ),
+                ]
+            brand_clean = getattr(self.config.branding, "brand_name", "") or "Atelier Maison"
+            hub_title = f"{brand_clean} Editorial Hub"
+            return render_hub(
+                posts=all_posts_list,
+                categories=self.manifest.categories,
+                title=hub_title,
+                subtitle="Curated Home Organization, Room Checklists, and DIY Tutorials.",
+                base_url="",
+                theme=theme_name,
+                source_domain=self.config.ingestion.wp_api_url or "stylesdays.com",
+                branding=self.config.branding,
+                routing_mode=r_mode,
+            )
 
         target_post: Optional[PostItem] = None
         if post_data:
@@ -1659,7 +1710,10 @@ class DashboardRequestHandler(http.server.BaseHTTPRequestHandler):
             slug = path[len("/api/preview/") :].strip("/")
             theme = query.get("theme", [None])[0]
             routing = query.get("routing_mode", [None])[0]
-            html_out = self.manager.render_preview(slug=slug, theme=theme, routing_mode=routing)
+            view_mode = query.get("view_mode", [None])[0]
+            html_out = self.manager.render_preview(
+                slug=slug, theme=theme, routing_mode=routing, view_mode=view_mode
+            )
             self.send_html(html_out)
             return
 
@@ -1958,8 +2012,13 @@ class DashboardRequestHandler(http.server.BaseHTTPRequestHandler):
             slug = body.get("slug")
             theme = body.get("theme")
             routing_mode = body.get("route_structure") or body.get("routing_mode")
+            view_mode = body.get("view_mode") or body.get("type")
             html_out = self.manager.render_preview(
-                slug=slug, post_data=post_data, theme=theme, routing_mode=routing_mode
+                slug=slug,
+                post_data=post_data,
+                theme=theme,
+                routing_mode=routing_mode,
+                view_mode=view_mode,
             )
             self.send_json({"success": True, "html": html_out})
             return

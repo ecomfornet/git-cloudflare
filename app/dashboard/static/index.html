@@ -748,6 +748,13 @@
           <div class="form-group compact-group" style="margin-top: 0.5rem;">
             <label class="form-label" style="margin-bottom: 0.3rem;">⚡ Quick Model Switcher</label>
             <div class="model-switcher-bar" id="modelSwitcherBar" style="display: flex; flex-direction: column; gap: 0.35rem;">
+              <button type="button" class="model-preview-btn compact-model-btn" id="modelBtnHub"
+                data-theme="editorial-warm"
+                data-view="hub"
+                data-title="Kinfolk Journal: Architectural Sanctuary Hub"
+                data-excerpt="Refined step-by-step spatial blueprints, styling journals, and architectural case studies.">
+                <span>🏛️ Model 1: Kinfolk Homepage Hub</span>
+              </button>
               <button type="button" class="model-preview-btn compact-model-btn" id="modelBtn1"
                 data-theme="editorial-warm"
                 data-title="15 Bedroom Refresh Ideas: Transform Your Oasis with Linen &amp; Warmth"
@@ -1125,9 +1132,15 @@
   <div id="templatePreviewModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="templateModalTitle">
     <div class="modal-content template-preview-window">
       <div class="template-modal-header">
-        <div style="display: flex; align-items: center; gap: 0.5rem;">
-          <span style="font-size: 1.1rem;">🎨</span>
-          <h2 id="templateModalTitle" class="card-title" style="margin: 0; font-size: 1rem;">Theme Template Live Preview</h2>
+        <div style="display: flex; align-items: center; gap: 0.75rem;">
+          <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <span style="font-size: 1.1rem;">🎨</span>
+            <h2 id="templateModalTitle" class="card-title" style="margin: 0; font-size: 1rem;">Theme Template Live Preview</h2>
+          </div>
+          <div class="btn-group modal-view-toggle" id="modalViewToggleGroup" style="display: inline-flex; background: rgba(0,0,0,0.3); border-radius: 6px; padding: 2px; border: 1px solid rgba(255,255,255,0.1);">
+            <button type="button" class="btn btn-xs btn-primary modal-view-btn active" id="modalViewHubBtn" data-view="hub" style="font-size: 0.72rem; padding: 0.2rem 0.55rem; font-weight: 600;">🏛️ Front / Hub</button>
+            <button type="button" class="btn btn-xs btn-secondary modal-view-btn" id="modalViewPostBtn" data-view="post" style="font-size: 0.72rem; padding: 0.2rem 0.55rem; font-weight: 600;">📄 Article Guide</button>
+          </div>
         </div>
         <div style="display: flex; align-items: center; gap: 0.5rem;">
           <div class="viewport-btns">
