@@ -52,9 +52,11 @@ def normalize_base_path(base_path: str = "", base_url: str = "") -> str:
 
 
 def normalize_routing_mode(mode: Optional[str] = None) -> str:
-    """Normalizes route mode string into one of the 4 canonical modes."""
+    """Normalizes route mode string into one of the canonical modes."""
     clean = (mode or "single").lower().strip()
-    if clean in ("category", "category_slug", "category-slug", "catslug"):
+    if clean in ("pseo_nested_silo", "styleire", "blog_nested", "silo_styleire", "nested_silo", "pseo_silo"):
+        return "pseo_nested_silo"
+    elif clean in ("category", "category_slug", "category-slug", "catslug"):
         return "category_slug"
     elif clean in ("parent", "parent_slug", "parent-slug"):
         return "parent_slug"
@@ -188,7 +190,16 @@ def resolve_post_route(
     base_prefix = normalize_base_path(base_path, base_url)
     home_url = f"{base_prefix}/" if base_prefix else "/"
 
-    if active_mode == "category_slug":
+    if active_mode == "pseo_nested_silo":
+        web_path = f"{base_prefix}/blog/{slug}/"
+        file_path = f"blog/{slug}/index.html"
+        depth = 2
+        breadcrumbs = [
+            {"name": "Home", "url": home_url},
+            {"name": cat_name, "url": f"{base_prefix}/category/{cat_slug}/"},
+            {"name": title, "url": web_path},
+        ]
+    elif active_mode == "category_slug":
         web_path = f"{base_prefix}/{cat_slug}/{slug}/"
         file_path = f"{cat_slug}/{slug}/index.html"
         depth = 2
@@ -277,7 +288,58 @@ def get_intermediate_routes(
 
     intermediate_routes: list[IntermediateRoute] = []
 
-    if active_mode in ("single", "category_slug"):
+    if active_mode == "pseo_nested_silo":
+        # 1. Category silos under /category/<cat-slug>/
+        categories: dict[str, list[Any]] = {}
+        cat_names: dict[str, str] = {}
+        for post in posts:
+            _, _, category, cat_slug_raw, _ = _extract_post_fields(post)
+            cat_slug = slugify(cat_slug_raw or category or "guides")
+            categories.setdefault(cat_slug, []).append(post)
+            if cat_slug not in cat_names:
+                cat_names[cat_slug] = category or cat_slug.replace("-", " ").title()
+
+        for cat_slug, child_posts in categories.items():
+            name = cat_names.get(cat_slug) or cat_slug.replace("-", " ").title()
+            web_path = f"{base_prefix}/category/{cat_slug}/"
+            file_path = f"category/{cat_slug}/index.html"
+            breadcrumbs = [
+                {"name": "Home", "url": home_url},
+                {"name": name, "url": web_path},
+            ]
+            intermediate_routes.append(
+                IntermediateRoute(
+                    web_path=web_path,
+                    file_path=file_path,
+                    title=f"{name}",
+                    slug=cat_slug,
+                    parent_slug="",
+                    depth=2,
+                    breadcrumbs=breadcrumbs,
+                    posts=child_posts,
+                )
+            )
+
+        # 2. Main blog hub /blog/index.html
+        blog_web_path = f"{base_prefix}/blog/"
+        blog_file_path = "blog/index.html"
+        intermediate_routes.append(
+            IntermediateRoute(
+                web_path=blog_web_path,
+                file_path=blog_file_path,
+                title="All Published Guides",
+                slug="blog",
+                parent_slug="",
+                depth=1,
+                breadcrumbs=[
+                    {"name": "Home", "url": home_url},
+                    {"name": "Blog", "url": blog_web_path},
+                ],
+                posts=list(posts),
+            )
+        )
+
+    elif active_mode in ("single", "category_slug"):
         categories: dict[str, list[Any]] = {}
         cat_names: dict[str, str] = {}
         for post in posts:
@@ -443,3 +505,107 @@ class RouteResolver:
             base_path=self.base_path,
             base_url=self.base_url,
         )
+
+
+def resolve_category_route(
+    cat_slug: str,
+    cat_name: str = "",
+    mode: str = "pseo_nested_silo",
+    base_path: str = "",
+    base_url: str = "",
+) -> RouteResult:
+    """Resolves URL and file paths for category hubs."""
+    slug = slugify(cat_slug or "guides")
+    name = cat_name or slug.replace("-", " ").title()
+    base_prefix = normalize_base_path(base_path, base_url)
+    home_url = f"{base_prefix}/" if base_prefix else "/"
+    active_mode = normalize_routing_mode(mode)
+
+    if active_mode == "pseo_nested_silo":
+        web_path = f"{base_prefix}/category/{slug}/"
+        file_path = f"category/{slug}/index.html"
+    elif active_mode == "silo_nested":
+        web_path = f"{base_prefix}/guides/{slug}/"
+        file_path = f"guides/{slug}/index.html"
+    else:
+        web_path = f"{base_prefix}/{slug}/"
+        file_path = f"{slug}/index.html"
+
+    breadcrumbs = [
+        {"name": "Home", "url": home_url},
+        {"name": name, "url": web_path},
+    ]
+    return RouteResult(
+        web_path=web_path,
+        file_path=file_path,
+        depth=2 if active_mode in ("pseo_nested_silo", "silo_nested") else 1,
+        breadcrumbs=breadcrumbs,
+    )
+
+
+def resolve_author_route(
+    author_slug: str = "sophia-bennett",
+    author_name: str = "Sophia Bennett",
+    base_path: str = "",
+    base_url: str = "",
+) -> RouteResult:
+    """Resolves URL and file paths for the E-E-A-T author profile page."""
+    slug = slugify(author_slug or "sophia-bennett")
+    name = author_name or slug.replace("-", " ").title()
+    base_prefix = normalize_base_path(base_path, base_url)
+    home_url = f"{base_prefix}/" if base_prefix else "/"
+    web_path = f"{base_prefix}/author/{slug}/"
+    file_path = f"author/{slug}/index.html"
+    breadcrumbs = [
+        {"name": "Home", "url": home_url},
+        {"name": name, "url": web_path},
+    ]
+    return RouteResult(
+        web_path=web_path,
+        file_path=file_path,
+        depth=2,
+        breadcrumbs=breadcrumbs,
+    )
+
+
+def resolve_sitemap_route(base_path: str = "", base_url: str = "") -> RouteResult:
+    """Resolves URL and file paths for the HTML sitemap page."""
+    base_prefix = normalize_base_path(base_path, base_url)
+    home_url = f"{base_prefix}/" if base_prefix else "/"
+    web_path = f"{base_prefix}/sitemap/"
+    file_path = "sitemap/index.html"
+    breadcrumbs = [
+        {"name": "Home", "url": home_url},
+        {"name": "Sitemap", "url": web_path},
+    ]
+    return RouteResult(
+        web_path=web_path,
+        file_path=file_path,
+        depth=1,
+        breadcrumbs=breadcrumbs,
+    )
+
+
+def resolve_trust_route(
+    trust_slug: str,
+    title: str = "",
+    base_path: str = "",
+    base_url: str = "",
+) -> RouteResult:
+    """Resolves URL and file paths for legal & compliance trust pages."""
+    slug = slugify(trust_slug)
+    clean_title = title or slug.replace("-", " ").title()
+    base_prefix = normalize_base_path(base_path, base_url)
+    home_url = f"{base_prefix}/" if base_prefix else "/"
+    web_path = f"{base_prefix}/{slug}/"
+    file_path = f"{slug}/index.html"
+    breadcrumbs = [
+        {"name": "Home", "url": home_url},
+        {"name": clean_title, "url": web_path},
+    ]
+    return RouteResult(
+        web_path=web_path,
+        file_path=file_path,
+        depth=1,
+        breadcrumbs=breadcrumbs,
+    )

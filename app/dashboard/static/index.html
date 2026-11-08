@@ -387,22 +387,22 @@
             <!-- Model 3 -->
             <div class="theme-card" data-theme="pinterest-mag">
               <div class="theme-card-header">
-                <span class="theme-badge" style="background: rgba(190, 18, 60, 0.15); color: #FB7185; border: 1px solid rgba(190, 18, 60, 0.3);">
-                  Model 3 · Pin Discovery
+                <span class="theme-badge" style="background: rgba(15, 23, 42, 0.15); color: #38BDF8; border: 1px solid rgba(56, 189, 248, 0.3);">
+                  Model 3 · Styleire Magazine
                 </span>
                 <button type="button" class="btn-preview-theme" data-theme="pinterest-mag" title="Preview">👁️ Preview</button>
               </div>
-              <div class="theme-card-mockup" style="background: #FFFDF9; color: #18181B; border-color: #F3E8E2; padding: 0.45rem;">
-                <div style="font-family: 'Playfair Display', serif; font-style: italic; font-size: 0.72rem; font-weight: 700;">Pinterest Mag Italic</div>
-                <div style="font-size: 0.58rem; color: #71717A;">High-CTR save tags &bull; Ruby accents</div>
+              <div class="theme-card-mockup" style="background: #FFFFFF; color: #09090B; border-color: #E4E4E7; padding: 0.45rem;">
+                <div style="font-family: 'Playfair Display', serif; font-size: 0.72rem; font-weight: 700;">Styleire Editorial</div>
+                <div style="font-size: 0.58rem; color: #71717A;">78-page pSEO architecture &bull; E-E-A-T suite</div>
               </div>
               <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.2rem;">
                 <div class="theme-swatches">
-                  <span class="swatch" style="background: #FFFDF9;"></span>
-                  <span class="swatch" style="background: #18181B;"></span>
-                  <span class="swatch" style="background: #BE123C;"></span>
+                  <span class="swatch" style="background: #FFFFFF; border: 1px solid #E4E4E7;"></span>
+                  <span class="swatch" style="background: #09090B;"></span>
+                  <span class="swatch" style="background: #71717A;"></span>
                 </div>
-                <span style="font-size: 0.68rem; color: #94A3B8; font-family: var(--font-mono);">Playfair Italic</span>
+                <span style="font-size: 0.68rem; color: #94A3B8; font-family: var(--font-mono);">Styleire Serif</span>
               </div>
             </div>
           </div>
@@ -440,6 +440,10 @@
               <div style="display: flex; justify-content: space-between;"><strong style="font-size: 0.82rem;">Guides Hierarchy</strong><span class="routing-badge">Deep</span></div>
               <div class="routing-tree" style="margin-top: 0.25rem;">/guides/&lt;parent&gt;/&lt;slug&gt;/</div>
             </div>
+            <div class="routing-card" data-routing="pseo_nested_silo">
+              <div style="display: flex; justify-content: space-between;"><strong style="font-size: 0.82rem;">pSEO Silo (Styleire)</strong><span class="routing-badge" style="background:#0F172A;color:#38BDF8;">Production</span></div>
+              <div class="routing-tree" style="margin-top: 0.25rem;">/blog/&lt;slug&gt;/ + /category/&lt;cat&gt;/</div>
+            </div>
           </div>
 
           <select id="cfgRoutingMode" class="form-control" style="display: none;">
@@ -447,6 +451,7 @@
             <option value="category_slug">Category Slug: /&lt;category-slug&gt;/&lt;slug&gt;/index.html</option>
             <option value="parent_slug">Parent Slug: /&lt;parent-slug&gt;/&lt;slug&gt;/index.html</option>
             <option value="silo_nested">Silo Nested: /guides/&lt;parent-slug&gt;/&lt;slug&gt;/index.html</option>
+            <option value="pseo_nested_silo">pSEO Silo: /blog/&lt;slug&gt;/ &amp; /category/&lt;slug&gt;/</option>
           </select>
         </div>
 

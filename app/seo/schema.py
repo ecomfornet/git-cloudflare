@@ -210,13 +210,62 @@ def build_breadcrumb_list(
     }
 
 
+def build_faq_schema(post: Any) -> Optional[dict[str, Any]]:
+    """Constructs Schema.org FAQPage schema from post FAQ data."""
+    faqs = _get_field(post, "faq", []) or _get_field(post, "faqs", [])
+    if not faqs:
+        raw_meta = _get_field(post, "raw_meta", {})
+        if isinstance(raw_meta, dict):
+            faqs = raw_meta.get("faq") or raw_meta.get("faqs") or []
+    if not faqs:
+        return None
+
+    items = []
+    for item in faqs:
+        if isinstance(item, dict):
+            q = item.get("question") or item.get("q") or item.get("title")
+            a = item.get("answer") or item.get("a") or item.get("body")
+            if q and a:
+                items.append({
+                    "@type": "Question",
+                    "name": strip_html(str(q)),
+                    "acceptedAnswer": {
+                        "@type": "Answer",
+                        "text": strip_html(str(a)),
+                    },
+                })
+        elif isinstance(item, (list, tuple)) and len(item) >= 2:
+            items.append({
+                "@type": "Question",
+                "name": strip_html(str(item[0])),
+                "acceptedAnswer": {
+                    "@type": "Answer",
+                    "text": strip_html(str(item[1])),
+                },
+            })
+
+    if not items:
+        return None
+
+    return {
+        "@context": "https://schema.org",
+        "@type": "FAQPage",
+        "mainEntity": items,
+    }
+
+
 def build_article_schema(
     post: Any,
     route: Any,
     base_url: str,
-    source_domain: str = "stylesdays.com",
+    source_domain: str = "styleire.com",
+    author_name: str = "Sophia Bennett",
+    author_slug: str = "sophia-bennett",
+    author_image: str = "",
+    brand_name: str = "Styleire",
+    logo_url: str = "",
 ) -> dict[str, Any]:
-    """Constructs Schema.org Article block with native GitHub image and canonical reference."""
+    """Constructs Schema.org Article block with E-E-A-T Person author and Organization publisher."""
     clean_base = base_url.rstrip("/")
     slug = _get_field(post, "slug", "")
     title = strip_html(_get_field(post, "title") or slug)
@@ -232,14 +281,11 @@ def build_article_schema(
     date_published = _format_iso_date(raw_date or raw_modified)
     date_modified = _format_iso_date(raw_modified or raw_date)
 
-    raw_meta = _get_field(post, "raw_meta", {})
-    canonical_source = (
-        _get_field(post, "link", "")
-        or (raw_meta.get("link") if isinstance(raw_meta, dict) else "")
-        or f"https://{source_domain}/{slug}/"
-    )
+    author_url = join_base_and_path(base_url, f"/author/{author_slug}/")
+    logo = logo_url or image_url
 
     return {
+        "@context": "https://schema.org",
         "@type": "Article",
         "headline": title,
         "description": excerpt,
@@ -247,21 +293,138 @@ def build_article_schema(
         "datePublished": date_published,
         "dateModified": date_modified,
         "author": {
-            "@type": "Organization",
-            "name": f"{source_domain} Editorial Team",
-            "url": f"https://{source_domain}/",
+            "@type": "Person",
+            "name": author_name,
+            "url": author_url,
+            "image": author_image or join_base_and_path(base_url, "/assets/images/author-sophia.jpg"),
         },
         "publisher": {
             "@type": "Organization",
-            "name": f"{source_domain} Editorial Hub",
-            "url": clean_base,
+            "name": brand_name,
+            "url": clean_base or "http://styleire.com",
+            "logo": {
+                "@type": "ImageObject",
+                "url": logo,
+            },
         },
-        "mainEntityOfPage": {
-            "@type": "WebPage",
-            "@id": full_page_url,
-        },
-        "isBasedOn": canonical_source,
+        "mainEntityOfPage": full_page_url,
     }
+
+
+def build_website_schema(
+    site_name: str = "Styleire",
+    site_url: str = "http://styleire.com",
+    description: str = "Styleire is an independent home decor publication with practical guides, expert styling advice, and inspiration for every room of your home.",
+    logo_url: str = "",
+) -> dict[str, Any]:
+    """Constructs Schema.org WebSite schema for homepage."""
+    clean_url = site_url.rstrip("/")
+    return {
+        "@context": "https://schema.org",
+        "@type": "WebSite",
+        "name": site_name,
+        "url": clean_url,
+        "description": description,
+        "publisher": {
+            "@type": "Organization",
+            "name": site_name,
+            "url": clean_url,
+            "logo": {
+                "@type": "ImageObject",
+                "url": logo_url or f"{clean_url}/assets/images/hero.jpg",
+            },
+        },
+    }
+
+
+def build_person_schema(
+    name: str = "Sophia Bennett",
+    author_url: str = "http://styleire.com/author/sophia-bennett",
+    job_title: str = "Senior Home Decor Editor & Interior Stylist",
+    bio: str = "Sophia Bennett is a certified interior stylist and the senior editor at Styleire with 8+ years helping homeowners create warm, functional interiors.",
+    image_url: str = "",
+) -> dict[str, Any]:
+    """Constructs Schema.org Person schema for E-E-A-T author profile page."""
+    schema = {
+        "@context": "https://schema.org",
+        "@type": "Person",
+        "name": name,
+        "url": author_url,
+        "jobTitle": job_title,
+        "description": bio,
+    }
+    if image_url:
+        schema["image"] = image_url
+    return schema
+
+
+def generate_multi_tier_json_ld_scripts(
+    post: Any,
+    route: Any,
+    base_url: str = "https://home-organization.github.io",
+    source_domain: str = "styleire.com",
+    author_name: str = "Sophia Bennett",
+    author_slug: str = "sophia-bennett",
+    author_image: str = "",
+    brand_name: str = "Styleire",
+    logo_url: str = "",
+) -> str:
+    """Generates the 3 separate <script type="application/ld+json"> tags matching static-site:
+    1. Article schema
+    2. FAQPage schema (if FAQs exist)
+    3. BreadcrumbList schema
+    """
+    scripts: list[str] = []
+
+    # 1. Article schema
+    article = build_article_schema(
+        post, route, base_url,
+        source_domain=source_domain,
+        author_name=author_name,
+        author_slug=author_slug,
+        author_image=author_image,
+        brand_name=brand_name,
+        logo_url=logo_url,
+    )
+    scripts.append(f'<script type="application/ld+json">{json.dumps(article, ensure_ascii=False)}</script>')
+
+    # 2. FAQPage schema
+    faq_schema = build_faq_schema(post)
+    if faq_schema:
+        scripts.append(f'<script type="application/ld+json">{json.dumps(faq_schema, ensure_ascii=False)}</script>')
+
+    # 3. BreadcrumbList schema
+    breadcrumbs = build_breadcrumb_list(post, route, base_url)
+    breadcrumbs_schema = {
+        "@context": "https://schema.org",
+        **breadcrumbs,
+    }
+    scripts.append(f'<script type="application/ld+json">{json.dumps(breadcrumbs_schema, ensure_ascii=False)}</script>')
+
+    return "\n".join(scripts)
+
+
+def generate_website_schema_script(
+    site_name: str = "Styleire",
+    site_url: str = "http://styleire.com",
+    description: str = "",
+    logo_url: str = "",
+) -> str:
+    """Returns formatted JSON-LD <script> tag for WebSite schema."""
+    schema = build_website_schema(site_name, site_url, description, logo_url)
+    return f'<script type="application/ld+json">{json.dumps(schema, ensure_ascii=False)}</script>'
+
+
+def generate_author_schema_script(
+    name: str = "Sophia Bennett",
+    author_url: str = "http://styleire.com/author/sophia-bennett",
+    job_title: str = "Senior Home Decor Editor & Interior Stylist",
+    bio: str = "",
+    image_url: str = "",
+) -> str:
+    """Returns formatted JSON-LD <script> tag for Person author schema."""
+    schema = build_person_schema(name, author_url, job_title, bio, image_url)
+    return f'<script type="application/ld+json">{json.dumps(schema, ensure_ascii=False)}</script>'
 
 
 def generate_json_ld(
@@ -277,12 +440,17 @@ def generate_json_ld(
     article = build_article_schema(post, route, base_url, source_domain)
     breadcrumbs = build_breadcrumb_list(post, route, base_url)
 
+    items = [article, breadcrumbs]
+    faq_schema = build_faq_schema(post)
+    if faq_schema and "mainEntity" in faq_schema:
+        items.append({
+            "@type": "FAQPage",
+            "mainEntity": faq_schema["mainEntity"],
+        })
+
     return {
         "@context": "https://schema.org",
-        "@graph": [
-            article,
-            breadcrumbs,
-        ],
+        "@graph": items,
     }
 
 

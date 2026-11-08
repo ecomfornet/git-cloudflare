@@ -8,13 +8,18 @@ from app.themes.templates import (
     THEMES,
     get_embedded_fallback_css,
     get_theme_tokens,
+    render_author_page,
     render_category_index,
     render_checklist,
+    render_html_sitemap,
     render_hub,
     render_post,
     render_related_guides,
+    render_styleire_hub,
+    render_styleire_layout,
     render_takeaways,
     render_taxonomy_pills,
+    render_trust_page,
 )
 
 
@@ -102,6 +107,74 @@ class ThemeEngine:
             subtitle=subtitle,
             base_url=base_url,
             theme=theme_key,
+            source_domain=source_domain,
+            **kwargs,
+        )
+
+    def render_author_page(
+        self,
+        author_name: str = "Sophia Bennett",
+        author_role: str = "Senior Home Decor Editor & Interior Stylist",
+        author_bio: str = "",
+        author_image: str = "",
+        posts: Optional[list[Any]] = None,
+        theme: Optional[str] = None,
+        base_url: str = "",
+        source_domain: str = "styleire.com",
+        **kwargs: Any,
+    ) -> str:
+        """Renders author E-E-A-T profile page."""
+        theme_key = theme or self.default_theme
+        return render_author_page(
+            author_name=author_name,
+            author_role=author_role,
+            author_bio=author_bio,
+            author_image=author_image,
+            posts=posts,
+            theme=theme_key,
+            base_url=base_url,
+            source_domain=source_domain,
+            **kwargs,
+        )
+
+    def render_trust_page(
+        self,
+        slug: str,
+        title: str = "",
+        content_html: str = "",
+        theme: Optional[str] = None,
+        base_url: str = "",
+        source_domain: str = "styleire.com",
+        **kwargs: Any,
+    ) -> str:
+        """Renders trust/legal compliance page."""
+        theme_key = theme or self.default_theme
+        return render_trust_page(
+            slug=slug,
+            title=title,
+            content_html=content_html,
+            theme=theme_key,
+            base_url=base_url,
+            source_domain=source_domain,
+            **kwargs,
+        )
+
+    def render_html_sitemap(
+        self,
+        posts: list[Any],
+        categories: Optional[list[dict[str, str]]] = None,
+        theme: Optional[str] = None,
+        base_url: str = "",
+        source_domain: str = "styleire.com",
+        **kwargs: Any,
+    ) -> str:
+        """Renders HTML sitemap directory."""
+        theme_key = theme or self.default_theme
+        return render_html_sitemap(
+            posts=posts,
+            categories=categories,
+            theme=theme_key,
+            base_url=base_url,
             source_domain=source_domain,
             **kwargs,
         )

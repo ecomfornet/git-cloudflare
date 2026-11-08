@@ -2162,7 +2162,7 @@
 
       'nordic-studio':  '#0F766E',
 
-      'pinterest-mag':  '#BE123C',
+      'pinterest-mag':  '#09090B',
 
     };
 
@@ -2258,7 +2258,7 @@
 
         title: '16 Coastal Bedroom Decor Essentials: Transform Your Beach House Space',
 
-        excerpt: 'A high-fashion visual pin discovery magazine layout with floating 📌 Save to Pinterest badge, 2-column moodboard pin cards, 98% viral save score bar, and ruby-red editorial accents for coastal beach house decor.',
+        excerpt: 'Styleire modern editorial layout: 78-page pSEO architecture with room category silos, author E-E-A-T credentials, 3-tier JSON-LD schemas, and complete trust suite.',
 
         local_image_path: '/assets/images/16-coastal-bedroom-decor-essentials-transform-your-space.webp',
 
@@ -2318,7 +2318,7 @@
 
         });
 
-        const accentMap = { 'editorial-warm': '#E60023', 'nordic-studio': '#8C6D53', 'pinterest-mag': '#BE123C' };
+        const accentMap = { 'editorial-warm': '#E60023', 'nordic-studio': '#8C6D53', 'pinterest-mag': '#09090B' };
 
         btn.style.boxShadow = `0 0 0 2px ${accentMap[theme] || '#666'}`;
 
@@ -3968,7 +3968,7 @@
 
         'nordic-studio': 'The Nordroom (Scandinavian Minimalist)',
 
-        'pinterest-mag': 'Pinterest Mag (Visual Discovery & Pin Focus)',
+        'pinterest-mag': 'Model 3 · Styleire Magazine (Editorial & Trust Suite)',
 
       };
 

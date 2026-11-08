@@ -114,6 +114,7 @@ def generate_sitemap_xml(
     posts: Union[Iterable[Any], Any],
     base_url: str = "https://home-organization.github.io",
     hub_urls: Optional[Iterable[str]] = None,
+    extra_pages: Optional[Iterable[Union[dict[str, Any], str]]] = None,
 ) -> str:
     """
     Generates a production-ready sitemap.xml strictly following Sitemaps Protocol 0.9
@@ -122,7 +123,10 @@ def generate_sitemap_xml(
     Hierarchy & Priorities:
     - Root organization hub (/): changefreq=daily, priority=1.0
     - Category and Silo hubs (/category/, /guides/...): changefreq=daily, priority=0.8
-    - Editorial Posts (/.../<slug>/): changefreq=weekly, priority=0.7 with <image:image> tags
+    - Editorial Posts (/blog/.../): changefreq=weekly, priority=0.8 with <image:image> tags
+    - Author Profile (/author/.../): changefreq=monthly, priority=0.6
+    - HTML Sitemap (/sitemap/): changefreq=weekly, priority=0.5
+    - Trust & Legal Pages (/about/, /privacy-policy/, etc.): changefreq=monthly, priority=0.3 - 0.4
     """
     clean_base = base_url.rstrip("/")
     today = datetime.date.today().isoformat()
@@ -194,7 +198,7 @@ def generate_sitemap_xml(
             "  </url>"
         )
 
-    # 3. Post URLs (Priority 0.7, weekly, with Google Image extension)
+    # 3. Post URLs (Priority 0.8, weekly, with Google Image extension)
     seen_post_locs: set[str] = set()
     for p in post_list:
         slug = _get_field(p, "slug", "")
@@ -207,7 +211,7 @@ def generate_sitemap_xml(
             clean_path = f"{clean_path}/"
         post_loc = join_base_and_path(clean_base, clean_path)
 
-        if post_loc in seen_post_locs:
+        if post_loc in seen_post_locs or post_loc in seen_hubs:
             continue
         seen_post_locs.add(post_loc)
 
@@ -225,7 +229,7 @@ def generate_sitemap_xml(
             f"    <loc>{xml_escape(post_loc)}</loc>",
             f"    <lastmod>{post_lastmod}</lastmod>",
             "    <changefreq>weekly</changefreq>",
-            "    <priority>0.7</priority>",
+            "    <priority>0.8</priority>",
             "    <image:image>",
             f"      <image:loc>{xml_escape(image_loc)}</image:loc>",
             f"      <image:title>{xml_escape(clean_title)}</image:title>",
@@ -233,6 +237,40 @@ def generate_sitemap_xml(
             "  </url>",
         ]
         url_entries.append("\n".join(entry_lines))
+
+    # 4. Extra Pages: Author, Sitemap, and 9 Trust/Legal Compliance pages
+    if extra_pages:
+        for ep in extra_pages:
+            if isinstance(ep, dict):
+                ep_path = ep.get("path") or ep.get("web_path") or ""
+                ep_prio = str(ep.get("priority", "0.4"))
+                ep_freq = str(ep.get("changefreq", "monthly"))
+                ep_mod = str(ep.get("lastmod", today))
+            else:
+                ep_path = str(ep)
+                ep_prio = "0.4"
+                ep_freq = "monthly"
+                ep_mod = today
+
+            if not ep_path:
+                continue
+            clean_ep = ep_path if ep_path.startswith("/") else f"/{ep_path}"
+            if not clean_ep.endswith("/"):
+                clean_ep = f"{clean_ep}/"
+            ep_loc = join_base_and_path(clean_base, clean_ep)
+
+            if ep_loc in seen_hubs or ep_loc in seen_post_locs:
+                continue
+            seen_post_locs.add(ep_loc)
+
+            url_entries.append(
+                "  <url>\n"
+                f"    <loc>{xml_escape(ep_loc)}</loc>\n"
+                f"    <lastmod>{ep_mod}</lastmod>\n"
+                f"    <changefreq>{ep_freq}</changefreq>\n"
+                f"    <priority>{ep_prio}</priority>\n"
+                "  </url>"
+            )
 
     # Assemble full XML document
     xml_header = '<?xml version="1.0" encoding="UTF-8"?>\n'

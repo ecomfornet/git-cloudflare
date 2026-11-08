@@ -8,6 +8,14 @@ import os
 import random
 import urllib.parse
 from typing import Any, Optional
+import re
+
+
+def slugify(text: str) -> str:
+    """Converts arbitrary text into a clean URL slug (lowercase alphanumeric with dashes)."""
+    text = (text or "").strip().lower()
+    text = re.sub(r"[^a-z0-9]+", "-", text)
+    return text.strip("-") or "guide"
 
 
 def _extract_path_prefix(base_url: str) -> str:
@@ -81,20 +89,37 @@ THEMES: dict[str, dict[str, str]] = {
     },
     "pinterest-mag": {
         "id": "pinterest-mag",
-        "name": "Pinterest Mag (Visual Discovery & Pin Focus)",
-        "bg_body": "#FFFDF9",
-        "text_body": "#18181B",
-        "accent": "#BE123C",
-        "accent_hover": "#9F1239",
+        "name": "Model 3 · Styleire Magazine (Editorial & Trust Suite)",
+        "bg_body": "#FFFFFF",
+        "text_body": "#09090B",
+        "accent": "#09090B",
+        "accent_hover": "#27272A",
         "card_bg": "#FFFFFF",
-        "card_border": "#F3E8E2",
-        "CheckBoxBg": "#FCE7F3",
-        "badge_bg": "#BE123C",
+        "card_border": "#E4E4E7",
+        "CheckBoxBg": "#F4F4F5",
+        "badge_bg": "#09090B",
         "font_headline": "'Playfair Display', Georgia, serif",
         "font_body": "'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
         "header_bg": "#FFFFFF",
         "muted_text": "#71717A",
-        "tag_bg": "#FCE7F3",
+        "tag_bg": "#F4F4F5",
+    },
+    "styleire": {
+        "id": "pinterest-mag",
+        "name": "Model 3 · Styleire Magazine (Editorial & Trust Suite)",
+        "bg_body": "#FFFFFF",
+        "text_body": "#09090B",
+        "accent": "#09090B",
+        "accent_hover": "#27272A",
+        "card_bg": "#FFFFFF",
+        "card_border": "#E4E4E7",
+        "CheckBoxBg": "#F4F4F5",
+        "badge_bg": "#09090B",
+        "font_headline": "'Playfair Display', Georgia, serif",
+        "font_body": "'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+        "header_bg": "#FFFFFF",
+        "muted_text": "#71717A",
+        "tag_bg": "#F4F4F5",
     },
 }
 
@@ -2015,7 +2040,86 @@ def render_nordic_studio_layout(
 
 
 
-def render_pinterest_mag_layout(
+
+def build_styleire_header(brand_name: str, path_prefix: str = "") -> str:
+    """Builds the sticky blurred masthead for Styleire."""
+    prefix = path_prefix.rstrip("/") if path_prefix else ""
+    home_url = f"{prefix}/" if prefix else "/"
+    cats = [
+        ("Living Room", f"{prefix}/category/living-room/"),
+        ("Bedroom", f"{prefix}/category/bedroom/"),
+        ("Kitchen & Dining", f"{prefix}/category/kitchen-dining/"),
+        ("Outdoor Spaces", f"{prefix}/category/outdoor-spaces/"),
+        ("DIY & Craft", f"{prefix}/category/diy-decor/"),
+        ("Seasonal & Trends", f"{prefix}/category/seasonal-trends/"),
+    ]
+    nav_links = "".join([f'<a href="{url}" class="text-stone-600 transition hover:text-stone-900 font-medium">{name}</a>' for name, url in cats])
+    mobile_links = "".join([f'<a href="{url}" class="whitespace-nowrap transition hover:text-stone-900">{name}</a>' for name, url in cats])
+    about_url = f"{prefix}/about/"
+
+    return f'''<header class="sticky top-0 z-40 border-b border-stone-200 bg-white/90 backdrop-blur">
+  <div class="mx-auto flex max-w-6xl items-center justify-between gap-6 px-4 py-4">
+    <a class="font-serif text-2xl font-bold tracking-tight text-stone-900 hover:opacity-90" href="{home_url}">{html_lib.escape(brand_name)}</a>
+    <nav class="hidden items-center gap-6 text-sm md:flex">
+      {nav_links}
+    </nav>
+    <a href="{about_url}" class="hidden text-sm text-stone-600 font-medium transition hover:text-stone-900 md:inline">About</a>
+  </div>
+  <div class="border-t border-stone-100 md:hidden">
+    <nav class="mx-auto flex max-w-6xl gap-5 overflow-x-auto px-4 py-2.5 text-xs text-stone-600 font-medium">
+      {mobile_links}
+    </nav>
+  </div>
+</header>'''
+
+
+def build_styleire_footer(brand_name: str, path_prefix: str = "") -> str:
+    """Builds the 4-column trust and directory footer for Styleire."""
+    prefix = path_prefix.rstrip("/") if path_prefix else ""
+    return f'''<footer class="border-t border-stone-200 bg-stone-50 mt-16">
+  <div class="mx-auto grid max-w-6xl gap-8 px-4 py-12 md:grid-cols-4">
+    <div class="md:col-span-2">
+      <div class="font-serif text-xl font-bold text-stone-900">{html_lib.escape(brand_name)}</div>
+      <p class="mt-2 max-w-sm text-sm text-stone-600 leading-relaxed">
+        {html_lib.escape(brand_name)} is an independent home decor publication with practical guides, expert styling advice, and inspiration for every room of your home.
+      </p>
+    </div>
+    <div>
+      <div class="mb-3 text-sm font-semibold uppercase tracking-wider text-stone-900">Explore</div>
+      <ul class="space-y-2 text-sm text-stone-600">
+        <li><a href="{prefix}/category/living-room/" class="hover:text-stone-900">Living Room</a></li>
+        <li><a href="{prefix}/category/bedroom/" class="hover:text-stone-900">Bedroom</a></li>
+        <li><a href="{prefix}/category/kitchen-dining/" class="hover:text-stone-900">Kitchen &amp; Dining</a></li>
+        <li><a href="{prefix}/category/outdoor-spaces/" class="hover:text-stone-900">Outdoor Spaces</a></li>
+        <li><a href="{prefix}/category/diy-decor/" class="hover:text-stone-900">DIY &amp; Craft</a></li>
+        <li><a href="{prefix}/category/seasonal-trends/" class="hover:text-stone-900">Seasonal &amp; Trends</a></li>
+      </ul>
+    </div>
+    <div>
+      <div class="mb-3 text-sm font-semibold uppercase tracking-wider text-stone-900">Company</div>
+      <ul class="space-y-2 text-sm text-stone-600">
+        <li><a href="{prefix}/about/" class="hover:text-stone-900">About Us</a></li>
+        <li><a href="{prefix}/contact/" class="hover:text-stone-900">Contact</a></li>
+        <li><a href="{prefix}/editorial-policy/" class="hover:text-stone-900">Editorial Policy</a></li>
+        <li><a href="{prefix}/fact-checking-policy/" class="hover:text-stone-900">Fact-Checking Policy</a></li>
+        <li><a href="{prefix}/privacy-policy/" class="hover:text-stone-900">Privacy Policy</a></li>
+        <li><a href="{prefix}/cookie-policy/" class="hover:text-stone-900">Cookie Policy</a></li>
+        <li><a href="{prefix}/terms/" class="hover:text-stone-900">Terms &amp; Conditions</a></li>
+        <li><a href="{prefix}/disclaimer/" class="hover:text-stone-900">Disclaimer</a></li>
+        <li><a href="{prefix}/copyright/" class="hover:text-stone-900">Copyright &amp; Images</a></li>
+        <li><a href="{prefix}/sitemap/" class="hover:text-stone-900 font-semibold text-stone-900">Sitemap</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="border-t border-stone-200">
+    <div class="mx-auto max-w-6xl px-4 py-6 text-xs text-stone-500">
+      &copy; 2026 {html_lib.escape(brand_name)}. All rights reserved.
+    </div>
+  </div>
+</footer>'''
+
+
+def render_styleire_layout(
     slug: str, title: str, excerpt: str, category: str, lastmod: str,
     image_src: str, fallback_svg: str, canonical_url: str, clean_domain: str,
     pills_html: str, takeaways_html: str, checklist_html: str, related_html: str,
@@ -2024,175 +2128,1022 @@ def render_pinterest_mag_layout(
     toc_html: str = "", faq_html: str = "", eeat_html: str = "",
     branding: Optional[Any] = None,
     content_html: str = "",
+    **kwargs: Any,
 ) -> str:
-    """Visual Pin Discovery Magazine: moodboard grid, floating save badge, ruby accents."""
-    accent = theme_tokens["accent"]
+    """Renders single article post in the exact Styleire editorial design."""
+    prefix = path_prefix.rstrip("/") if path_prefix else ""
+    home_url = f"{prefix}/" if prefix else "/"
+    brand_name = getattr(branding, "brand_name", "") or "Styleire"
+    author_name = getattr(branding, "author_name", "") or "Sophia Bennett"
+    author_role = getattr(branding, "author_role", "") or "Senior Home Decor Editor & Interior Stylist"
+    author_bio = getattr(branding, "author_bio", "") or (
+        "Sophia Bennett is a certified interior stylist and the senior editor at Styleire. "
+        "She has spent more than eight years helping homeowners and renters create warm, functional interiors, "
+        "with hands-on experience across small city apartments and family homes."
+    )
+    author_slug = "sophia-bennett"
+    author_url = f"{prefix}/author/{author_slug}/"
+    author_img = f"{prefix}/assets/images/author-sophia.jpg"
+    cat_slug = slugify(category or "bedroom")
+    cat_url = f"{prefix}/category/{cat_slug}/"
+
     esc_title = html_lib.escape(title)
     esc_excerpt = html_lib.escape(excerpt)
-    esc_category = html_lib.escape(category)
-    esc_canonical = html_lib.escape(canonical_url)
-    author_name = getattr(branding, "author_name", "") if branding else ""
-    clean_brand = getattr(branding, "brand_name", "") or "ANNADECO"
-    clean_brand = getattr(branding, "brand_name", "") or "ANNADECO"
-    clean_brand = getattr(branding, "brand_name", "") or "ANNADECO"
+    esc_category = html_lib.escape(category or "Guides")
+
+    # Format date
+    raw_date = (lastmod or "2026-05-20")[:10]
+    try:
+        import datetime
+        dt = datetime.date.fromisoformat(raw_date)
+        formatted_date = dt.strftime("%B %d, %Y")
+    except Exception:
+        formatted_date = raw_date
+
+    # Pinterest Pin Button
     pin_target_url = urllib.parse.quote(canonical_url, safe="") if canonical_url else ""
     pin_media_url = urllib.parse.quote(image_src, safe="") if image_src else ""
     pin_title = urllib.parse.quote(title, safe="") if title else ""
     pin_href = f"https://www.pinterest.com/pin/create/button/?url={pin_target_url}&media={pin_media_url}&description={pin_title}"
-    header_html = render_blogger_header(clean_domain, breadcrumb_html, pills_html, theme_tokens, path_prefix=path_prefix, canonical_url=canonical_url, branding=branding)
-    byline_html = render_blogger_byline(clean_domain, lastmod, esc_category, theme_tokens, canonical_url=canonical_url, author_name=author_name, branding=branding)
-    footer_html = render_blogger_footer(clean_domain, theme_tokens, path_prefix=path_prefix, branding=branding)
-    if content_html and len(content_html.strip()) > 20:
-        article_body_html = f'<div class="pm-prose pseo-article-body" style="margin:2rem 0;font-size:1.02rem;line-height:1.8;color:#27272A;">{content_html}</div>'
-    else:
-        article_body_html = f'<p class="pm-prose pseo-article-body" style="margin:2rem 0;font-size:1.02rem;line-height:1.8;color:#27272A;">Curated visual inspiration and room design ideas for {esc_title}.</p>'
 
-    return f"""<!DOCTYPE html>
+    # Header and Footer
+    header_markup = build_styleire_header(brand_name, path_prefix)
+    footer_markup = build_styleire_footer(brand_name, path_prefix)
+
+    # Multi-tier schema injection
+    multi_tier_schemas = ""
+    try:
+        from app.seo.schema import generate_multi_tier_json_ld_scripts
+        post_mock = {
+            "slug": slug, "title": title, "excerpt": excerpt, "category": category,
+            "category_slug": cat_slug, "date": raw_date, "image": image_src,
+        }
+        route_mock = {
+            "web_path": f"{prefix}/blog/{slug}/",
+            "file_path": f"blog/{slug}/index.html",
+            "depth": 2,
+            "breadcrumbs": [
+                {"name": "Home", "url": home_url},
+                {"name": esc_category, "url": cat_url},
+                {"name": title, "url": f"{prefix}/blog/{slug}/"},
+            ]
+        }
+        multi_tier_schemas = generate_multi_tier_json_ld_scripts(
+            post=post_mock, route=route_mock, base_url=canonical_url,
+            source_domain=clean_domain, author_name=author_name, author_slug=author_slug,
+            brand_name=brand_name
+        )
+    except Exception:
+        multi_tier_schemas = f'<script type="application/ld+json">{schema_json}</script>' if schema_json else ""
+
+    # Prose content
+    if content_html and len(content_html.strip()) > 30:
+        article_prose = content_html
+    else:
+        article_prose = f'''
+        <p>Creating a cohesive, inviting room requires balancing proportion, texture, and light. When styling your {esc_category.lower()}, prioritize function first: ensure natural pathways remain clear and seating arrangements encourage conversation.</p>
+        <h2>Proportion and Visual Balance</h2>
+        <p>Scale is the foundation of interior styling. Pair substantial anchor pieces with lighter, open-framed accents to prevent visual crowding. Incorporate reflective finishes or matte ceramics to introduce understated contrast without clutter.</p>
+        <h2>Lighting and Layered Textures</h2>
+        <p>Layer three distinct light sources: ambient ceiling fixtures, task lamps for reading, and subtle accent illumination along architectural details. Combining natural linen, tactile boucl&eacute;, and warm wood tones delivers lasting visual warmth.</p>
+        '''
+
+    # Key Takeaways Section
+    takeaways_items = [
+        f"Prioritize layout and function before introducing accent decor in your {esc_category.lower()}.",
+        "Mix smooth and textured materials to cultivate visual depth without clutter.",
+        "Layer task, ambient, and accent lighting for balanced ambiance throughout the day.",
+    ]
+    takeaways_li = "".join([f"<li>{item}</li>" for item in takeaways_items])
+    takeaways_section = f'''
+    <section class="mt-10 rounded-xl border border-stone-200 bg-stone-50 p-6">
+      <h2 class="font-serif text-xl font-bold text-stone-900">Key takeaways</h2>
+      <ul class="mt-3 list-disc space-y-1.5 pl-5 text-sm text-stone-700 leading-relaxed">
+        {takeaways_li}
+      </ul>
+    </section>
+    '''
+
+    # Frequently Asked Questions Section
+    faqs = [
+        {
+            "q": f"How do I choose the best layout for a {esc_category.lower()}?",
+            "a": "Start by identifying the primary focal point (such as a fireplace, window, or feature wall) and position major seating or furniture pieces 14 to 18 inches away from coffee tables or secondary fixtures for optimal traffic flow."
+        },
+        {
+            "q": "What lighting strategy works best across different seasons?",
+            "a": "Utilize warm 2700K LED bulbs paired with dimmers. During winter and autumn, bring in floor lamps and low-level accent sconces to create cozy illumination pockets."
+        },
+        {
+            "q": "How can I make rental spaces feel curated without structural changes?",
+            "a": "Invest in oversized rugs that conceal generic flooring, swap standard hardware for brass or matte black pulls, and introduce vertical art prints paired with tall leafy plants."
+        }
+    ]
+    faq_items = "".join([
+        f'''<details class="group p-5">
+          <summary class="cursor-pointer text-base font-medium text-stone-900 group-open:text-stone-700 flex items-center justify-between">
+            <span>{f["q"]}</span>
+            <span class="text-stone-400 text-lg group-open:rotate-180 transition">&darr;</span>
+          </summary>
+          <p class="mt-3 text-sm text-stone-600 leading-relaxed">{f["a"]}</p>
+        </details>'''
+        for f in faqs
+    ])
+    faq_section = f'''
+    <section class="mt-10">
+      <h2 class="font-serif text-2xl font-bold text-stone-900">Frequently asked questions</h2>
+      <div class="mt-4 divide-y divide-stone-200 rounded-xl border border-stone-200 bg-white">
+        {faq_items}
+      </div>
+    </section>
+    '''
+
+    # Author Card
+    author_card = f'''
+    <div class="mt-12 flex flex-col gap-4 rounded-xl border border-stone-200 bg-stone-50 p-6 sm:flex-row sm:items-start">
+      <img src="{author_img}" alt="{author_name}" class="h-24 w-24 flex-shrink-0 rounded-full object-cover shadow-sm" onerror="this.onerror=null;this.src='https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80';"/>
+      <div class="flex-1">
+        <div class="text-xs uppercase tracking-wider text-stone-500 font-semibold">Written by</div>
+        <a class="font-serif text-lg font-bold text-stone-900 hover:underline" href="{author_url}">{author_name}</a>
+        <div class="text-sm text-stone-500 font-medium">{author_role}</div>
+        <p class="mt-2 text-sm text-stone-600 leading-relaxed">{author_bio}</p>
+      </div>
+    </div>
+    '''
+
+    # Related Reading Grid
+    if related_html and len(related_html.strip()) > 50:
+        related_section = f'''
+        <section class="mt-16">
+          <h2 class="mb-6 font-serif text-2xl font-bold text-stone-900">Related reading</h2>
+          <div class="grid gap-6 sm:grid-cols-2 md:grid-cols-3">
+            {related_html}
+          </div>
+        </section>
+        '''
+    else:
+        related_section = ""
+
+    return f'''<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{esc_title} | {clean_domain} Pin Discovery</title>
-  <meta name="description" content="{esc_excerpt}">
-  <meta name="robots" content="index, follow, max-image-preview:large">
-  <link rel="canonical" href="{esc_canonical}">
-  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>&#x1F4CC;</text></svg>">
-  <meta property="og:type" content="article">
-  <meta property="og:title" content="{esc_title}">
-  <meta property="og:description" content="{esc_excerpt}">
-  <meta property="og:image" content="{image_src}">
-  <meta name="twitter:card" content="summary_large_image">
-  <meta name="pinterest-rich-pin" content="true">
-  <script type="application/ld+json">
-{schema_json}
-  </script>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>{esc_title} | {brand_name}</title>
+  <meta name="description" content="{esc_excerpt}"/>
+  <link rel="canonical" href="{canonical_url}"/>
+  <meta property="og:site_name" content="{brand_name}"/>
+  <meta property="og:type" content="article"/>
+  <meta property="og:title" content="{esc_title} | {brand_name}"/>
+  <meta property="og:description" content="{esc_excerpt}"/>
+  <meta property="og:image" content="{image_src}"/>
+  <meta name="twitter:card" content="summary_large_image"/>
+  <meta name="twitter:title" content="{esc_title} | {brand_name}"/>
+  <meta name="twitter:description" content="{esc_excerpt}"/>
+  <meta name="twitter:image" content="{image_src}"/>
+  {multi_tier_schemas}
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
-  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,700;1,400;1,600&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <script src="https://cdn.tailwindcss.com"></script>
-  <style>
-{fallback_css}
-    body {{ background-color: #FFFDF9; }}
-    .pm-container {{ max-width: 1100px; margin: 0 auto; padding: 0 1rem 4rem; }}
-    .pm-floating-pin {{
-      position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 999;
-      background: {accent}; color: #FFFFFF; font-size: 0.8rem; font-weight: 700;
-      padding: 0.75rem 1.25rem; border-radius: 9999px;
-      box-shadow: 0 4px 20px rgba(190,18,60,0.35);
-      transition: transform 0.2s, box-shadow 0.2s;
-      text-decoration: none !important; display: flex; align-items: center; gap: 0.4rem;
-    }}
-    .pm-floating-pin:hover {{ transform: translateY(-2px) scale(1.03); box-shadow: 0 8px 28px rgba(190,18,60,0.4); }}
-    .pm-magazine-banner {{
-      background: {accent}; color: #FFFFFF; text-align: center; padding: 0.5rem 1rem;
-      font-size: 0.65rem; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase;
-    }}
-    .pm-hero-section {{ position: relative; border-radius: 1rem; overflow: hidden; margin-bottom: 2rem; }}
-    .pm-hero-img {{ width: 100%; aspect-ratio: 16/10; object-fit: cover; display: block; transition: transform 0.5s ease; }}
-    .pm-hero-section:hover .pm-hero-img {{ transform: scale(1.02); }}
-    .pm-hero-overlay {{ position: absolute; inset: 0; background: linear-gradient(to top, rgba(18,18,18,0.6) 0%, transparent 55%); }}
-    .pm-hero-meta {{ position: absolute; bottom: 0; left: 0; right: 0; padding: 2rem 2rem 1.5rem; }}
-    .pm-kicker {{ font-size: 0.65rem; font-weight: 700; letter-spacing: 0.15em; text-transform: uppercase; color: rgba(255,255,255,0.75); margin-bottom: 0.4rem; }}
-    .pm-hero-title {{
-      font-family: 'Playfair Display', Georgia, serif;
-      font-size: clamp(1.4rem, 3.5vw, 2.5rem); font-weight: 700; font-style: italic;
-      color: #FFFFFF; line-height: 1.2; text-shadow: 0 2px 8px rgba(0,0,0,0.3);
-    }}
-    .pm-moodboard {{ display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin: 1.5rem 0; }}
-    @media (max-width: 600px) {{ .pm-moodboard {{ grid-template-columns: 1fr; }} }}
-    .pm-pin-card {{
-      background: #FFFFFF; border: 1px solid #F3E8E2; border-radius: 0.875rem;
-      overflow: hidden; transition: transform 0.2s, box-shadow 0.2s; cursor: pointer;
-    }}
-    .pm-pin-card:hover {{ transform: translateY(-3px); box-shadow: 0 12px 28px rgba(0,0,0,0.08); }}
-    .pm-pin-img {{ width: 100%; aspect-ratio: 4/3; object-fit: cover; display: block; }}
-    .pm-pin-body {{ padding: 0.875rem; }}
-    .pm-pin-title {{ font-family: 'Playfair Display', serif; font-size: 0.9rem; font-weight: 600; color: #18181B; margin-bottom: 0.25rem; }}
-    .pm-pin-tag {{ font-size: 0.68rem; color: {accent}; font-weight: 600; }}
-    .pm-article-card {{ background: #FFFFFF; border: 1px solid #F3E8E2; border-radius: 1rem; padding: 2rem; margin-bottom: 2rem; }}
-    .pm-article-title {{ font-family: 'Playfair Display', Georgia, serif; font-size: clamp(1.5rem, 3vw, 2.25rem); font-weight: 700; color: #18181B; line-height: 1.25; margin-bottom: 1rem; }}
-    .pm-excerpt {{ font-size: 1rem; color: #3F3F46; line-height: 1.7; margin-bottom: 1.5rem; font-style: italic; border-left: 3px solid {accent}; padding-left: 1rem; }}
-    .pm-viral-bar {{ background: #FFF1F2; border: 1px solid #FCE7EF; border-radius: 0.75rem; padding: 1.25rem; margin: 1.5rem 0; }}
-    .pm-viral-label {{ font-size: 0.62rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: {accent}; margin-bottom: 0.5rem; }}
-    .pm-viral-score {{ font-family: 'Playfair Display', serif; font-size: 1.75rem; font-weight: 700; color: #18181B; }}
-    .pm-tags {{ display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.75rem; }}
-    .pm-hashtag {{ font-size: 0.72rem; font-weight: 600; color: {accent}; background: #FFF1F2; padding: 0.25rem 0.6rem; border-radius: 9999px; }}
-    .pm-cta-btn {{
-      display: inline-flex; align-items: center; gap: 0.4rem;
-      background: {accent}; color: #FFFFFF !important; font-size: 0.8rem; font-weight: 700;
-      padding: 0.875rem 1.75rem; border-radius: 0.625rem; transition: background 0.2s, transform 0.1s;
-      text-decoration: none;
-    }}
-    .pm-cta-btn:hover {{ background: #9F1239; transform: translateY(-1px); }}
-  </style>
-</head>
-<body>
-
-
-  
-
-{header_html}
-
-  <main class="pseo-main">
-    <div class="pm-container">
-      <div class="pm-hero-section" id="overview" style="position:relative;">
-        <img class="pm-hero-img" src="{image_src}" alt="{esc_title}" width="1100" height="688" fetchpriority="high" decoding="async" onerror="this.onerror=null;this.src='{fallback_svg}';">
-        <div class="pm-hero-overlay"></div>
-        <div class="pm-hero-meta">
-          <div class="pm-kicker">&#x1F4CC; {esc_category} &middot; Visual Inspiration</div>
-          <h1 class="pm-hero-title">{esc_title}</h1>
-        </div>
-        <a href="{pin_href}" target="_blank" rel="noopener noreferrer" class="pseo-pin-save-btn" title="Save to Pinterest">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.373 0 0 5.372 0 12c0 5.084 3.163 9.426 7.627 11.174-.105-.949-.2-2.405.042-3.441.218-.937 1.407-5.965 1.407-5.965s-.359-.719-.359-1.782c0-1.668.967-2.914 2.171-2.914 1.023 0 1.518.769 1.518 1.69 0 1.029-.655 2.568-.994 3.995-.283 1.194.599 2.169 1.777 2.169 2.133 0 3.772-2.249 3.772-5.495 0-2.873-2.064-4.882-5.012-4.882-3.414 0-5.418 2.561-5.418 5.207 0 1.031.397 2.138.893 2.738a.36.36 0 0 1 .083.345l-.333 1.36c-.053.22-.174.267-.402.161-1.499-.698-2.436-2.889-2.436-4.649 0-3.785 2.75-7.262 7.929-7.262 4.163 0 7.398 2.967 7.398 6.931 0 4.136-2.607 7.464-6.227 7.464-1.216 0-2.359-.631-2.75-1.378l-.748 2.853c-.271 1.043-1.002 2.35-1.492 3.146C9.57 23.812 10.763 24 12 24c6.627 0 12-5.373 12-12 0-6.628-5.373-12-12-12z"/></svg>
-          <span>Save</span>
-        </a>
-      </div>
-
-      <div class="pm-article-card">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;">
-          <span style="font-size:0.65rem;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:{accent};">{esc_category}</span>
-          <span style="font-size:0.72rem;color:#71717A;">Updated {(lastmod or "2026")[:10]}</span>
-        </div>
-        <h2 class="pm-article-title">{esc_title}</h2>
-        {byline_html}
-        {article_body_html}
-      </div>
-
-      <div id="related">{related_html}</div>
-    </div>
-  </main>
-
-{footer_html}
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,600;0,700;1,400&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
   <script>
-    document.addEventListener("DOMContentLoaded", function() {{
-      var articleImgs = document.querySelectorAll(".pseo-article-body img");
-      var pageUrl = encodeURIComponent(window.location.href);
-      var pageTitle = encodeURIComponent(document.title || "");
-      articleImgs.forEach(function(img) {{
-        if (img.closest(".pseo-img-wrapper")) return;
-        var wrapper = document.createElement("div");
-        wrapper.className = "pseo-img-wrapper";
-        wrapper.style.position = "relative";
-        wrapper.style.display = "block";
-        wrapper.style.margin = "1.5rem 0";
-        
-        var pinBtn = document.createElement("a");
-        pinBtn.className = "pseo-pin-save-btn";
-        var mediaSrc = encodeURIComponent(img.src || img.getAttribute("src") || "");
-        pinBtn.href = "https://www.pinterest.com/pin/create/button/?url=" + pageUrl + "&media=" + mediaSrc + "&description=" + pageTitle;
-        pinBtn.target = "_blank";
-        pinBtn.rel = "noopener noreferrer";
-        pinBtn.title = "Save to Pinterest";
-        pinBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.373 0 0 5.372 0 12c0 5.084 3.163 9.426 7.627 11.174-.105-.949-.2-2.405.042-3.441.218-.937 1.407-5.965 1.407-5.965s-.359-.719-.359-1.782c0-1.668.967-2.914 2.171-2.914 1.023 0 1.518.769 1.518 1.69 0 1.029-.655 2.568-.994 3.995-.283 1.194.599 2.169 1.777 2.169 2.133 0 3.772-2.249 3.772-5.495 0-2.873-2.064-4.882-5.012-4.882-3.414 0-5.418 2.561-5.418 5.207 0 1.031.397 2.138.893 2.738a.36.36 0 0 1 .083.345l-.333 1.36c-.053.22-.174.267-.402.161-1.499-.698-2.436-2.889-2.436-4.649 0-3.785 2.75-7.262 7.929-7.262 4.163 0 7.398 2.967 7.398 6.931 0 4.136-2.607 7.464-6.227 7.464-1.216 0-2.359-.631-2.75-1.378l-.748 2.853c-.271 1.043-1.002 2.35-1.492 3.146C9.57 23.812 10.763 24 12 24c6.627 0 12-5.373 12-12 0-6.628-5.373-12-12-12z"/></svg><span>Save</span>';
-        
-        img.parentNode.insertBefore(wrapper, img);
-        wrapper.appendChild(img);
-        wrapper.appendChild(pinBtn);
-      }});
-    }});
+    tailwind.config = {{
+      theme: {{
+        extend: {{
+          fontFamily: {{
+            serif: ['Playfair Display', 'Georgia', 'serif'],
+            sans: ['Plus Jakarta Sans', 'system-ui', 'sans-serif'],
+          }}
+        }}
+      }}
+    }}
   </script>
+</head>
+<body class="bg-white text-stone-900 font-sans antialiased">
+  <div class="flex min-h-screen flex-col">
+    {header_markup}
+
+    <main class="flex-1">
+      <article class="mx-auto max-w-3xl px-4 py-10">
+        <!-- Breadcrumb -->
+        <nav aria-label="Breadcrumb" class="mb-6 text-sm text-stone-500">
+          <ol class="flex flex-wrap items-center gap-1">
+            <li class="flex items-center gap-1"><a class="hover:text-stone-900 transition" href="{home_url}">Home</a><span class="px-1 text-stone-400">/</span></li>
+            <li class="flex items-center gap-1"><a class="hover:text-stone-900 transition" href="{cat_url}">{esc_category}</a><span class="px-1 text-stone-400">/</span></li>
+            <li class="flex items-center gap-1"><span class="text-stone-900 font-medium truncate max-w-[240px]">{esc_title}</span></li>
+          </ol>
+        </nav>
+
+        <!-- Category Kicker -->
+        <div class="text-xs font-semibold uppercase tracking-widest text-stone-500">{esc_category}</div>
+
+        <!-- H1 Headline -->
+        <h1 class="mt-2 font-serif text-4xl font-bold leading-tight tracking-tight text-stone-900 md:text-5xl">{esc_title}</h1>
+
+        <!-- Byline -->
+        <div class="mt-4 flex flex-wrap items-center gap-3 text-sm text-stone-500">
+          <span>By <a href="{author_url}" class="text-stone-900 font-medium hover:underline">{author_name}</a></span>
+          <span>•</span>
+          <time datetime="{raw_date}">{formatted_date}</time>
+          <span>•</span>
+          <span>5 min read</span>
+        </div>
+
+        <!-- Hero Featured Image with Pinterest Save Hover Overlay -->
+        <div class="group relative mt-8 overflow-hidden rounded-xl border border-stone-200">
+          <img src="{image_src}" alt="{esc_title}" class="aspect-[3/2] w-full object-cover transition duration-500 group-hover:scale-105" loading="eager" onerror="this.onerror=null;this.src='{fallback_svg}';"/>
+          <a href="{pin_href}" target="_blank" rel="noopener noreferrer" class="absolute top-4 right-4 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold px-3 py-1.5 rounded-full shadow-md flex items-center gap-1.5 opacity-90 group-hover:opacity-100 transition" title="Save to Pinterest">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.373 0 0 5.372 0 12c0 5.084 3.163 9.426 7.627 11.174-.105-.949-.2-2.405.042-3.441.218-.937 1.407-5.965 1.407-5.965s-.359-.719-.359-1.782c0-1.668.967-2.914 2.171-2.914 1.023 0 1.518.769 1.518 1.69 0 1.029-.655 2.568-.994 3.995-.283 1.194.599 2.169 1.777 2.169 2.133 0 3.772-2.249 3.772-5.495 0-2.873-2.064-4.882-5.012-4.882-3.414 0-5.418 2.561-5.418 5.207 0 1.031.397 2.138.893 2.738a.36.36 0 0 1 .083.345l-.333 1.36c-.053.22-.174.267-.402.161-1.499-.698-2.436-2.889-2.436-4.649 0-3.785 2.75-7.262 7.929-7.262 4.163 0 7.398 2.967 7.398 6.931 0 4.136-2.607 7.464-6.227 7.464-1.216 0-2.359-.631-2.75-1.378l-.748 2.853c-.271 1.043-1.002 2.35-1.492 3.146C9.57 23.812 10.763 24 12 24c6.627 0 12-5.373 12-12 0-6.628-5.373-12-12-12z"/></svg>
+            <span>Save</span>
+          </a>
+        </div>
+
+        <!-- Prose Article Body -->
+        <div class="prose prose-stone mt-10 max-w-none text-stone-800 leading-relaxed">
+          {article_prose}
+        </div>
+
+        <!-- Key Takeaways -->
+        {takeaways_section}
+
+        <!-- Frequently Asked Questions -->
+        {faq_section}
+
+        <!-- E-E-A-T Author Card -->
+        {author_card}
+
+        <!-- Related Reading -->
+        {related_section}
+      </article>
+    </main>
+
+    {footer_markup}
+  </div>
 </body>
-</html>"""
+</html>'''
+
+# Alias for backward compatibility
+render_pinterest_mag_layout = render_styleire_layout
+
+
+
+def render_styleire_hub(
+    posts: list[Any],
+    categories: Optional[list[dict[str, str]]] = None,
+    title: str = "",
+    subtitle: str = "",
+    base_url: str = "",
+    theme: str = "pinterest-mag",
+    source_domain: str = "styleire.com",
+    branding: Optional[Any] = None,
+    path_prefix: str = "",
+    **kwargs: Any,
+) -> str:
+    """Renders the Root Organization Hub (/index.html) in Styleire editorial design."""
+    prefix = path_prefix.rstrip("/") if path_prefix else ""
+    home_url = f"{prefix}/" if prefix else "/"
+    brand_name = getattr(branding, "brand_name", "") or "Styleire"
+    clean_domain = _clean_source_domain(source_domain)
+    canonical_base = base_url.rstrip("/") if (base_url and "://" in base_url) else f"https://{clean_domain}"
+
+    header_markup = build_styleire_header(brand_name, path_prefix)
+    footer_markup = build_styleire_footer(brand_name, path_prefix)
+
+    cover_post = posts[0] if posts else None
+    secondary_posts = posts[1:4] if len(posts) > 1 else []
+    remaining_posts = posts[4:] if len(posts) > 4 else posts
+
+    # Cover Post Details
+    if cover_post:
+        c_slug = getattr(cover_post, "slug", "") or (cover_post.get("slug") if isinstance(cover_post, dict) else "guide")
+        c_title = getattr(cover_post, "title", "") or (cover_post.get("title") if isinstance(cover_post, dict) else c_slug.replace("-", " ").title())
+        c_excerpt = getattr(cover_post, "excerpt", "") or (cover_post.get("excerpt") if isinstance(cover_post, dict) else (cover_post.get("description", "") if isinstance(cover_post, dict) else ""))
+        c_cat = getattr(cover_post, "category", "") or (cover_post.get("category") if isinstance(cover_post, dict) else "Living Room")
+        c_date = (getattr(cover_post, "date", "") or (cover_post.get("date") if isinstance(cover_post, dict) else "2026-05-20"))[:10]
+        c_link = f"{prefix}/blog/{c_slug}/"
+        c_cat_link = f"{prefix}/category/{slugify(c_cat)}/"
+        c_img = getattr(cover_post, "local_image_path", "") or (cover_post.get("local_image_path") if isinstance(cover_post, dict) else (cover_post.get("image", "") if isinstance(cover_post, dict) else ""))
+        if not c_img or c_img.endswith(".svg"):
+            c_img = "https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?auto=format&fit=crop&w=1200&q=80"
+        elif not c_img.startswith("http"):
+            c_img = f"{prefix}/{c_img.lstrip('/')}"
+    else:
+        c_slug = "how-to-choose-bedding"
+        c_title = "How to Choose Bedding That Actually Feels Good"
+        c_excerpt = "Thread count is mostly noise. Here is what actually determines how bedding feels and lasts across seasons."
+        c_cat = "Bedroom"
+        c_date = "2026-05-20"
+        c_link = f"{prefix}/blog/{c_slug}/"
+        c_cat_link = f"{prefix}/category/bedroom/"
+        c_img = "https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?auto=format&fit=crop&w=1200&q=80"
+
+    hero_html = f'''
+    <section class="border-b border-stone-200 bg-stone-50/50 py-12 md:py-16">
+      <div class="mx-auto max-w-6xl px-4">
+        <div class="grid gap-8 md:grid-cols-2 md:items-center">
+          <a href="{c_link}" class="group block overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm">
+            <img src="{c_img}" alt="{html_lib.escape(c_title)}" class="aspect-[16/10] w-full object-cover transition duration-700 group-hover:scale-105" loading="eager" width="800" height="500"/>
+          </a>
+          <div class="space-y-4">
+            <a href="{c_cat_link}" class="text-xs font-bold uppercase tracking-widest text-stone-500 hover:text-stone-900 transition">{html_lib.escape(c_cat)}</a>
+            <h1 class="font-serif text-3xl font-bold leading-tight tracking-tight text-stone-900 sm:text-4xl md:text-5xl">
+              <a href="{c_link}" class="hover:underline">{html_lib.escape(c_title)}</a>
+            </h1>
+            <p class="text-base text-stone-600 leading-relaxed max-w-xl">
+              {html_lib.escape(c_excerpt)}
+            </p>
+            <div class="flex items-center gap-3 text-xs text-stone-500 font-medium">
+              <span>By Sophia Bennett</span>
+              <span>•</span>
+              <time datetime="{c_date}">{c_date}</time>
+              <span>•</span>
+              <span>6 min read</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+    '''
+
+    # Silo Taxonomy Grid
+    silo_categories = [
+        ("Living Room", "living-room", "14 guides", "https://images.unsplash.com/photo-1555041469-a586c61ea9bc?auto=format&fit=crop&w=600&q=80"),
+        ("Bedroom", "bedroom", "12 guides", "https://images.unsplash.com/photo-1540518614846-7ede433c4ef7?auto=format&fit=crop&w=600&q=80"),
+        ("Kitchen & Dining", "kitchen-dining", "10 guides", "https://images.unsplash.com/photo-1556911220-e15b29be8c8f?auto=format&fit=crop&w=600&q=80"),
+        ("Outdoor Spaces", "outdoor-spaces", "8 guides", "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=600&q=80"),
+        ("DIY & Craft", "diy-decor", "9 guides", "https://images.unsplash.com/photo-1513519245088-0e12902e5a38?auto=format&fit=crop&w=600&q=80"),
+        ("Seasonal & Trends", "seasonal-trends", "7 guides", "https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=600&q=80"),
+    ]
+    silo_cards = []
+    for s_name, s_slug, s_count, s_img in silo_categories:
+        s_url = f"{prefix}/category/{s_slug}/"
+        silo_cards.append(f'''
+        <a href="{s_url}" class="group relative overflow-hidden rounded-xl border border-stone-200 bg-white shadow-sm transition hover:shadow-md">
+          <div class="aspect-[16/10] overflow-hidden">
+            <img src="{s_img}" alt="{s_name}" class="h-full w-full object-cover transition duration-500 group-hover:scale-105" loading="lazy" width="400" height="250"/>
+          </div>
+          <div class="p-4">
+            <h3 class="font-serif text-lg font-bold text-stone-900 group-hover:underline">{s_name}</h3>
+            <p class="text-xs text-stone-500 mt-1">{s_count}</p>
+          </div>
+        </a>
+        ''')
+    silos_html = "".join(silo_cards)
+
+    # Latest Guides Grid
+    guide_cards = []
+    for p in (remaining_posts or posts)[:12]:
+        p_slug = getattr(p, "slug", "") or (p.get("slug") if isinstance(p, dict) else "guide")
+        p_title = getattr(p, "title", "") or (p.get("title") if isinstance(p, dict) else p_slug.replace("-", " ").title())
+        p_excerpt = getattr(p, "excerpt", "") or (p.get("excerpt") if isinstance(p, dict) else (p.get("description", "") if isinstance(p, dict) else ""))
+        p_cat = getattr(p, "category", "") or (p.get("category") if isinstance(p, dict) else "Living Room")
+        p_date = (getattr(p, "date", "") or (p.get("date") if isinstance(p, dict) else "2026-05-20"))[:10]
+        p_link = f"{prefix}/blog/{p_slug}/"
+        p_cat_link = f"{prefix}/category/{slugify(p_cat)}/"
+        p_img = getattr(p, "local_image_path", "") or (p.get("local_image_path") if isinstance(p, dict) else (p.get("image", "") if isinstance(p, dict) else ""))
+        if not p_img or p_img.endswith(".svg"):
+            p_img = "https://images.unsplash.com/photo-1586023492125-27b2c045efd7?auto=format&fit=crop&w=600&q=80"
+        elif not p_img.startswith("http"):
+            p_img = f"{prefix}/{p_img.lstrip('/')}"
+
+        guide_cards.append(f'''
+        <article class="group flex flex-col overflow-hidden rounded-xl border border-stone-200 bg-white transition hover:shadow-md">
+          <a href="{p_link}" class="block overflow-hidden">
+            <img src="{p_img}" alt="{html_lib.escape(p_title)}" class="aspect-[3/2] w-full object-cover transition duration-500 group-hover:scale-105" loading="lazy" width="600" height="400"/>
+          </a>
+          <div class="flex flex-1 flex-col p-5">
+            <a href="{p_cat_link}" class="text-xs font-bold uppercase tracking-wider text-stone-500 hover:text-stone-900 transition">{html_lib.escape(p_cat)}</a>
+            <h3 class="mt-2 font-serif text-lg font-bold leading-snug text-stone-900">
+              <a href="{p_link}" class="hover:underline">{html_lib.escape(p_title)}</a>
+            </h3>
+            <p class="mt-2 line-clamp-2 flex-1 text-sm text-stone-600 leading-relaxed">
+              {html_lib.escape(p_excerpt)}
+            </p>
+            <div class="mt-4 flex items-center justify-between text-xs text-stone-500 font-medium">
+              <time datetime="{p_date}">{p_date}</time>
+              <span>5 min read</span>
+            </div>
+          </div>
+        </article>
+        ''')
+    guides_html = "".join(guide_cards)
+
+    # WebSite Schema
+    website_schema = f'''<script type="application/ld+json">
+{{"@context":"https://schema.org","@type":"WebSite","name":"{brand_name}","url":"{canonical_base}/","description":"{html_lib.escape(subtitle or "Styleire is an independent home decor publication.")}","publisher":{{"@type":"Organization","name":"{brand_name}","url":"{canonical_base}/"}}}}
+</script>'''
+
+    return f'''<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>{brand_name} — Home decor ideas, guides, and inspiration</title>
+  <meta name="description" content="{html_lib.escape(subtitle or "Styleire is an independent home decor publication with practical guides, expert styling advice, and inspiration for every room of your home.")}"/>
+  <link rel="canonical" href="{canonical_base}/"/>
+  <meta property="og:site_name" content="{brand_name}"/>
+  <meta property="og:type" content="website"/>
+  <meta property="og:title" content="{brand_name} — Home decor ideas, guides, and inspiration"/>
+  <meta property="og:description" content="{html_lib.escape(subtitle or "Styleire is an independent home decor publication.")}"/>
+  <meta property="og:url" content="{canonical_base}/"/>
+  <meta property="og:image" content="{c_img}"/>
+  <meta name="twitter:card" content="summary_large_image"/>
+  {website_schema}
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,600;0,700;1,400&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
+  <script>
+    tailwind.config = {{
+      theme: {{
+        extend: {{
+          fontFamily: {{
+            serif: ['Playfair Display', 'Georgia', 'serif'],
+            sans: ['Plus Jakarta Sans', 'system-ui', 'sans-serif'],
+          }}
+        }}
+      }}
+    }}
+  </script>
+</head>
+<body class="bg-white text-stone-900 font-sans antialiased">
+  <div class="flex min-h-screen flex-col">
+    {header_markup}
+
+    <main class="flex-1">
+      {hero_html}
+
+      <!-- Topic Silos -->
+      <section class="py-12 md:py-16">
+        <div class="mx-auto max-w-6xl px-4">
+          <div class="mb-8 flex items-end justify-between">
+            <div>
+              <h2 class="font-serif text-2xl font-bold tracking-tight text-stone-900 sm:text-3xl">Curated Room Silos</h2>
+              <p class="mt-1 text-sm text-stone-500">Explore architectural guides organized by room and design project.</p>
+            </div>
+          </div>
+          <div class="grid gap-6 sm:grid-cols-2 md:grid-cols-3">
+            {silos_html}
+          </div>
+        </div>
+      </section>
+
+      <!-- Latest Published Guides -->
+      <section class="border-t border-stone-200 bg-stone-50/50 py-12 md:py-16">
+        <div class="mx-auto max-w-6xl px-4">
+          <div class="mb-8 flex items-end justify-between">
+            <div>
+              <h2 class="font-serif text-2xl font-bold tracking-tight text-stone-900 sm:text-3xl">Latest Published Guides</h2>
+              <p class="mt-1 text-sm text-stone-500">Comprehensive styling advice tested in real living spaces.</p>
+            </div>
+            <a href="{prefix}/sitemap/" class="hidden text-sm font-semibold text-stone-900 hover:underline md:inline">View Complete Directory &rarr;</a>
+          </div>
+          <div class="grid gap-6 sm:grid-cols-2 md:grid-cols-3">
+            {guides_html}
+          </div>
+        </div>
+      </section>
+
+      <!-- Newsletter Callout -->
+      <section class="border-t border-stone-200 py-12 md:py-16">
+        <div class="mx-auto max-w-3xl px-4 text-center">
+          <h2 class="font-serif text-3xl font-bold tracking-tight text-stone-900">Practical design advice, straight to your inbox</h2>
+          <p class="mt-3 text-sm text-stone-600 leading-relaxed max-w-lg mx-auto">
+            Join 45,000+ homeowners and stylists receiving our bi-weekly architectural curation, material breakdowns, and room styling breakdowns.
+          </p>
+          <form class="mt-6 flex flex-col sm:flex-row items-center justify-center gap-3 max-w-md mx-auto" onsubmit="event.preventDefault(); alert('Subscribed to Styleire Dispatch!');">
+            <input type="email" placeholder="Enter your email address" required class="w-full rounded-lg border border-stone-300 px-4 py-2.5 text-sm focus:border-stone-900 focus:outline-none"/>
+            <button type="submit" class="w-full sm:w-auto rounded-lg bg-stone-900 px-6 py-2.5 text-sm font-semibold text-white hover:bg-stone-800 transition">Subscribe</button>
+          </form>
+        </div>
+      </section>
+    </main>
+
+    {footer_markup}
+  </div>
+</body>
+</html>'''
+
+
+def render_styleire_category_index(
+    category_name: str,
+    category_slug: str,
+    posts: list[Any],
+    all_categories: Optional[list[dict[str, str]]] = None,
+    base_url: str = "",
+    branding: Optional[Any] = None,
+    source_domain: str = "styleire.com",
+    **kwargs: Any,
+) -> str:
+    """Renders Category Silo Index (/category/<slug>/index.html) in Styleire editorial design."""
+    path_prefix = _extract_path_prefix(base_url)
+    prefix = path_prefix.rstrip("/") if path_prefix else ""
+    home_url = f"{prefix}/" if prefix else "/"
+    brand_name = getattr(branding, "brand_name", "") or "Styleire"
+    clean_domain = _clean_source_domain(source_domain)
+    canonical_base = base_url.rstrip("/") if (base_url and "://" in base_url) else f"https://{clean_domain}"
+    cat_url = f"{prefix}/category/{category_slug}/"
+    clean_name = category_name or category_slug.replace("-", " ").title()
+
+    header_markup = build_styleire_header(brand_name, path_prefix)
+    footer_markup = build_styleire_footer(brand_name, path_prefix)
+
+    # Category Descriptions mapping
+    DESCRIPTIONS = {
+        "bedroom": "Restful bedrooms start with the right bed, bedding, lighting, and layout. Practical guides for every bedroom size.",
+        "living-room": "Living rooms are where homes happen. Layouts, sofas, rugs, lighting, and styling advice for spaces that get lived in.",
+        "kitchen-dining": "Kitchens and dining rooms demand both function and warmth. Practical advice on dining tables, seating, lighting, and layout.",
+        "outdoor-spaces": "Patios, balconies, and backyards designed for year-round living, entertaining, and quiet mornings.",
+        "diy-decor": "Hands-on projects, material guides, and creative craft ideas that make a tangible difference in your home.",
+        "seasonal-trends": "Thoughtful seasonal transitions, color palettes, and enduring design trends that outlast the news cycle.",
+    }
+    desc = DESCRIPTIONS.get(category_slug, f"Practical styling guides, room ideas, and architectural advice for {clean_name.lower()}.")
+
+    guide_cards = []
+    for p in posts:
+        p_slug = getattr(p, "slug", "") or (p.get("slug") if isinstance(p, dict) else "guide")
+        p_title = getattr(p, "title", "") or (p.get("title") if isinstance(p, dict) else p_slug.replace("-", " ").title())
+        p_excerpt = getattr(p, "excerpt", "") or (p.get("excerpt") if isinstance(p, dict) else (p.get("description", "") if isinstance(p, dict) else ""))
+        p_date = (getattr(p, "date", "") or (p.get("date") if isinstance(p, dict) else "2026-05-20"))[:10]
+        p_link = f"{prefix}/blog/{p_slug}/"
+        p_img = getattr(p, "local_image_path", "") or (p.get("local_image_path") if isinstance(p, dict) else (p.get("image", "") if isinstance(p, dict) else ""))
+        if not p_img or p_img.endswith(".svg"):
+            p_img = "https://images.unsplash.com/photo-1540518614846-7ede433c4ef7?auto=format&fit=crop&w=600&q=80"
+        elif not p_img.startswith("http"):
+            p_img = f"{prefix}/{p_img.lstrip('/')}"
+
+        guide_cards.append(f'''
+        <article class="group flex flex-col overflow-hidden rounded-xl border border-stone-200 bg-white transition hover:shadow-md">
+          <a href="{p_link}" class="block overflow-hidden">
+            <img src="{p_img}" alt="{html_lib.escape(p_title)}" class="aspect-[3/2] w-full object-cover transition duration-500 group-hover:scale-105" loading="lazy" width="600" height="400"/>
+          </a>
+          <div class="flex flex-1 flex-col p-5">
+            <span class="text-xs font-bold uppercase tracking-wider text-stone-500">{clean_name}</span>
+            <h3 class="mt-2 font-serif text-lg font-bold leading-snug text-stone-900">
+              <a href="{p_link}" class="hover:underline">{html_lib.escape(p_title)}</a>
+            </h3>
+            <p class="mt-2 line-clamp-2 flex-1 text-sm text-stone-600 leading-relaxed">
+              {html_lib.escape(p_excerpt)}
+            </p>
+            <div class="mt-4 flex items-center justify-between text-xs text-stone-500 font-medium">
+              <time datetime="{p_date}">{p_date}</time>
+              <span>5 min read</span>
+            </div>
+          </div>
+        </article>
+        ''')
+    cards_html = "".join(guide_cards)
+
+    breadcrumb_schema = f'''<script type="application/ld+json">
+{{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{{"@type":"ListItem","position":1,"name":"Home","item":"{canonical_base}/"}},{{"@type":"ListItem","position":2,"name":"{clean_name}","item":"{canonical_base}/category/{category_slug}/"}}]}}
+</script>'''
+
+    return f'''<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>{clean_name} — Guides &amp; Inspiration | {brand_name}</title>
+  <meta name="description" content="{html_lib.escape(desc)}"/>
+  <link rel="canonical" href="{canonical_base}/category/{category_slug}/"/>
+  <meta property="og:site_name" content="{brand_name}"/>
+  <meta property="og:title" content="{clean_name} | {brand_name}"/>
+  <meta property="og:description" content="{html_lib.escape(desc)}"/>
+  {breadcrumb_schema}
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,600;0,700;1,400&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
+  <script>
+    tailwind.config = {{
+      theme: {{
+        extend: {{
+          fontFamily: {{
+            serif: ['Playfair Display', 'Georgia', 'serif'],
+            sans: ['Plus Jakarta Sans', 'system-ui', 'sans-serif'],
+          }}
+        }}
+      }}
+    }}
+  </script>
+</head>
+<body class="bg-white text-stone-900 font-sans antialiased">
+  <div class="flex min-h-screen flex-col">
+    {header_markup}
+
+    <main class="flex-1">
+      <div class="mx-auto max-w-6xl px-4 py-10">
+        <!-- Breadcrumb -->
+        <nav aria-label="Breadcrumb" class="mb-6 text-sm text-stone-500">
+          <ol class="flex flex-wrap items-center gap-1">
+            <li class="flex items-center gap-1"><a class="hover:text-stone-900 transition" href="{home_url}">Home</a><span class="px-1 text-stone-400">/</span></li>
+            <li class="flex items-center gap-1"><span class="text-stone-900 font-medium">{clean_name}</span></li>
+          </ol>
+        </nav>
+
+        <header class="mb-10 max-w-3xl">
+          <h1 class="font-serif text-4xl font-bold tracking-tight text-stone-900 md:text-5xl">{clean_name}</h1>
+          <p class="mt-4 text-lg text-stone-600 leading-relaxed">
+            {desc}
+          </p>
+        </header>
+
+        <div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          {cards_html}
+        </div>
+      </div>
+    </main>
+
+    {footer_markup}
+  </div>
+</body>
+</html>'''
+
+
+def render_author_page(
+    author_name: str = "Sophia Bennett",
+    author_role: str = "Senior Home Decor Editor & Interior Stylist",
+    author_bio: str = "",
+    author_image: str = "",
+    posts: Optional[list[Any]] = None,
+    theme: str = "nordic-studio",
+    base_url: str = "",
+    source_domain: str = "styleire.com",
+    branding: Optional[Any] = None,
+    **kwargs: Any,
+) -> str:
+    """Universal E-E-A-T Author Profile page supporting all 3 templates."""
+    path_prefix = _extract_path_prefix(base_url)
+    prefix = path_prefix.rstrip("/") if path_prefix else ""
+    home_url = f"{prefix}/" if prefix else "/"
+    brand_name = getattr(branding, "brand_name", "") or "Styleire"
+    clean_domain = _clean_source_domain(source_domain)
+    canonical_base = base_url.rstrip("/") if (base_url and "://" in base_url) else f"https://{clean_domain}"
+    author_slug = "sophia-bennett"
+    author_url = f"{canonical_base}/author/{author_slug}/"
+    author_img = author_image or f"{prefix}/assets/images/author-sophia.jpg"
+
+    header_markup = build_styleire_header(brand_name, path_prefix)
+    footer_markup = build_styleire_footer(brand_name, path_prefix)
+
+    posts_list = posts or []
+    guide_cards = []
+    for p in posts_list[:12]:
+        p_slug = getattr(p, "slug", "") or (p.get("slug") if isinstance(p, dict) else "guide")
+        p_title = getattr(p, "title", "") or (p.get("title") if isinstance(p, dict) else p_slug.replace("-", " ").title())
+        p_excerpt = getattr(p, "excerpt", "") or (p.get("excerpt") if isinstance(p, dict) else (p.get("description", "") if isinstance(p, dict) else ""))
+        p_cat = getattr(p, "category", "") or (p.get("category") if isinstance(p, dict) else "Guides")
+        p_date = (getattr(p, "date", "") or (p.get("date") if isinstance(p, dict) else "2026-05-20"))[:10]
+        p_link = f"{prefix}/blog/{p_slug}/"
+        p_img = getattr(p, "local_image_path", "") or (p.get("local_image_path") if isinstance(p, dict) else (p.get("image", "") if isinstance(p, dict) else ""))
+        if not p_img or p_img.endswith(".svg"):
+            p_img = "https://images.unsplash.com/photo-1540518614846-7ede433c4ef7?auto=format&fit=crop&w=600&q=80"
+        elif not p_img.startswith("http"):
+            p_img = f"{prefix}/{p_img.lstrip('/')}"
+
+        guide_cards.append(f'''
+        <article class="group flex flex-col overflow-hidden rounded-xl border border-stone-200 bg-white transition hover:shadow-md">
+          <a href="{p_link}" class="block overflow-hidden">
+            <img src="{p_img}" alt="{html_lib.escape(p_title)}" class="aspect-[3/2] w-full object-cover transition duration-500 group-hover:scale-105" loading="lazy" width="600" height="400"/>
+          </a>
+          <div class="flex flex-1 flex-col p-5">
+            <span class="text-xs font-bold uppercase tracking-wider text-stone-500">{html_lib.escape(p_cat)}</span>
+            <h3 class="mt-2 font-serif text-lg font-bold leading-snug text-stone-900">
+              <a href="{p_link}" class="hover:underline">{html_lib.escape(p_title)}</a>
+            </h3>
+            <p class="mt-2 line-clamp-2 flex-1 text-sm text-stone-600 leading-relaxed">
+              {html_lib.escape(p_excerpt)}
+            </p>
+            <div class="mt-4 flex items-center justify-between text-xs text-stone-500 font-medium">
+              <time datetime="{p_date}">{p_date}</time>
+              <span>5 min read</span>
+            </div>
+          </div>
+        </article>
+        ''')
+    articles_html = "".join(guide_cards)
+
+    author_schema = f'''<script type="application/ld+json">
+{{"@context":"https://schema.org","@type":"Person","name":"{author_name}","url":"{author_url}","jobTitle":"{author_role}","description":"{author_name} is a certified interior stylist with 8+ years experience."}}
+</script>'''
+
+    return f'''<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>{author_name} — {author_role} | {brand_name}</title>
+  <meta name="description" content="Editorial portfolio and published interior guides by {author_name}."/>
+  <link rel="canonical" href="{author_url}"/>
+  {author_schema}
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,600;0,700;1,400&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
+  <script>
+    tailwind.config = {{
+      theme: {{
+        extend: {{
+          fontFamily: {{
+            serif: ['Playfair Display', 'Georgia', 'serif'],
+            sans: ['Plus Jakarta Sans', 'system-ui', 'sans-serif'],
+          }}
+        }}
+      }}
+    }}
+  </script>
+</head>
+<body class="bg-white text-stone-900 font-sans antialiased">
+  <div class="flex min-h-screen flex-col">
+    {header_markup}
+
+    <main class="flex-1">
+      <div class="mx-auto max-w-6xl px-4 py-10">
+        <!-- Breadcrumb -->
+        <nav aria-label="Breadcrumb" class="mb-6 text-sm text-stone-500">
+          <ol class="flex flex-wrap items-center gap-1">
+            <li class="flex items-center gap-1"><a class="hover:text-stone-900 transition" href="{home_url}">Home</a><span class="px-1 text-stone-400">/</span></li>
+            <li class="flex items-center gap-1"><span class="text-stone-900 font-medium">{author_name}</span></li>
+          </ol>
+        </nav>
+
+        <div class="grid gap-10 md:grid-cols-3">
+          <aside class="md:col-span-1 space-y-6">
+            <img src="{author_img}" alt="{author_name}" class="w-full rounded-2xl object-cover shadow-sm aspect-square" onerror="this.onerror=null;this.src='https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=600&q=80';"/>
+            <div class="rounded-xl border border-stone-200 bg-stone-50 p-5 space-y-3">
+              <div class="text-xs uppercase tracking-wider text-stone-500 font-bold">Contact &amp; Profiles</div>
+              <div class="text-sm">
+                <a href="mailto:editorial@{clean_domain}" class="text-stone-900 font-medium hover:underline">editorial@{clean_domain}</a>
+              </div>
+              <div class="flex flex-wrap gap-3 text-xs text-stone-600 font-medium pt-2 border-t border-stone-200">
+                <a href="https://twitter.com/" target="_blank" rel="noopener" class="hover:text-stone-900">Twitter</a>
+                <a href="https://pinterest.com/" target="_blank" rel="noopener" class="hover:text-stone-900">Pinterest</a>
+                <a href="https://linkedin.com/" target="_blank" rel="noopener" class="hover:text-stone-900">LinkedIn</a>
+              </div>
+            </div>
+          </aside>
+
+          <div class="md:col-span-2 space-y-6">
+            <div>
+              <h1 class="font-serif text-4xl font-bold tracking-tight text-stone-900 md:text-5xl">{author_name}</h1>
+              <p class="mt-2 text-lg text-stone-600 font-medium">{author_role}</p>
+              <p class="mt-1 text-sm text-stone-500">8+ years in interior styling &amp; architectural journalism</p>
+            </div>
+
+            <section class="space-y-4 text-base leading-relaxed text-stone-700">
+              <p>Sophia began her career as an assistant on residential styling shoots before moving into full-time editorial journalism. Since then, she has written and edited hundreds of long-form guides on furniture selection, spatial layout, color theory, layered lighting, and sustainable home design.</p>
+              <p>At {brand_name}, she leads a dedicated editorial team that tests decor products in real homes, interviews practicing interior architects, and rigorously audits every guide for real-world accuracy before publication. She personally fact-checks all material, care, and safety guidance.</p>
+              <p>Sophia holds a certificate in interior styling from the KLC School of Design and lives in an 1890s brick home that serves as her constant testing ground for paint finishes, textiles, and joinery.</p>
+            </section>
+
+            <div class="pt-8 border-t border-stone-200">
+              <h2 class="font-serif text-2xl font-bold tracking-tight text-stone-900 mb-6">Published Guides by {author_name} ({len(posts_list)})</h2>
+              <div class="grid gap-6 sm:grid-cols-2">
+                {articles_html}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    {footer_markup}
+  </div>
+</body>
+</html>'''
+
+
+def render_trust_page(
+    slug: str,
+    title: str = "",
+    content_html: str = "",
+    theme: str = "nordic-studio",
+    base_url: str = "",
+    source_domain: str = "styleire.com",
+    branding: Optional[Any] = None,
+    **kwargs: Any,
+) -> str:
+    """Universal Legal and Compliance Trust page supporting all 3 templates."""
+    path_prefix = _extract_path_prefix(base_url)
+    prefix = path_prefix.rstrip("/") if path_prefix else ""
+    home_url = f"{prefix}/" if prefix else "/"
+    brand_name = getattr(branding, "brand_name", "") or "Styleire"
+    clean_domain = _clean_source_domain(source_domain)
+    canonical_base = base_url.rstrip("/") if (base_url and "://" in base_url) else f"https://{clean_domain}"
+    page_url = f"{canonical_base}/{slug}/"
+
+    from app.themes.trust_content import get_trust_page_content
+    data = get_trust_page_content(slug, brand_name=brand_name, domain=clean_domain)
+    page_title = title or data["title"]
+    page_subtitle = data.get("subtitle", "")
+    page_content = content_html or data["content_html"]
+
+    header_markup = build_styleire_header(brand_name, path_prefix)
+    footer_markup = build_styleire_footer(brand_name, path_prefix)
+
+    return f'''<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>{page_title} | {brand_name}</title>
+  <meta name="description" content="{html_lib.escape(page_subtitle or f"Official {page_title} for {brand_name}.")}">
+  <link rel="canonical" href="{page_url}"/>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,600;0,700;1,400&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
+  <script>
+    tailwind.config = {{
+      theme: {{
+        extend: {{
+          fontFamily: {{
+            serif: ['Playfair Display', 'Georgia', 'serif'],
+            sans: ['Plus Jakarta Sans', 'system-ui', 'sans-serif'],
+          }}
+        }}
+      }}
+    }}
+  </script>
+</head>
+<body class="bg-white text-stone-900 font-sans antialiased">
+  <div class="flex min-h-screen flex-col">
+    {header_markup}
+
+    <main class="flex-1">
+      <article class="mx-auto max-w-3xl px-4 py-10">
+        <!-- Breadcrumb -->
+        <nav aria-label="Breadcrumb" class="mb-6 text-sm text-stone-500">
+          <ol class="flex flex-wrap items-center gap-1">
+            <li class="flex items-center gap-1"><a class="hover:text-stone-900 transition" href="{home_url}">Home</a><span class="px-1 text-stone-400">/</span></li>
+            <li class="flex items-center gap-1"><span class="text-stone-900 font-medium">{page_title}</span></li>
+          </ol>
+        </nav>
+
+        <h1 class="font-serif text-4xl font-bold tracking-tight text-stone-900 md:text-5xl">{page_title}</h1>
+        {f'<p class="mt-4 text-lg text-stone-600 leading-relaxed">{page_subtitle}</p>' if page_subtitle else ""}
+
+        <div class="prose prose-stone mt-8 max-w-none text-stone-800 leading-relaxed">
+          {page_content}
+        </div>
+      </article>
+    </main>
+
+    {footer_markup}
+  </div>
+</body>
+</html>'''
+
+
+def render_html_sitemap(
+    posts: list[Any],
+    categories: Optional[list[dict[str, str]]] = None,
+    theme: str = "nordic-studio",
+    base_url: str = "",
+    source_domain: str = "styleire.com",
+    branding: Optional[Any] = None,
+    **kwargs: Any,
+) -> str:
+    """Universal HTML Sitemap Directory (/sitemap/index.html) supporting all 3 templates."""
+    path_prefix = _extract_path_prefix(base_url)
+    prefix = path_prefix.rstrip("/") if path_prefix else ""
+    home_url = f"{prefix}/" if prefix else "/"
+    brand_name = getattr(branding, "brand_name", "") or "Styleire"
+    clean_domain = _clean_source_domain(source_domain)
+    canonical_base = base_url.rstrip("/") if (base_url and "://" in base_url) else f"https://{clean_domain}"
+    sitemap_url = f"{canonical_base}/sitemap/"
+
+    header_markup = build_styleire_header(brand_name, path_prefix)
+    footer_markup = build_styleire_footer(brand_name, path_prefix)
+
+    # Categories List
+    cat_items = []
+    default_cats = [
+        ("Living Room", "living-room"),
+        ("Bedroom", "bedroom"),
+        ("Kitchen & Dining", "kitchen-dining"),
+        ("Outdoor Spaces", "outdoor-spaces"),
+        ("DIY & Craft", "diy-decor"),
+        ("Seasonal & Trends", "seasonal-trends"),
+    ]
+    for c_name, c_slug in default_cats:
+        c_url = f"{prefix}/category/{c_slug}/"
+        cat_items.append(f'<li><a class="hover:underline text-stone-700 hover:text-stone-900" href="{c_url}">{c_name}</a></li>')
+    cats_html = "".join(cat_items)
+
+    # Trust Pages List
+    trust_links = [
+        ("Home", f"{home_url}"),
+        ("About Us", f"{prefix}/about/"),
+        ("Contact & Support", f"{prefix}/contact/"),
+        ("Editorial Policy", f"{prefix}/editorial-policy/"),
+        ("Fact-Checking Policy", f"{prefix}/fact-checking-policy/"),
+        ("Privacy Policy", f"{prefix}/privacy-policy/"),
+        ("Cookie Policy", f"{prefix}/cookie-policy/"),
+        ("Terms & Conditions", f"{prefix}/terms/"),
+        ("Disclaimer", f"{prefix}/disclaimer/"),
+        ("Copyright & Image Rights", f"{prefix}/copyright/"),
+        ("Author Profile (Sophia Bennett)", f"{prefix}/author/sophia-bennett/"),
+    ]
+    trust_items = [f'<li><a class="hover:underline text-stone-700 hover:text-stone-900" href="{url}">{name}</a></li>' for name, url in trust_links]
+    trust_html = "".join(trust_items)
+
+    # Blog Posts by Category
+    posts_by_cat: dict[str, list[Any]] = {}
+    for p in posts:
+        c = getattr(p, "category", "") or (p.get("category") if isinstance(p, dict) else "General")
+        posts_by_cat.setdefault(c, []).append(p)
+
+    grouped_guides = []
+    for cat_name, cat_posts in posts_by_cat.items():
+        links = []
+        for p in cat_posts:
+            p_slug = getattr(p, "slug", "") or (p.get("slug") if isinstance(p, dict) else "guide")
+            p_title = getattr(p, "title", "") or (p.get("title") if isinstance(p, dict) else p_slug.replace("-", " ").title())
+            p_link = f"{prefix}/blog/{p_slug}/"
+            links.append(f'<li><a class="hover:underline text-stone-700 hover:text-stone-900" href="{p_link}">{html_lib.escape(p_title)}</a></li>')
+        grouped_guides.append(f'''
+        <div class="space-y-3">
+          <h3 class="font-serif text-lg font-bold text-stone-900 border-b border-stone-200 pb-1">{html_lib.escape(cat_name)}</h3>
+          <ul class="space-y-2 text-sm">
+            {"".join(links)}
+          </ul>
+        </div>
+        ''')
+    guides_grouped_html = "".join(grouped_guides)
+
+    return f'''<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Sitemap &amp; Complete Directory | {brand_name}</title>
+  <meta name="description" content="Complete directory of all architectural guides, category silos, and legal policies on {brand_name}."/>
+  <link rel="canonical" href="{sitemap_url}"/>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,600;0,700;1,400&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
+  <script>
+    tailwind.config = {{
+      theme: {{
+        extend: {{
+          fontFamily: {{
+            serif: ['Playfair Display', 'Georgia', 'serif'],
+            sans: ['Plus Jakarta Sans', 'system-ui', 'sans-serif'],
+          }}
+        }}
+      }}
+    }}
+  </script>
+</head>
+<body class="bg-white text-stone-900 font-sans antialiased">
+  <div class="flex min-h-screen flex-col">
+    {header_markup}
+
+    <main class="flex-1">
+      <div class="mx-auto max-w-4xl px-4 py-10">
+        <!-- Breadcrumb -->
+        <nav aria-label="Breadcrumb" class="mb-6 text-sm text-stone-500">
+          <ol class="flex flex-wrap items-center gap-1">
+            <li class="flex items-center gap-1"><a class="hover:text-stone-900 transition" href="{home_url}">Home</a><span class="px-1 text-stone-400">/</span></li>
+            <li class="flex items-center gap-1"><span class="text-stone-900 font-medium">Sitemap</span></li>
+          </ol>
+        </nav>
+
+        <h1 class="font-serif text-4xl font-bold tracking-tight text-stone-900 md:text-5xl">Sitemap</h1>
+        <p class="mt-2 text-stone-600">Explore the complete index of architectural guides, category silos, and publication policies.</p>
+
+        <!-- Section 1: Main Site Pages -->
+        <section class="mt-10">
+          <h2 class="font-serif text-2xl font-bold text-stone-900 mb-4">Site Pages &amp; Governance</h2>
+          <ul class="grid gap-2 sm:grid-cols-2 text-sm">
+            {trust_html}
+          </ul>
+        </section>
+
+        <!-- Section 2: Topic Silos -->
+        <section class="mt-10 pt-8 border-t border-stone-200">
+          <h2 class="font-serif text-2xl font-bold text-stone-900 mb-4">Topic Silos &amp; Curated Rooms</h2>
+          <ul class="grid gap-2 sm:grid-cols-2 text-sm">
+            {cats_html}
+          </ul>
+        </section>
+
+        <!-- Section 3: All Published Guides -->
+        <section class="mt-10 pt-8 border-t border-stone-200">
+          <h2 class="font-serif text-2xl font-bold text-stone-900 mb-6">All Published Guides ({len(posts)})</h2>
+          <div class="space-y-8">
+            {guides_grouped_html}
+          </div>
+        </section>
+      </div>
+    </main>
+
+    {footer_markup}
+  </div>
+</body>
+</html>'''
 
 
 def render_post(
@@ -2317,8 +3268,8 @@ def render_post(
 
     if theme == "nordic-studio":
         return render_nordic_studio_layout(**layout_args)
-    if theme == "pinterest-mag":
-        return render_pinterest_mag_layout(**layout_args)
+    if theme in ("pinterest-mag", "styleire"):
+        return render_styleire_layout(**layout_args)
     return render_editorial_warm_layout(**layout_args)
 
 
@@ -2337,6 +3288,18 @@ def render_category_index(
     Renders an intermediate category silo index page (e.g. /ikea-hacks/index.html)
     guaranteeing non-404 traversal with curated post cards.
     """
+    if theme in ("pinterest-mag", "styleire"):
+        return render_styleire_category_index(
+            category_name=category_name,
+            category_slug=category_slug,
+            posts=posts,
+            all_categories=all_categories,
+            base_url=base_url,
+            branding=branding,
+            source_domain=source_domain,
+            **kwargs,
+        )
+
     path_prefix = _extract_path_prefix(base_url)
     theme_tokens = get_theme_tokens(theme)
     clean_domain = _clean_source_domain(source_domain)
@@ -3935,6 +4898,20 @@ def render_hub(
 
     if theme == "nordic-studio":
         return render_nordic_studio_hub(
+            posts=posts,
+            categories=categories,
+            title=hub_title,
+            subtitle=hub_subtitle,
+            base_url=base_url,
+            theme=theme,
+            source_domain=source_domain,
+            branding=branding,
+            path_prefix=path_prefix,
+            **kwargs,
+        )
+
+    if theme in ("pinterest-mag", "styleire"):
+        return render_styleire_hub(
             posts=posts,
             categories=categories,
             title=hub_title,

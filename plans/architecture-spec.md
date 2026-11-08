@@ -2394,3 +2394,115 @@ The Nordroom is an internationally celebrated interior design and Scandinavian l
 | **N2** | **UI & Backend Worker** | `app/themes/templates.py`, `app/config.py`, `app/dashboard/server.py`, `app/dashboard/static/app.js`, `app/dashboard/static/index.html` | Implement `render_nordic_studio_hub`, modernize `render_nordic_studio_layout`, update default theme across config & dashboard |
 | **N3** | **QA Critic** | `python -m compileall`, `node -c`, Playwright live browser | Compile checks, verify `http://127.0.0.1:8080/` modal renders The Nordroom Hub and Article views with 0 errors, capture screenshots |
 | **N4** | **Master Orchestrator** | `plans/master-task-board.md`, `walkthrough.md`, git repo | Zero-placeholder audit (`TODO`/`FIXME`), git clone synchronization, commit, walkthrough update |
+
+
+## 38. Production Static Site Architecture & pSEO Hierarchy Alignment Specification
+
+### 38.1 Forensic Analysis of `static-site` Reference
+A comprehensive analysis of `C:\Users\mouni\Desktop\github cloudlare\static-site` reveals a production-grade programmatic SEO (pSEO) publication architecture:
+- **Total Entities**: 82 directories, 78 HTML pages, 128 optimized JPG images, 1 consolidated Tailwind v4 CSS bundle, 20 optimized JS chunks.
+- **Routing & Directory Taxonomy**:
+  1. **Root Hub**: `/index.html` (`http://styleire.com/`)
+  2. **Blog Posts**: `/blog/<slug>/index.html` (60 curated guides)
+  3. **Category Silos**: `/category/<category_slug>/index.html` (6 silos: `bedroom`, `diy-decor`, `kitchen-dining`, `living-room`, `outdoor-spaces`, `seasonal-trends`)
+  4. **Author Bio (E-E-A-T)**: `/author/<author_slug>/index.html` (`sophia-bennett`)
+  5. **HTML Sitemap**: `/sitemap/index.html` (Complete human-readable directory linking to all 78 pages)
+  6. **Trust & Compliance Suite (9 Pages)**:
+     - `/about/index.html`
+     - `/contact/index.html`
+     - `/privacy-policy/index.html`
+     - `/terms/index.html`
+     - `/disclaimer/index.html`
+     - `/editorial-policy/index.html`
+     - `/fact-checking-policy/index.html`
+     - `/cookie-policy/index.html`
+     - `/copyright/index.html`
+  7. **Technical SEO & Monetization Assets**:
+     - `/robots.txt` (User-agent: * Allow: / Sitemap: sitemap.xml)
+     - `/sitemap.xml` (Full 78-URL XML index with `<lastmod>`, `<changefreq>`, `<priority>`)
+     - `/ads.txt` (IAB Tech Lab spec 1.1 ready for AdSense / Mediavine)
+     - `/favicon.ico`
+
+### 38.2 Programmatic SEO (pSEO) Structure & Schemas
+The reference site implements strict 3-tier JSON-LD schema markup on every article page:
+1. **Schema 1: `@type: "Article"`**:
+   - `headline`, `description`, `image` array, `datePublished`, `dateModified`.
+   - `author`: `@type: "Person"` with `name` and `url` (`http://styleire.com/author/sophia-bennett`).
+   - `publisher`: `@type: "Organization"` with `name`, `url`, and `logo`.
+2. **Schema 2: `@type: "FAQPage"`**:
+   - Array of `Question` and `Answer` matching visible on-page FAQ accordion.
+3. **Schema 3: `@type: "BreadcrumbList"`**:
+   - Position 1: `Home` (`/`)
+   - Position 2: `Category` (`/category/<category_slug>`)
+   - Position 3: `Article Title` (`/blog/<slug>`)
+4. **Homepage Schema**: `@type: "WebSite"` with publisher Organization.
+5. **Author Schema**: `@type: "Person"` with jobTitle, bio, description, and list of written works.
+
+### 38.3 URL Routing Mode: `pseo_nested_silo`
+In `app/routing/resolver.py`, register a dedicated routing mode:
+- **Identifier**: `pseo_nested_silo` (aliases: `styleire`, `blog_nested`, `silo_styleire`)
+- **Post URL**: `/blog/<slug>/` -> `blog/<slug>/index.html`
+- **Category URL**: `/category/<category_slug>/` -> `category/<category_slug>/index.html`
+- **Author URL**: `/author/<author_slug>/` -> `author/<author_slug>/index.html`
+- **HTML Sitemap**: `/sitemap/` -> `sitemap/index.html`
+- **Trust Pages**: `/<trust_slug>/` -> `<trust_slug>/index.html`
+
+### 38.4 Generator Engine Upgrades (`app/generator/site_builder.py`)
+Enhance `SiteBuilder.build()` to orchestrate the exact structure:
+1. Compile `/index.html` (Root Organization Hub).
+2. Compile all posts to `/blog/<slug>/index.html` with 3-tier JSON-LD schemas (`Article`, `FAQPage`, `BreadcrumbList`).
+3. Compile all category silos to `/category/<category_slug>/index.html`.
+4. Compile author profile page to `/author/<author_slug>/index.html` with E-E-A-T credentials and article grid.
+5. Compile 9 Trust/Legal pages (`about`, `contact`, `privacy-policy`, `terms`, `disclaimer`, `editorial-policy`, `fact-checking-policy`, `cookie-policy`, `copyright`).
+6. Compile human-readable HTML Sitemap to `/sitemap/index.html`.
+7. Generate `/sitemap.xml` listing all 78 URLs with accurate priorities.
+8. Generate `/robots.txt` and copy `/ads.txt` to root.
+
+### 38.5 Universal 3-Template Support for pSEO Architecture
+The pSEO structural system is universally supported across all 3 design templates:
+1. **Model 1 · Kinfolk Journal (`editorial-warm`)**: Warm terracotta & sage tones, Playfair Display typography, magazine layout with full pSEO silo routing, multi-schema JSON-LD, author profile, 9 trust pages, and HTML sitemap.
+2. **Model 2 · The Nordroom (`nordic-studio`)**: Scandinavian minimalist aesthetic, 740px reading width, Cormorant Garamond serif headlines, clean taxonomy with full pSEO silo routing, multi-schema JSON-LD, author profile, 9 trust pages, and HTML sitemap.
+3. **Model 3 · Styleire Magazine (`pinterest-mag` / `styleire`)**: Replaced with the complete Styleire modern editorial magazine layout matching `static-site`, featuring a sticky clean header, 768px article body, Pinterest hover pin button, 'Key takeaways' card, 'Frequently asked questions' accordion, rich author box, related reading grid, and 4-column trust footer.
+
+All 3 templates seamlessly render:
+- Single Article Guides (with breadcrumbs, single clean H1, takeaways, FAQ accordion, author box, related guides, and 3-tier JSON-LD schemas).
+- Homepage / Root Hub (`/index.html`).
+- Category Silo Indexes (`/category/<category_slug>/index.html`).
+- Author E-E-A-T Profile Page (`/author/<author_slug>/index.html`).
+- HTML Sitemap Directory (`/sitemap/index.html`).
+- 9 Legal/Trust Compliance Pages (`about`, `contact`, `privacy-policy`, `terms`, `disclaimer`, `editorial-policy`, `fact-checking-policy`, `cookie-policy`, `copyright`).
+
+### 38.6 Complete Styleire Specification for Template 3
+Template 3 (`pinterest-mag` / `styleire`) is fully rebuilt to match `static-site`:
+- **Masthead / Header**:
+  - Top bar with sticky blur (`backdrop-blur bg-background/85`).
+  - Serif brand logo ('Styleire' or branding override).
+  - Navigation links: `Living Room`, `Bedroom`, `Kitchen & Dining`, `Outdoor Spaces`, `DIY & Craft`, `Seasonal & Trends`, plus `About`.
+  - Mobile scrollable category bar.
+- **Article Guide Layout (`render_styleire_layout`)**:
+  - Breadcrumbs `<nav aria-label="Breadcrumb">` linking `Home / Category / Article Title`.
+  - Uppercase category kicker (`text-xs font-semibold uppercase tracking-widest text-primary/80`).
+  - H1 headline in serif typography (`font-serif text-4xl font-bold leading-tight tracking-tight md:text-5xl`).
+  - Byline: `By {author_name} • {formatted_date} • {read_time} min read`.
+  - Pinterest pin button and social share row.
+  - Featured hero image with Pinterest save overlay.
+  - Clean prose body (`prose prose-neutral mt-10 max-w-none`).
+  - **Key Takeaways Callout**: `<section class="mt-10 rounded-lg border border-primary/20 bg-primary/5 p-6">` with `<h2 class="font-serif text-xl font-semibold">Key takeaways</h2>` and bullet items.
+  - **Frequently Asked Questions**: `<section class="mt-10"><h2 class="font-serif text-2xl font-semibold">Frequently asked questions</h2><div class="mt-4 divide-y rounded-lg border">...` with `<details class="group p-5"><summary class="cursor-pointer text-base font-medium">...</summary><p class="mt-2 text-sm text-muted-foreground">...</p></details>`.
+  - **E-E-A-T Author Card**: `<div class="mt-12 flex flex-col gap-4 rounded-lg border bg-muted/30 p-6 sm:flex-row sm:items-start">` with 112x112 avatar, name, credentials, and bio.
+  - **Related Reading Grid**: 3-card grid matching category silo.
+  - **Footer**: 4-column layout with brand bio, category explore links, 10 legal/trust links, and copyright notice.
+- **Homepage Hub Layout (`render_styleire_hub`)**:
+  - Featured cover story with high-resolution imagery and read-time badges.
+  - Curated category silo cards.
+  - Latest guides grid.
+  - Newsletter subscription banner.
+  - Full legal footer with links to all 9 trust pages and HTML sitemap.
+
+### 38.7 Milestones Roadmap (S1-S4)
+| Milestone | Role | Target Modules | Verification Scope |
+| :---: | :--- | :--- | :--- |
+| **S1** | **Technical Architect** | `plans/architecture-spec.md`, `plans/master-task-board.md` | Forensic analysis of `static-site`, blueprint specification, task board registration |
+| **S2** | **Backend & UI Worker** | `app/routing/resolver.py`, `app/seo/schema.py`, `app/seo/sitemap.py`, `app/generator/site_builder.py`, `app/themes/templates.py`, `app/dashboard/` | Implement `pseo_nested_silo` routing, 3-tier schemas, Styleire layout (Template 3 replacement), universal author/trust/sitemap renderers |
+| **S3** | **QA Critic** | `python -m compileall`, automated test suite, live build into `dist/` | Build full site, assert exact 78 routes, 0 dead links, sitemap.xml validation, Playwright verification |
+| **S4** | **Master Orchestrator** | `plans/master-task-board.md`, `walkthrough.md`, git repo | Zero-placeholder audit, git clone sync, commit, walkthrough update |

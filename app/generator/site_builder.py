@@ -135,12 +135,22 @@ THEME_PALETTES = {
         "font_heading": "'Plus Jakarta Sans', sans-serif",
     },
     "pinterest-mag": {
-        "bg_body": "#FFFDF9",
-        "text_body": "#18181B",
-        "accent": "#BE123C",
+        "bg_body": "#FFFFFF",
+        "text_body": "#09090B",
+        "accent": "#09090B",
         "header_bg": "#FFFFFF",
         "card_bg": "#FFFFFF",
-        "border": "#F4F4F5",
+        "border": "#E4E4E7",
+        "font_family": "'Plus Jakarta Sans', sans-serif",
+        "font_heading": "'Playfair Display', Georgia, serif",
+    },
+    "styleire": {
+        "bg_body": "#FFFFFF",
+        "text_body": "#09090B",
+        "accent": "#09090B",
+        "header_bg": "#FFFFFF",
+        "card_bg": "#FFFFFF",
+        "border": "#E4E4E7",
         "font_family": "'Plus Jakarta Sans', sans-serif",
         "font_heading": "'Playfair Display', Georgia, serif",
     },
@@ -1324,6 +1334,7 @@ class SiteBuilder:
         posts: list[PostItem],
         post_routes: dict[str, RouteResult],
         intermediate_routes: list[IntermediateRoute],
+        extra_pages: Optional[list[dict[str, Any]]] = None,
     ) -> tuple[str, str]:
         """Generates robots.txt and sitemap.xml adhering strictly to R5."""
         clean_base = self.base_url.rstrip("/")
@@ -1375,6 +1386,7 @@ Sitemap: {sitemap_url}
                     posts=posts,
                     base_url=clean_base,
                     hub_urls=hub_urls,
+                    extra_pages=extra_pages,
                 )
             except Exception:
                 sitemap_xml = self._build_standalone_sitemap_xml(posts, post_routes, intermediate_routes)
@@ -1543,8 +1555,87 @@ Sitemap: {sitemap_url}
             errors.append(f"Error rendering root hub: {e}")
 
         # 7. Generate robots.txt and sitemap.xml
+        # 6b. Render E-E-A-T Author Page (/author/sophia-bennett/index.html)
+        author_file = os.path.join(abs_output_dir, "author", "sophia-bennett", "index.html")
+        os.makedirs(os.path.dirname(author_file), exist_ok=True)
+        try:
+            from app.themes.templates import render_author_page
+            author_html = render_author_page(
+                author_name="Sophia Bennett",
+                posts=posts,
+                theme=self.theme,
+                base_url=self.base_url,
+                source_domain=self.source_domain,
+                branding=getattr(self.config, "branding", None),
+            )
+            with open(author_file, "w", encoding="utf-8") as f:
+                f.write(author_html)
+            files_created.append("author/sophia-bennett/index.html")
+        except Exception as e:
+            errors.append(f"Error rendering author page: {e}")
+
+        # 6c. Render 9 Trust & Compliance Pages
+        trust_slugs = [
+            "about", "contact", "editorial-policy", "fact-checking-policy",
+            "privacy-policy", "cookie-policy", "terms", "disclaimer", "copyright"
+        ]
+        try:
+            from app.themes.templates import render_trust_page
+            for t_slug in trust_slugs:
+                t_file = os.path.join(abs_output_dir, t_slug, "index.html")
+                os.makedirs(os.path.dirname(t_file), exist_ok=True)
+                t_html = render_trust_page(
+                    slug=t_slug,
+                    theme=self.theme,
+                    base_url=self.base_url,
+                    source_domain=self.source_domain,
+                    branding=getattr(self.config, "branding", None),
+                )
+                with open(t_file, "w", encoding="utf-8") as f:
+                    f.write(t_html)
+                files_created.append(f"{t_slug}/index.html")
+        except Exception as e:
+            errors.append(f"Error rendering trust pages: {e}")
+
+        # 6d. Render HTML Sitemap Directory (/sitemap/index.html)
+        sitemap_html_file = os.path.join(abs_output_dir, "sitemap", "index.html")
+        os.makedirs(os.path.dirname(sitemap_html_file), exist_ok=True)
+        try:
+            from app.themes.templates import render_html_sitemap
+            sitemap_html = render_html_sitemap(
+                posts=posts,
+                categories=categories,
+                theme=self.theme,
+                base_url=self.base_url,
+                source_domain=self.source_domain,
+                branding=getattr(self.config, "branding", None),
+            )
+            with open(sitemap_html_file, "w", encoding="utf-8") as f:
+                f.write(sitemap_html)
+            files_created.append("sitemap/index.html")
+        except Exception as e:
+            errors.append(f"Error rendering HTML sitemap: {e}")
+
+        # 6e. Deploy ads.txt
+        ads_file = os.path.join(abs_output_dir, "ads.txt")
+        ref_ads = os.path.join("static-site", "ads.txt")
+        if os.path.exists(ref_ads):
+            shutil.copy2(ref_ads, ads_file)
+        else:
+            with open(ads_file, "w", encoding="utf-8") as f:
+                f.write("google.com, pub-0000000000000000, DIRECT, f08c47fec0942fa0\n")
+        files_created.append("ads.txt")
+
+        # 7. Generate robots.txt and sitemap.xml with full 78-URL priority index
+        extra_sitemap_pages = [
+            {"path": "/author/sophia-bennett/", "priority": "0.6", "changefreq": "monthly"},
+            {"path": "/sitemap/", "priority": "0.5", "changefreq": "weekly"},
+        ]
+        for t_slug in trust_slugs:
+            extra_sitemap_pages.append({"path": f"/{t_slug}/", "priority": "0.4", "changefreq": "monthly"})
+
         robots_content, sitemap_content = self.generate_robots_and_sitemap(
-            posts, post_routes, intermediate_routes
+            posts, post_routes, intermediate_routes, extra_pages=extra_sitemap_pages
         )
         robots_file = os.path.join(abs_output_dir, "robots.txt")
         with open(robots_file, "w", encoding="utf-8") as f:
@@ -1569,7 +1660,7 @@ Sitemap: {sitemap_url}
             errors.append(f"Error saving manifest to output: {e}")
 
         duration = round(time.time() - start_time, 4)
-        total_pages = 1 + intermediate_count + post_pages_count
+        total_pages = 1 + intermediate_count + post_pages_count + 1 + len(trust_slugs) + 1
 
         return BuildSummary(
             status="success" if not errors else "partial_success",
