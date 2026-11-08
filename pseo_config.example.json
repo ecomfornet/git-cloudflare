@@ -24,7 +24,7 @@
     "download_images": true
   },
   "build": {
-    "theme": "editorial-warm",
+    "theme": "nordic-studio",
     "routing_mode": "single",
     "output_dir": "dist"
   },

@@ -150,7 +150,7 @@ class IngestionConfig:
 class BuildConfig:
     """Static site generation and routing options."""
 
-    theme: str = "editorial-warm"
+    theme: str = "nordic-studio"
     routing_mode: str = "single"  # single | category_slug | parent_slug | silo_nested
     output_dir: str = "dist"
 
@@ -166,7 +166,7 @@ class BuildConfig:
         if not data:
             return cls()
         return cls(
-            theme=str(data.get("theme") or "editorial-warm"),
+            theme=str(data.get("theme") or "nordic-studio"),
             routing_mode=str(data.get("routing_mode") or "single"),
             output_dir=str(data.get("output_dir") or "dist"),
         )

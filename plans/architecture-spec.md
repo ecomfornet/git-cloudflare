@@ -2152,3 +2152,245 @@ c:\Users\mouni\Desktop\github cloudlare\
 | **T2** | **DevOps & Backend Worker** | `tests/`, `run_tests.py`, `verify_live_pipeline.py`, `.agents/teamwork/`, `scratch/` | Purge test directories, scripts, and non-production files |
 | **T3** | **QA Critic** | `python -m py_compile`, `node -c`, Playwright live probe | Production syntax compilation, runtime health on 8080, Playwright audit |
 | **T4** | **Master Orchestrator** | `plans/master-task-board.md`, `walkthrough.md` | Zero placeholder audit, size verification, final sign-off |
+
+
+## 35. Model 1 Kinfolk Journal (`editorial-warm`) Template Refinement Blueprint
+
+### 35.1 Context & Objectives
+The user requested specific aesthetic and functional refinements to **Model 1 · Kinfolk Journal** (`editorial-warm` in `app/themes/templates.py`, specifically `render_stitch_editorial_hub`):
+1. **Dynamic Front of Home Hero Image**: The magazine hero cover must dynamically extract its image, title, excerpt, and target link from the latest ingested article (`posts[0]` if available, with graceful fallback).
+2. **Metadata Elimination**:
+   - Excise `"Featured Cover Story"`
+   - Excise `"schedule 8 Min Read"`
+   - Excise `"•"` separator and `"Volume 48 • Autumn/Winter"`
+   - Excise top dispatch bar `"The Spatial Journal • Vol. XII"`
+   - Excise top dispatch bar `"auto_stories {total_posts} Guides Published"`
+3. **Category Silos Clean Taxonomy**:
+   - In `TOPIC SILOS & CATEGORIES`, completely eliminate the slug display (`/bedroom-inspo/`, `/fire-pits/`, etc.).
+   - Retain only the clean category title and guide count.
+4. **All Published Guides Card Interactivity & Clean Title**:
+   - Wrap both the card thumbnail image and card title inside clickable anchor links `<a href="{link}">...</a>`.
+   - Remove the monospace slug preview (`{web_path_val}`) completely from the article card body.
+
+### 35.2 Technical Specifications & Data Flow
+
+```mermaid
+flowchart TD
+    subgraph Data Layer
+        P0["posts[0] (Latest Article)"]
+        CATS["categories / Topic Silos"]
+        POSTS["All Published Posts"]
+    end
+
+    subgraph Homepage Hub [render_stitch_editorial_hub]
+        HERO["Hero Cover Story: Dynamic Image, Title & Excerpt from posts[0]"]
+        SILOS["Topic Silos: Clean Category Names (Zero Slugs)"]
+        GRID["Article Grid: Clickable Images & Titles, Zero Slugs"]
+    end
+
+    P0 -->|Hero Image, Title, URL| HERO
+    CATS -->|Clean Titles & Counts| SILOS
+    POSTS -->|Cards with &lt;a href&gt; for img & title| GRID
+```
+
+#### Detailed Element Audits:
+1. **Hero Story Bindings**:
+   - `lead_post = post_items[0] if post_items else None`
+   - Dynamically resolve `lead_img`, `lead_title`, `lead_excerpt`, and `lead_link` from `lead_post` attributes and dictionary lookups (`local_image_path`, `image_url`, `web_path`, `slug`, `title`, `excerpt`).
+2. **Top Notice Bar Cleanup**:
+   - Delete `The Spatial Journal • Vol. XII` badge.
+   - Delete `{total_posts} Guides Published` counter and `auto_stories` icon.
+   - Center publication dispatch subtitle cleanly.
+3. **Hero Badge Elimination**:
+   - Strip the entire `flex flex-wrap items-center gap-3 mb-4` container containing `Featured Cover Story`, `schedule 8 Min Read`, and `Volume 48 • Autumn/Winter`.
+4. **Category Silos Taxonomy**:
+   - In category buttons, remove `<span class="font-label-sm text-[11px] text-stone-500 block mb-1 group-hover:text-primary transition-colors">/{cat_slug}/</span>`.
+   - Display only `<h3 class="font-serif-editorial text-base text-on-surface font-semibold leading-snug group-hover:text-primary transition-colors">{cat_name}</h3>`.
+5. **Article Cards in Feed**:
+   - Wrap `<img>` inside `<a href="{link}" class="block w-full h-full">...</a>`.
+   - Wrap `<h3>` inside `<a href="{link}" class="hover:underline text-inherit">{html_lib.escape(title_val)}</a>`.
+   - Delete `<span class="font-label-sm text-[11px] font-mono uppercase tracking-widest text-on-surface-variant block mb-2 text-stone-500">{web_path_val}</span>`.
+
+### 35.3 Milestones Roadmap (K1–K4)
+| Milestone | Role | Target Modules | Verification Scope |
+| :---: | :--- | :--- | :--- |
+| **K1** | **Technical Architect** | `plans/architecture-spec.md`, `plans/master-task-board.md` | Blueprint approval, task board milestones registered |
+| **K2** | **UI & Theme Worker** | `app/themes/templates.py` | Implement dynamic hero binding, strip badges/slugs, enable clickable cards |
+| **K3** | **QA Critic** | `python -m compileall`, Playwright live browser | Compile checks, DOM inspection, visual screenshot verification |
+| **K4** | **Master Orchestrator** | `plans/master-task-board.md`, `walkthrough.md` | Zero placeholder audit, documentation update, final sign-off |
+
+
+## 36. Template Live Preview Engine Enhancement (Homepage Hub & Article Dual-View)
+
+### 36.1 Problem Statement & User Intent
+When the user clicks **`👁️ Preview`** on **Model 1 · Kinfolk Journal** in Step 2 or tests preview in Step 4, the dashboard previously invoked `/api/preview` which exclusively executed `render_post(...)` (the single article layout with checklists and takeaways). Consequently, the user could not see the actual **Kinfolk Journal Homepage / Hub** template (`render_stitch_editorial_hub`), where the hero story, topic silos, and published guides feed reside, leading to the perception that the template updates were not visible in the project.
+
+### 36.2 Architectural Solution
+
+```mermaid
+flowchart TD
+    subgraph UI Triggers
+        BTN_MODAL["Step 2: '👁️ Preview' on Model 1 / 2 / 3"]
+        TOGGLE["Modal View Toggle: [🏛️ Homepage Hub | 📄 Article Guide]"]
+        SEL_STEP4["Step 4 Live Preview: '#previewPostSelect' (__hub__ / post)"]
+    end
+
+    subgraph API Layer
+        API_PREVIEW["POST /api/preview { theme, view_mode: 'hub' | 'post', slug }"]
+        GET_PREVIEW["GET /api/preview/{slug}?view_mode=hub&theme=..."]
+    end
+
+    subgraph Backend Engine [server.py render_preview]
+        ROUTER{"view_mode == 'hub' or slug == '__hub__'?"}
+        RENDER_HUB["render_hub(posts, categories, theme, ...) -> render_stitch_editorial_hub"]
+        RENDER_POST["render_post(target_post, all_posts, theme, ...) -> render_editorial_warm_layout"]
+    end
+
+    BTN_MODAL -->|view_mode: 'hub'| API_PREVIEW
+    TOGGLE -->|view_mode toggle| API_PREVIEW
+    SEL_STEP4 -->|slug: '__hub__'| API_PREVIEW
+
+    API_PREVIEW --> ROUTER
+    GET_PREVIEW --> ROUTER
+
+    ROUTER -->|Yes| RENDER_HUB
+    ROUTER -->|No| RENDER_POST
+```
+
+### 36.3 Detailed Implementation Specifications
+1. **Backend (`app/dashboard/server.py`)**:
+   - Update `render_preview` signature:
+     ```python
+     def render_preview(
+         self,
+         slug: Optional[str] = None,
+         post_data: Optional[dict[str, Any]] = None,
+         theme: Optional[str] = None,
+         routing_mode: Optional[str] = None,
+         view_mode: Optional[str] = None,
+     ) -> str:
+     ```
+   - If `view_mode == "hub"` or `slug in ("__hub__", "hub", "index", "home", "__home__")`:
+     - Load `all_posts_list = list(self.manifest.posts.values())`.
+     - If `all_posts_list` is empty, generate 3 sample `PostItem` instances with valid categories and images.
+     - Call `render_hub(posts=all_posts_list or sample_posts, categories=self.manifest.categories, title=hub_title, base_url="", theme=theme_name, source_domain=source_domain, branding=self.config.branding)`.
+     - When `theme == "editorial-warm"`, this delivers the newly refined Kinfolk Journal Hub.
+   - If `view_mode != "hub"`:
+     - Render `render_post(...)` for the target article as before.
+   - Update `POST /api/preview` and `GET /api/preview/*` to extract `view_mode` and forward it to `render_preview`.
+
+2. **Frontend UI (`app/dashboard/static/index.html`)**:
+   - In `#templatePreviewModal .template-modal-header`:
+     - Add a clean segmented toggle button group:
+       ```html
+       <div class="view-toggle-btns" id="modalViewToggleGroup" style="display: flex; gap: 0.25rem;">
+         <button type="button" class="btn btn-xs btn-primary active modal-view-btn" data-view="hub">🏛️ Homepage Hub</button>
+         <button type="button" class="btn btn-xs btn-secondary modal-view-btn" data-view="post">📄 Article Guide</button>
+       </div>
+       ```
+   - In `#previewPostSelect` (Step 4 Live Preview):
+     - Ensure the top option is `<option value="__hub__">🏛️ Homepage / Magazine Hub (Kinfolk Journal)</option>`.
+
+3. **Frontend Controller (`app/dashboard/static/app.js`)**:
+   - In `openTemplateModal(themeKey, routingKey, defaultView = 'hub')`:
+     - Default `state.modalActiveView = defaultView || 'hub'`.
+     - When opening **Model 1 · Kinfolk Journal**, default to `hub` so the user immediately sees the Kinfolk Hub cover story, topic silos, and published guides!
+     - Listen for clicks on `.modal-view-btn`: swap active button styling and immediately fetch `/api/preview` with the selected `view_mode`.
+   - In `triggerPreview()`:
+     - If `slug === '__hub__'`, send `{ view_mode: 'hub', theme, routing_mode }`.
+
+### 36.4 Milestones Roadmap (H1–H4)
+| Milestone | Role | Target Modules | Verification Scope |
+| :---: | :--- | :--- | :--- |
+| **H1** | **Technical Architect** | `plans/architecture-spec.md`, `plans/master-task-board.md` | Blueprint approval, task board milestones registered |
+| **H2** | **Backend & UI Workers** | `app/dashboard/server.py`, `app/dashboard/static/index.html`, `app/dashboard/static/app.js` | Implement `view_mode="hub"`, modal toggle buttons, and Step 4 hub preview |
+| **H3** | **QA Critic** | `python -m compileall`, `node -c`, Playwright live browser | Compile checks, click `👁️ Preview` in browser, verify Kinfolk Hub renders in modal with 0 errors |
+| **H4** | **Master Orchestrator** | `plans/master-task-board.md`, `walkthrough.md`, git repo | Sync to git clone, capture screenshot proof, final sign-off |
+
+
+## 37. The Nordroom Scandinavian Design System & Default Theme Specification (Template 2)
+
+### 37.1 Context & Objectives
+The user requested seeding the exact aesthetic and architecture of **The Nordroom** ([thenordroom.com](https://www.thenordroom.com/)) into **Template 2** (`nordic-studio`, displayed as **Model 2 · Minimalist Scandi**) and setting it as the default template across the application.
+
+The Nordroom is an internationally celebrated interior design and Scandinavian living publication founded by Rachel. Its signature hallmarks are:
+1. **Understated Scandinavian Elegance**: Airy, light-filled layouts with expansive gallery whitespace (`#FFFFFF` / `#FBFBFA`), delicate hairline borders (`#EBEBEA`), and warm natural accents (Scandinavian teak `#8C6D53` and Nordic pine `#2E483E`).
+2. **Editorial Masthead & Room Taxonomy**: A centered uppercase tracking-widest brand masthead flanked by curated room categories (`LIVING ROOM`, `BEDROOM`, `KITCHEN`, `BATHROOM`, `GARDEN & OUTDOOR`, `SMALL SPACES`, `COLOR TRENDS`) without robotic slugs.
+3. **High-Impact Photography & Centered 740px Reading Pane**: Articles feature prominent 16:10 and 4:3 interior spreads, 18px body typography with 1.8 line-height, elegant dropped capitals, and clean author bylines (`By Rachel`).
+4. **Zero Robotic Filler**: Absolute elimination of canned checklist boxes (e.g. `Step 1: Draft floor plan...`). All content flows naturally from authentic ingested articles.
+
+### 37.2 The Nordroom Design Tokens (`nordic-studio`)
+```json
+{
+  "id": "nordic-studio",
+  "name": "The Nordroom (Scandinavian Minimalist)",
+  "bg_body": "#FBFBFA",
+  "text_body": "#1C1C1C",
+  "text_muted": "#686866",
+  "accent": "#8C6D53",
+  "accent_hover": "#6E523B",
+  "accent_secondary": "#2E483E",
+  "card_bg": "#FFFFFF",
+  "card_border": "#EBEBEA",
+  "font_headline": "'Cormorant Garamond', 'Playfair Display', Georgia, serif",
+  "font_body": "'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
+}
+```
+
+### 37.3 Homepage Hub Engine (`render_nordic_studio_hub`)
+- **Top Utility Bar**: Displays editorial dispatch *"SCANDINAVIAN INTERIORS • HOME TOURS • DESIGN GUIDES"* and quick links (`Home Tours`, `Newsletter`, `Pinterest`, `About`).
+- **Centered Masthead**:
+  ```html
+  <header class="text-center py-8 border-b border-[#EBEBEA] bg-white">
+    <span class="text-[11px] tracking-[0.25em] uppercase text-[#8C6D53] font-semibold block mb-2">Nordic Living & Interior Architecture</span>
+    <h1 class="font-serif text-4xl sm:text-5xl tracking-[0.18em] font-medium text-[#1C1C1C] uppercase">THE NORDROOM</h1>
+    <p class="text-xs text-[#686866] mt-2 italic font-serif">Curated Interior Design, Space Transformations & Scandinavian Living</p>
+  </header>
+  ```
+- **Navigation Bar**: Clean horizontal menu with room pills and search trigger.
+- **Hero Cover Story**: Dynamically bound to `posts[0]`. Displays large photographic spread (16:9 / 3:2), teak category kicker, 40px serif headline, 2-line architectural lede, and byline `By Rachel • 4 Min Read`. Both image and title are fully clickable links.
+- **Curated Room Taxonomy Grid**: 6 clean cards showcasing *Living Room Ideas*, *Scandinavian Bedrooms*, *Modern Kitchens & Pantries*, *Garden & Outdoor Patios*, *Small Space Solutions*, and *Color & Paint Palettes* (0 slugs).
+- **Latest Home Tours & Guides Grid**: 3-column responsive card grid with 4:3 photography, hover zoom, teak category kicker, serif headline, excerpt, and author byline.
+- **Newsletter Box**: Muted linen box inviting readers to join weekly Scandinavian interior tours.
+- **The Nordroom 4-Column Footer**: Curated room tours, design styles, and social/copyright links.
+
+### 37.4 Single Article Guide Engine (`render_nordic_studio_layout`)
+- **Header & Footer Continuity**: Identical Nordroom masthead, navigation, and 4-column footer.
+- **Centered 740px Reading Pane**: Max-width strictly constrained to `740px` with generous margins.
+- **Post Kicker & Headline**:
+  - Breadcrumb: `Home › [Category] › [Title]`
+  - Kicker: `[CATEGORY] • 5 MIN READ • UPDATED 2026`
+  - Headline: `Cormorant Garamond` serif (2.5rem – 3.25rem).
+  - Lede: 2-line elegant italic introduction.
+  - Byline: `By Rachel` with circular monogram avatar, publish date, and `📌 Save to Pinterest` button.
+- **Hero Image**: 16:10 rounded image with subtle caption credit.
+- **Body Content**:
+  - 18px body font (`Plus Jakarta Sans`), 1.8 line height, color `#1C1C1C`.
+  - Classic dropped capital on first paragraph.
+  - Authentic article body from WordPress/ingestion rendered cleanly.
+  - Material & Design Notes card rendered ONLY if real specs exist (no fake checklist text).
+  - Related reading grid (3 cards with clickable images/titles, 0 slugs).
+
+### 37.5 Default Theme Elevation Across Application
+1. **`app/config.py`**:
+   - `BuildConfig.theme: str = "nordic-studio"`
+2. **`pseo_config.json` & `pseo_config.example.json`**:
+   - Set `"build": { "theme": "nordic-studio", "routing_mode": "single", ... }`
+3. **`app/dashboard/server.py`**:
+   - Default theme fallback set to `"nordic-studio"`.
+   - In `render_hub`, add route for `theme == "nordic-studio"` -> `render_nordic_studio_hub(...)`.
+4. **`app/dashboard/static/app.js`**:
+   - Default active theme state set to `"nordic-studio"`.
+   - On page load, select Model 2 card as the active theme.
+   - Dual-view modal preview defaults to `"nordic-studio"`.
+5. **`app/dashboard/static/index.html`**:
+   - Update Model 2 title to `Model 2 · The Nordroom (Scandinavian Minimalist)`.
+   - Add `⭐ Default Theme` badge to Model 2 card.
+
+### 37.6 Milestones Roadmap (N1–N4)
+| Milestone | Role | Target Modules | Verification Scope |
+| :---: | :--- | :--- | :--- |
+| **N1** | **Technical Architect** | `plans/architecture-spec.md`, `plans/master-task-board.md` | Blueprint approval, design token schema, task board registration |
+| **N2** | **UI & Backend Worker** | `app/themes/templates.py`, `app/config.py`, `app/dashboard/server.py`, `app/dashboard/static/app.js`, `app/dashboard/static/index.html` | Implement `render_nordic_studio_hub`, modernize `render_nordic_studio_layout`, update default theme across config & dashboard |
+| **N3** | **QA Critic** | `python -m compileall`, `node -c`, Playwright live browser | Compile checks, verify `http://127.0.0.1:8080/` modal renders The Nordroom Hub and Article views with 0 errors, capture screenshots |
+| **N4** | **Master Orchestrator** | `plans/master-task-board.md`, `walkthrough.md`, git repo | Zero-placeholder audit (`TODO`/`FIXME`), git clone synchronization, commit, walkthrough update |

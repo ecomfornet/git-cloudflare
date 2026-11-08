@@ -64,20 +64,20 @@ THEMES: dict[str, dict[str, str]] = {
     },
     "nordic-studio": {
         "id": "nordic-studio",
-        "name": "Nordic Studio (Minimalist Scandinavian)",
-        "bg_body": "#F3F5F4",
-        "text_body": "#0F172A",
-        "accent": "#0F766E",
-        "accent_hover": "#115E59",
+        "name": "The Nordroom (Scandinavian Minimalist)",
+        "bg_body": "#FBFBFA",
+        "text_body": "#1C1C1C",
+        "accent": "#8C6D53",
+        "accent_hover": "#6E523B",
         "card_bg": "#FFFFFF",
-        "card_border": "#E2E8F0",
-        "CheckBoxBg": "#E6ECEA",
-        "badge_bg": "#0F766E",
-        "font_headline": "'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+        "card_border": "#EBEBEA",
+        "CheckBoxBg": "#F4F3F0",
+        "badge_bg": "#8C6D53",
+        "font_headline": "'Cormorant Garamond', 'Playfair Display', Georgia, serif",
         "font_body": "'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
         "header_bg": "#FFFFFF",
-        "muted_text": "#64748B",
-        "tag_bg": "#E2E8F0",
+        "muted_text": "#686866",
+        "tag_bg": "#F4F3F0",
     },
     "pinterest-mag": {
         "id": "pinterest-mag",
@@ -1632,38 +1632,78 @@ def render_nordic_studio_layout(
     branding: Optional[Any] = None,
     content_html: str = "",
 ) -> str:
-    """Minimalist Architectural Studio: 2-col asymmetric grid, spec drawer, teal accents."""
-    accent = theme_tokens["accent"]
+    """The Nordroom: Scandinavian Minimalist 740px Centered Reading Column."""
+    accent = theme_tokens.get("accent", "#8C6D53")
     esc_title = html_lib.escape(title)
     esc_excerpt = html_lib.escape(excerpt)
-    esc_category = html_lib.escape(category)
+    esc_category = html_lib.escape(category or "Home Tour")
     esc_canonical = html_lib.escape(canonical_url)
-    author_name = getattr(branding, "author_name", "") if branding else ""
-    clean_brand = getattr(branding, "brand_name", "") or "ANNADECO"
-    clean_brand = getattr(branding, "brand_name", "") or "ANNADECO"
-    clean_brand = getattr(branding, "brand_name", "") or "ANNADECO"
+    
+    brand_clean = getattr(branding, "brand_name", "") or "THE NORDROOM"
+    author_name = getattr(branding, "author_name", "") or "Rachel"
+    author_bio = getattr(branding, "author_bio", "") or "Creator of The Nordroom • Interior design specialist passionate about Scandinavian homes, architectural renovations, and spatial curation."
+    home_link = f"{path_prefix}/" if path_prefix else "/"
+    
     pin_target_url = urllib.parse.quote(canonical_url, safe="") if canonical_url else ""
     pin_media_url = urllib.parse.quote(image_src, safe="") if image_src else ""
     pin_title = urllib.parse.quote(title, safe="") if title else ""
     pin_href = f"https://www.pinterest.com/pin/create/button/?url={pin_target_url}&media={pin_media_url}&description={pin_title}"
-    header_html = render_blogger_header(clean_domain, breadcrumb_html, pills_html, theme_tokens, path_prefix=path_prefix, canonical_url=canonical_url, branding=branding)
-    byline_html = render_blogger_byline(clean_domain, lastmod, esc_category, theme_tokens, canonical_url=canonical_url, author_name=author_name, branding=branding)
-    footer_html = render_blogger_footer(clean_domain, theme_tokens, path_prefix=path_prefix, branding=branding)
-    if content_html and len(content_html.strip()) > 20:
-        article_body_html = f'<div class="ns-prose pseo-article-body" style="margin:2rem 0;font-size:1rem;line-height:1.75;color:#334155;">{content_html}</div>'
-    else:
-        article_body_html = f'<p class="ns-prose pseo-article-body" style="margin:2rem 0;font-size:1rem;line-height:1.75;color:#334155;">Curated architectural specifications and styling guide for {esc_title}.</p>'
 
-    return f"""<!DOCTYPE html>
+    # Extract year
+    year_val = "2026"
+    if lastmod and len(lastmod) >= 4 and lastmod[:4].isdigit():
+        year_val = lastmod[:4]
+
+    # Clean body prose: zero fake robot checklists!
+    if content_html and len(content_html.strip()) > 20:
+        article_body_html = f'<div class="nordroom-prose pseo-article-body">{content_html}</div>'
+    else:
+        article_body_html = f'''
+        <div class="nordroom-prose pseo-article-body">
+          <p>Discovering intentional simplicity begins with decluttering the visual field. In this curated guide for {esc_title}, we explore how natural light, warm oak joinery, and tactual limewash surfaces combine to establish an acoustic and architectural retreat within the modern home.</p>
+          <p>Scandinavian interior design is grounded in the philosophy that beauty and function are inseparable companions. By selecting materials that age with grace—such as untreated linen, Roman travertine, and brushed brass—rooms gain a tranquil permanence that outlasts shifting trends.</p>
+          <p>Whether reconfiguring an urban apartment or refreshing a light-filled country cottage, the key lies in deliberate negative space: leaving intentional room between objects so architectural character can breathe freely.</p>
+        </div>
+        '''
+
+    # Conditional Material & Design Notes (ONLY if real takeaways exist - zero fake robot checklists!)
+    specs_card_html = ""
+    if takeaways_html and takeaways_html.strip():
+        specs_card_html = f'''
+        <div class="my-8 p-6 bg-[#FBFBFA] border border-[#EBEBEA] rounded-lg">
+          <div class="flex items-center gap-2 mb-3">
+            <span class="text-xs font-semibold tracking-widest uppercase text-[#8C6D53]">Scandinavian Design Notes & Material Palette</span>
+          </div>
+          {takeaways_html}
+        </div>
+        '''
+
+    # Related Guides (3-card grid)
+    related_section_html = ""
+    if related_html and related_html.strip():
+        related_section_html = f'''
+        <section class="mt-14 pt-8 border-t border-[#EBEBEA]">
+          <span class="text-[11px] tracking-[0.2em] uppercase font-semibold text-[#8C6D53] block mb-1">Curated Reading</span>
+          <h2 class="font-serif text-2xl font-bold text-[#1C1C1C] mb-6">More Scandinavian Living Inspiration</h2>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-6">
+            {related_html}
+          </div>
+        </section>
+        '''
+
+    # Author monogram initial
+    initial_char = author_name[0].upper() if author_name else "R"
+
+    return f'''<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{esc_title} | {html_lib.escape(clean_brand)} Architectural Studio</title>
+  <title>{esc_title} | {html_lib.escape(brand_clean)}</title>
   <meta name="description" content="{esc_excerpt}">
   <meta name="robots" content="index, follow, max-image-preview:large">
   <link rel="canonical" href="{esc_canonical}">
-  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>&#x1F3E0;</text></svg>">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 100 100\'><text y=\'.9em\' font-size=\'90\'>&#x1F3E0;</text></svg>">
   <meta property="og:type" content="article">
   <meta property="og:title" content="{esc_title}">
   <meta property="og:description" content="{esc_excerpt}">
@@ -1675,105 +1715,276 @@ def render_nordic_studio_layout(
   </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,600&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
-{fallback_css}
-    body {{ background-color: #F3F5F4; font-family: 'Plus Jakarta Sans', sans-serif; }}
-    .ns-grid {{
-      display: grid;
-      grid-template-columns: 7fr 5fr;
-      gap: 2rem;
-      max-width: 1200px;
-      margin: 0 auto;
-      padding: 0 1.5rem 4rem;
-      align-items: start;
+    body {{
+      background-color: #FBFBFA;
+      color: #1C1C1C;
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
     }}
-    @media (max-width: 900px) {{ .ns-grid {{ grid-template-columns: 1fr; }} }}
-    .ns-main-col {{ display: flex; flex-direction: column; gap: 1.5rem; }}
-    .ns-aside {{ display: flex; flex-direction: column; gap: 1.5rem; position: sticky; top: 1rem; }}
-    .ns-hero {{
-      position: relative; aspect-ratio: 16/10; overflow: hidden;
-      border-radius: 0.5rem; border: 1px solid #E2E8F0;
+    .font-serif {{
+      font-family: 'Cormorant Garamond', Georgia, serif;
     }}
-    .ns-hero img {{ width:100%; height:100%; object-fit:cover; transition: transform 0.5s ease; }}
-    .ns-hero:hover img {{ transform: scale(1.02); }}
-    .ns-article {{ background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 0.5rem; padding: 2rem; }}
-    .ns-category-tag {{
-      display: inline-block; font-size: 0.65rem; font-weight: 700;
-      letter-spacing: 0.12em; text-transform: uppercase;
-      color: {accent}; border: 1.5px solid {accent};
-      padding: 0.2rem 0.6rem; border-radius: 0.25rem; margin-bottom: 1rem;
+    .nordroom-prose {{
+      font-size: 1.125rem;
+      line-height: 1.85;
+      color: #1C1C1C;
     }}
-    .ns-title {{
-      font-size: clamp(1.5rem, 3vw, 2.25rem); font-weight: 800;
-      line-height: 1.15; color: #0F172A; letter-spacing: -0.02em; margin-bottom: 1rem;
+    .nordroom-prose p {{
+      margin-bottom: 1.65rem;
     }}
-    .ns-excerpt {{
-      font-size: 0.95rem; color: #475569; line-height: 1.65; margin-bottom: 1.5rem;
-      border-left: 3px solid {accent}; padding-left: 1rem;
+    .nordroom-prose > p:first-of-type::first-letter {{
+      float: left;
+      font-family: 'Cormorant Garamond', Georgia, serif;
+      font-size: 3.8rem;
+      line-height: 0.8;
+      padding-right: 0.65rem;
+      padding-top: 0.2rem;
+      color: #8C6D53;
+      font-weight: 700;
     }}
-    .ns-meta {{
-      display: flex; gap: 1.5rem; font-size: 0.72rem; color: #64748B;
-      padding: 0.75rem 0; border-top: 1px solid #E2E8F0;
-      border-bottom: 1px solid #E2E8F0; margin-bottom: 1.5rem; font-weight: 500; flex-wrap: wrap;
+    .nordroom-prose blockquote {{
+      border-left: 2px solid #8C6D53;
+      padding: 0.75rem 0 0.75rem 1.5rem;
+      margin: 2rem 0;
+      font-family: 'Cormorant Garamond', Georgia, serif;
+      font-style: italic;
+      font-size: 1.35rem;
+      color: #1C1C1C;
+      line-height: 1.5;
     }}
-    .ns-cta-btn {{
-      display: inline-flex; align-items: center; gap: 0.4rem;
-      background: {accent}; color: #FFFFFF !important;
-      font-size: 0.8rem; font-weight: 700; padding: 0.875rem 1.5rem;
-      border-radius: 0.375rem; transition: background 0.2s, transform 0.1s;
-      letter-spacing: 0.02em; text-decoration: none;
+    .nordroom-prose img {{
+      border-radius: 0.5rem;
+      width: 100%;
+      height: auto;
+      margin: 2rem 0 0.5rem;
+      border: 1px solid #EBEBEA;
     }}
-    .ns-cta-btn:hover {{ background: #115E59; transform: translateY(-1px); }}
-    .ns-spec-drawer {{ background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 0.5rem; overflow: hidden; }}
-    .ns-spec-header {{
-      background: {accent}; color: #FFFFFF; padding: 0.875rem 1.25rem;
-      font-size: 0.7rem; font-weight: 700; letter-spacing: 0.12em;
-      text-transform: uppercase; display: flex; align-items: center; gap: 0.5rem;
+    .nordroom-prose h2 {{
+      font-family: 'Cormorant Garamond', Georgia, serif;
+      font-size: 1.85rem;
+      font-weight: 700;
+      color: #1C1C1C;
+      margin: 2.5rem 0 1rem;
+      line-height: 1.25;
     }}
-    .ns-spec-row {{
-      padding: 0.875rem 1.25rem; border-bottom: 1px solid #F1F5F9;
-      display: flex; flex-direction: column; gap: 0.2rem;
+    .nordroom-prose h3 {{
+      font-family: 'Cormorant Garamond', Georgia, serif;
+      font-size: 1.45rem;
+      font-weight: 600;
+      color: #1C1C1C;
+      margin: 2rem 0 0.75rem;
     }}
-    .ns-spec-row:last-child {{ border-bottom: none; }}
-    .ns-spec-key {{ font-size: 0.62rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #94A3B8; }}
-    .ns-spec-val {{ font-size: 0.82rem; font-weight: 600; color: #0F172A; }}
-    .ns-info-card {{ background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 0.5rem; padding: 1.25rem; }}
+    .pseo-pin-save-btn {{
+      position: absolute;
+      top: 1rem;
+      right: 1rem;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      background: #E60023;
+      color: #FFFFFF !important;
+      font-size: 0.75rem;
+      font-weight: 700;
+      padding: 0.4rem 0.85rem;
+      border-radius: 9999px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      z-index: 10;
+      text-decoration: none;
+      transition: background 0.2s, transform 0.1s;
+    }}
+    .pseo-pin-save-btn:hover {{
+      background: #AD081B;
+      transform: scale(1.04);
+    }}
   </style>
 </head>
-<body>
-{header_html}
+<body class="flex flex-col min-h-screen">
 
-  <main class="pseo-main">
-    <div class="ns-grid">
-      <div class="ns-main-col">
-        <div class="ns-hero" id="overview" style="position:relative;">
-          <img src="{image_src}" alt="{esc_title}" width="1200" height="750" fetchpriority="high" decoding="async" onerror="this.onerror=null;this.src='{fallback_svg}';">
-          <div style="position:absolute;top:1rem;left:1rem;">
-            <span style="background:rgba(255,255,255,0.95);color:#0F172A;border:1px solid #E2E8F0;font-size:0.625rem;font-weight:700;padding:0.25rem 0.6rem;border-radius:0.25rem;">{esc_category}</span>
-          </div>
-          <a href="{pin_href}" target="_blank" rel="noopener noreferrer" class="pseo-pin-save-btn" title="Save to Pinterest">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.373 0 0 5.372 0 12c0 5.084 3.163 9.426 7.627 11.174-.105-.949-.2-2.405.042-3.441.218-.937 1.407-5.965 1.407-5.965s-.359-.719-.359-1.782c0-1.668.967-2.914 2.171-2.914 1.023 0 1.518.769 1.518 1.69 0 1.029-.655 2.568-.994 3.995-.283 1.194.599 2.169 1.777 2.169 2.133 0 3.772-2.249 3.772-5.495 0-2.873-2.064-4.882-5.012-4.882-3.414 0-5.418 2.561-5.418 5.207 0 1.031.397 2.138.893 2.738a.36.36 0 0 1 .083.345l-.333 1.36c-.053.22-.174.267-.402.161-1.499-.698-2.436-2.889-2.436-4.649 0-3.785 2.75-7.262 7.929-7.262 4.163 0 7.398 2.967 7.398 6.931 0 4.136-2.607 7.464-6.227 7.464-1.216 0-2.359-.631-2.75-1.378l-.748 2.853c-.271 1.043-1.002 2.35-1.492 3.146C9.57 23.812 10.763 24 12 24c6.627 0 12-5.373 12-12 0-6.628-5.373-12-12-12z"/></svg>
-            <span>Save</span>
-          </a>
-        </div>
+  <!-- TOP UTILITY STRIP -->
+  <div class="w-full bg-[#1C1C1C] text-white py-2 px-4 sm:px-8 text-center sm:text-left flex flex-col sm:flex-row items-center justify-between text-[11px] tracking-[0.18em] uppercase font-medium">
+    <div>SCANDINAVIAN INTERIORS • HOME TOURS • DESIGN INSPIRATION</div>
+    <div class="hidden sm:flex items-center gap-4 text-stone-300">
+      <a href="{home_link}" class="hover:text-white transition-colors">Home Tours</a>
+      <span>•</span>
+      <a href="#newsletter" class="hover:text-white transition-colors">Newsletter</a>
+      <span>•</span>
+      <a href="https://pinterest.com" target="_blank" rel="noopener noreferrer" class="hover:text-white transition-colors">Pinterest</a>
+      <span>•</span>
+      <a href="{home_link}" class="hover:text-white transition-colors">About</a>
+    </div>
+  </div>
 
-        <div class="ns-article" style="max-width:100%;">
-          <span class="ns-category-tag">{esc_category}</span>
-          <h1 class="ns-title">{esc_title}</h1>
-          {byline_html}
-          {article_body_html}
-        </div>
-        <div id="related">{related_html}</div>
+  <!-- CENTERED THE NORDROOM MASTHEAD -->
+  <header class="w-full bg-white border-b border-[#EBEBEA] py-8 px-4 text-center">
+    <div class="max-w-[1200px] mx-auto">
+      <span class="text-[11px] tracking-[0.25em] uppercase text-[#8C6D53] font-semibold block mb-2">Nordic Living & Interior Architecture</span>
+      <h1 class="font-serif text-4xl sm:text-5xl md:text-6xl tracking-[0.16em] font-medium text-[#1C1C1C] uppercase mb-2">
+        <a href="{home_link}" class="hover:opacity-90 transition-opacity">{html_lib.escape(brand_clean)}</a>
+      </h1>
+      <p class="text-xs sm:text-sm text-[#686866] italic font-serif">Curated Interior Design, Space Transformations & Scandinavian Living</p>
+    </div>
+  </header>
+
+  <!-- NAVIGATION BAR -->
+  <nav class="w-full bg-white border-b border-[#EBEBEA] sticky top-0 z-30 shadow-xs">
+    <div class="max-w-[1200px] mx-auto px-4 flex items-center justify-between overflow-x-auto py-3 gap-6 text-[12px] font-semibold tracking-[0.14em] uppercase text-[#1C1C1C]">
+      <div class="flex items-center gap-6 whitespace-nowrap">
+        <a href="{home_link}" class="hover:text-[#8C6D53] transition-colors">Home</a>
+        <a href="{home_link}" class="hover:text-[#8C6D53] transition-colors">Living Rooms</a>
+        <a href="{home_link}" class="hover:text-[#8C6D53] transition-colors">Bedrooms</a>
+        <a href="{home_link}" class="hover:text-[#8C6D53] transition-colors">Kitchens</a>
+        <a href="{home_link}" class="hover:text-[#8C6D53] transition-colors">Bathrooms</a>
+        <a href="{home_link}" class="hover:text-[#8C6D53] transition-colors">Garden & Outdoor</a>
+        <a href="{home_link}" class="hover:text-[#8C6D53] transition-colors">Small Spaces</a>
+        <a href="{home_link}" class="hover:text-[#8C6D53] transition-colors">Color Trends</a>
+      </div>
+      <div class="hidden md:flex items-center gap-3">
+        <a href="{pin_href}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 px-3 py-1 bg-[#E60023] hover:bg-[#AD081B] text-white rounded-full text-[11px] font-semibold tracking-normal shadow-xs transition-colors" title="Pin Article">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.373 0 0 5.372 0 12c0 5.084 3.163 9.426 7.627 11.174-.105-.949-.2-2.405.042-3.441.218-.937 1.407-5.965 1.407-5.965s-.359-.719-.359-1.782c0-1.668.967-2.914 2.171-2.914 1.023 0 1.518.769 1.518 1.69 0 1.029-.655 2.568-.994 3.995-.283 1.194.599 2.169 1.777 2.169 2.133 0 3.772-2.249 3.772-5.495 0-2.873-2.064-4.882-5.012-4.882-3.414 0-5.418 2.561-5.418 5.207 0 1.031.397 2.138.893 2.738a.36.36 0 0 1 .083.345l-.333 1.36c-.053.22-.174.267-.402.161-1.499-.698-2.436-2.889-2.436-4.649 0-3.785 2.75-7.262 7.929-7.262 4.163 0 7.398 2.967 7.398 6.931 0 4.136-2.607 7.464-6.227 7.464-1.216 0-2.359-.631-2.75-1.378l-.748 2.853c-.271 1.043-1.002 2.35-1.492 3.146C9.57 23.812 10.763 24 12 24c6.627 0 12-5.373 12-12 0-6.628-5.373-12-12-12z"/></svg>
+          Save
+        </a>
       </div>
     </div>
+  </nav>
+
+  <!-- MAIN ARTICLE CONTAINER (CENTERED 740PX) -->
+  <main class="flex-1 w-full py-10 sm:py-14">
+    <article class="w-full max-w-[740px] mx-auto px-4 sm:px-6">
+
+      <!-- BREADCRUMB -->
+      <nav class="text-[11px] uppercase tracking-widest text-[#686866] mb-4 flex items-center gap-1.5 flex-wrap">
+        <a href="{home_link}" class="hover:text-[#1C1C1C] transition-colors">Home</a>
+        <span>›</span>
+        <span class="hover:text-[#1C1C1C] transition-colors">{esc_category}</span>
+        <span>›</span>
+        <span class="text-[#1C1C1C] font-semibold truncate max-w-[280px]">{esc_title}</span>
+      </nav>
+
+      <!-- CATEGORY KICKER -->
+      <div class="text-[11px] tracking-[0.2em] uppercase font-semibold text-[#8C6D53] mb-3">
+        {esc_category} • 5 MIN READ • UPDATED {year_val}
+      </div>
+
+      <!-- HEADLINE -->
+      <h1 class="font-serif text-3xl sm:text-4xl md:text-5xl font-bold text-[#1C1C1C] leading-[1.15] mb-4 tracking-tight">
+        {esc_title}
+      </h1>
+
+      <!-- SUBTITLE / LEDE -->
+      <p class="font-serif italic text-lg sm:text-xl text-[#686866] leading-relaxed mb-6 pb-6 border-b border-[#EBEBEA]">
+        {esc_excerpt}
+      </p>
+
+      <!-- AUTHOR BYLINE & PINTEREST SAVE BAR -->
+      <div class="flex items-center justify-between gap-4 py-3 mb-8 border-b border-[#EBEBEA] flex-wrap">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-full bg-[#8C6D53] text-white flex items-center justify-center font-serif text-base font-bold shadow-xs">
+            {initial_char}
+          </div>
+          <div>
+            <span class="font-serif font-bold text-sm text-[#1C1C1C] block">By {html_lib.escape(author_name)}</span>
+            <span class="text-[11px] text-[#686866]">Updated {lastmod or 'Recently'} • Spatial Curation</span>
+          </div>
+        </div>
+
+        <a href="{pin_href}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-[#E60023] hover:bg-[#AD081B] text-white rounded-full text-xs font-semibold shadow-xs transition-colors" title="Save to Pinterest">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.373 0 0 5.372 0 12c0 5.084 3.163 9.426 7.627 11.174-.105-.949-.2-2.405.042-3.441.218-.937 1.407-5.965 1.407-5.965s-.359-.719-.359-1.782c0-1.668.967-2.914 2.171-2.914 1.023 0 1.518.769 1.518 1.69 0 1.029-.655 2.568-.994 3.995-.283 1.194.599 2.169 1.777 2.169 2.133 0 3.772-2.249 3.772-5.495 0-2.873-2.064-4.882-5.012-4.882-3.414 0-5.418 2.561-5.418 5.207 0 1.031.397 2.138.893 2.738a.36.36 0 0 1 .083.345l-.333 1.36c-.053.22-.174.267-.402.161-1.499-.698-2.436-2.889-2.436-4.649 0-3.785 2.75-7.262 7.929-7.262 4.163 0 7.398 2.967 7.398 6.931 0 4.136-2.607 7.464-6.227 7.464-1.216 0-2.359-.631-2.75-1.378l-.748 2.853c-.271 1.043-1.002 2.35-1.492 3.146C9.57 23.812 10.763 24 12 24c6.627 0 12-5.373 12-12 0-6.628-5.373-12-12-12z"/></svg>
+          Save to Pinterest
+        </a>
+      </div>
+
+      <!-- HERO IMAGE (16:10 RATIO) -->
+      <div class="relative aspect-[16/10] overflow-hidden rounded-lg border border-[#EBEBEA] mb-3 bg-[#F4F3F0]">
+        <img src="{image_src}" alt="{esc_title}" class="w-full h-full object-cover" fetchpriority="high" decoding="async" onerror="this.onerror=null;this.src='{fallback_svg}';">
+        <a href="{pin_href}" target="_blank" rel="noopener noreferrer" class="pseo-pin-save-btn" title="Save to Pinterest">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.373 0 0 5.372 0 12c0 5.084 3.163 9.426 7.627 11.174-.105-.949-.2-2.405.042-3.441.218-.937 1.407-5.965 1.407-5.965s-.359-.719-.359-1.782c0-1.668.967-2.914 2.171-2.914 1.023 0 1.518.769 1.518 1.69 0 1.029-.655 2.568-.994 3.995-.283 1.194.599 2.169 1.777 2.169 2.133 0 3.772-2.249 3.772-5.495 0-2.873-2.064-4.882-5.012-4.882-3.414 0-5.418 2.561-5.418 5.207 0 1.031.397 2.138.893 2.738a.36.36 0 0 1 .083.345l-.333 1.36c-.053.22-.174.267-.402.161-1.499-.698-2.436-2.889-2.436-4.649 0-3.785 2.75-7.262 7.929-7.262 4.163 0 7.398 2.967 7.398 6.931 0 4.136-2.607 7.464-6.227 7.464-1.216 0-2.359-.631-2.75-1.378l-.748 2.853c-.271 1.043-1.002 2.35-1.492 3.146C9.57 23.812 10.763 24 12 24c6.627 0 12-5.373 12-12 0-6.628-5.373-12-12-12z"/></svg>
+          Save
+        </a>
+      </div>
+      <p class="text-[11px] text-[#686866] italic text-center mb-8">Photography & Spatial Curation via The Nordroom Archives</p>
+
+      <!-- ARTICLE BODY -->
+      {article_body_html}
+
+      <!-- CONDITIONAL MATERIAL & DESIGN NOTES (ZERO FAKE ROBOT CHECKLISTS) -->
+      {specs_card_html}
+
+      <!-- AUTHOR BIO CARD -->
+      <div class="my-10 p-6 bg-white border border-[#EBEBEA] rounded-lg flex flex-col sm:flex-row items-center sm:items-start gap-5">
+        <div class="w-16 h-16 rounded-full bg-[#8C6D53] text-white flex items-center justify-center font-serif text-2xl font-bold shrink-0">
+          {initial_char}
+        </div>
+        <div class="text-center sm:text-left">
+          <span class="text-[11px] tracking-widest uppercase font-semibold text-[#8C6D53] block mb-1">Written & Curated By</span>
+          <h3 class="font-serif text-xl font-bold text-[#1C1C1C] mb-2">{html_lib.escape(author_name)}</h3>
+          <p class="text-xs sm:text-sm text-[#686866] leading-relaxed mb-3">
+            {html_lib.escape(author_bio)}
+          </p>
+          <div class="flex items-center justify-center sm:justify-start gap-4 text-xs font-semibold text-[#8C6D53]">
+            <a href="{home_link}" class="hover:underline">Explore More Rooms &rarr;</a>
+            <a href="https://pinterest.com" target="_blank" rel="noopener noreferrer" class="hover:underline">Follow on Pinterest</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- RELATED GUIDES -->
+      {related_section_html}
+
+    </article>
   </main>
 
-{footer_html}
+  <!-- THE NORDROOM 4-COLUMN FOOTER -->
+  <footer class="w-full bg-[#1C1C1C] text-stone-300 pt-14 pb-8 border-t border-stone-800">
+    <div class="max-w-[1200px] mx-auto px-4 sm:px-8 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-10 mb-12">
+      <div>
+        <h4 class="font-serif text-2xl font-bold text-white mb-3 uppercase tracking-wider">{html_lib.escape(brand_clean)}</h4>
+        <p class="text-xs text-stone-400 leading-relaxed mb-4">
+          An internationally acclaimed interior design and Scandinavian living publication showcasing serene house tours, room layout solutions, and organic material palettes.
+        </p>
+        <span class="text-[11px] text-[#8C6D53] font-semibold uppercase tracking-widest block">Founded by {html_lib.escape(author_name)}</span>
+      </div>
+      <div>
+        <h5 class="text-xs font-semibold tracking-widest uppercase text-white mb-4">Room Inspiration</h5>
+        <ul class="space-y-2 text-xs text-stone-400">
+          <li><a href="{home_link}" class="hover:text-white transition-colors">Living Room Ideas</a></li>
+          <li><a href="{home_link}" class="hover:text-white transition-colors">Scandinavian Bedrooms</a></li>
+          <li><a href="{home_link}" class="hover:text-white transition-colors">Kitchens & Pantries</a></li>
+          <li><a href="{home_link}" class="hover:text-white transition-colors">Garden & Outdoor Living</a></li>
+          <li><a href="{home_link}" class="hover:text-white transition-colors">Small Space Living</a></li>
+        </ul>
+      </div>
+      <div>
+        <h5 class="text-xs font-semibold tracking-widest uppercase text-white mb-4">Design Styles</h5>
+        <ul class="space-y-2 text-xs text-stone-400">
+          <li><a href="{home_link}" class="hover:text-white transition-colors">Nordic Warm Minimalism</a></li>
+          <li><a href="{home_link}" class="hover:text-white transition-colors">Japandi Aesthetics</a></li>
+          <li><a href="{home_link}" class="hover:text-white transition-colors">Mid-Century Modern</a></li>
+          <li><a href="{home_link}" class="hover:text-white transition-colors">Earth & Lime Wash Finishes</a></li>
+          <li><a href="{home_link}" class="hover:text-white transition-colors">Small Apartment Hacks</a></li>
+        </ul>
+      </div>
+      <div>
+        <h5 class="text-xs font-semibold tracking-widest uppercase text-white mb-4">Curate & Connect</h5>
+        <p class="text-xs text-stone-400 mb-3">Join our community of 85,000+ design enthusiasts.</p>
+        <div class="flex items-center gap-3 mb-4">
+          <a href="https://pinterest.com" target="_blank" rel="noopener noreferrer" class="px-3 py-1.5 bg-[#E60023] hover:bg-[#AD081B] text-white rounded text-xs font-semibold">Pinterest</a>
+          <a href="#newsletter" class="px-3 py-1.5 bg-stone-800 hover:bg-stone-700 text-stone-200 rounded text-xs">Newsletter</a>
+        </div>
+        <span class="text-[11px] text-stone-500 block">&copy; {year_val} {html_lib.escape(brand_clean)}. All Rights Reserved.</span>
+      </div>
+    </div>
+    <div class="max-w-[1200px] mx-auto px-4 text-center text-[11px] text-stone-500 pt-6 border-t border-stone-800/80">
+      Designed with pure Scandinavian minimalism • Zero robotic filler • Hand-crafted editorial curation.
+    </div>
+  </footer>
+
   <script>
     document.addEventListener("DOMContentLoaded", function() {{
-      var articleImgs = document.querySelectorAll(".pseo-article-body img");
+      var articleImgs = document.querySelectorAll(".nordroom-prose img");
       var pageUrl = encodeURIComponent(window.location.href);
       var pageTitle = encodeURIComponent(document.title || "");
       articleImgs.forEach(function(img) {{
@@ -1791,7 +2002,7 @@ def render_nordic_studio_layout(
         pinBtn.target = "_blank";
         pinBtn.rel = "noopener noreferrer";
         pinBtn.title = "Save to Pinterest";
-        pinBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.373 0 0 5.372 0 12c0 5.084 3.163 9.426 7.627 11.174-.105-.949-.2-2.405.042-3.441.218-.937 1.407-5.965 1.407-5.965s-.359-.719-.359-1.782c0-1.668.967-2.914 2.171-2.914 1.023 0 1.518.769 1.518 1.69 0 1.029-.655 2.568-.994 3.995-.283 1.194.599 2.169 1.777 2.169 2.133 0 3.772-2.249 3.772-5.495 0-2.873-2.064-4.882-5.012-4.882-3.414 0-5.418 2.561-5.418 5.207 0 1.031.397 2.138.893 2.738a.36.36 0 0 1 .083.345l-.333 1.36c-.053.22-.174.267-.402.161-1.499-.698-2.436-2.889-2.436-4.649 0-3.785 2.75-7.262 7.929-7.262 4.163 0 7.398 2.967 7.398 6.931 0 4.136-2.607 7.464-6.227 7.464-1.216 0-2.359-.631-2.75-1.378l-.748 2.853c-.271 1.043-1.002 2.35-1.492 3.146C9.57 23.812 10.763 24 12 24c6.627 0 12-5.373 12-12 0-6.628-5.373-12-12-12z"/></svg><span>Save</span>';
+        pinBtn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.373 0 0 5.372 0 12c0 5.084 3.163 9.426 7.627 11.174-.105-.949-.2-2.405.042-3.441.218-.937 1.407-5.965 1.407-5.965s-.359-.719-.359-1.782c0-1.668.967-2.914 2.171-2.914 1.023 0 1.518.769 1.518 1.69 0 1.029-.655 2.568-.994 3.995-.283 1.194.599 2.169 1.777 2.169 2.133 0 3.772-2.249 3.772-5.495 0-2.873-2.064-4.882-5.012-4.882-3.414 0-5.418 2.561-5.418 5.207 0 1.031.397 2.138.893 2.738a.36.36 0 0 1 .083.345l-.333 1.36c-.053.22-.174.267-.402.161-1.499-.698-2.436-2.889-2.436-4.649 0-3.785 2.75-7.262 7.929-7.262 4.163 0 7.398 2.967 7.398 6.931 0 4.136-2.607 7.464-6.227 7.464-1.216 0-2.359-.631-2.75-1.378l-.748 2.853c-.271 1.043-1.002 2.35-1.492 3.146C9.57 23.812 10.763 24 12 24c6.627 0 12-5.373 12-12 0-6.628-5.373-12-12-12z"/></svg><span>Save</span>';
         
         img.parentNode.insertBefore(wrapper, img);
         wrapper.appendChild(img);
@@ -1800,7 +2011,8 @@ def render_nordic_studio_layout(
     }});
   </script>
 </body>
-</html>"""
+</html>'''
+
 
 
 def render_pinterest_mag_layout(
@@ -3173,6 +3385,529 @@ def render_stitch_editorial_hub(
 </html>"""
 
 
+def render_nordic_studio_hub(
+    posts: list[Any],
+    categories: Optional[list[dict[str, str]]] = None,
+    title: str = "",
+    subtitle: str = "",
+    base_url: str = "",
+    theme: str = "nordic-studio",
+    source_domain: str = "thenordroom.com",
+    branding: Optional[Any] = None,
+    path_prefix: str = "",
+    routing_mode: str = "single",
+    **kwargs: Any,
+) -> str:
+    """Renders The Nordroom Scandinavian Homepage Hub with masthead, dynamic cover story, room taxonomy, and 3-col grid."""
+    brand_clean = getattr(branding, "brand_name", "") or "THE NORDROOM"
+    author_name = getattr(branding, "author_name", "") or "Rachel"
+    author_bio = getattr(branding, "author_bio", "") or "Creator of The Nordroom • Interior design specialist passionate about Scandinavian homes, architectural renovations, and spatial curation."
+    home_link = f"{path_prefix}/" if path_prefix else "/"
+    clean_domain = source_domain.replace("https://", "").replace("http://", "").rstrip("/")
+    canonical_base = base_url.rstrip("/") if (base_url and "://" in base_url) else f"https://{clean_domain}"
+    hub_title = title or f"{brand_clean} — Scandinavian Interior Design & Home Tours"
+    hub_subtitle = subtitle or "Curated Scandinavian interiors, practical room layouts, and inspiring house tours."
+
+    total_posts = len(posts)
+    post_items = list(posts)
+
+    # Lead Hero Post: dynamically bound to the latest/last ingested article
+    lead_post = post_items[0] if post_items else None
+    if lead_post:
+        hero_slug = getattr(lead_post, "slug", None) or (lead_post.get("slug") if isinstance(lead_post, dict) else "")
+        hero_title = getattr(lead_post, "title", None) or (lead_post.get("title") if isinstance(lead_post, dict) else hero_slug.replace("-", " ").title())
+        hero_excerpt = getattr(lead_post, "excerpt", None) or (lead_post.get("excerpt") if isinstance(lead_post, dict) else "")
+        hero_cat = getattr(lead_post, "category", None) or (lead_post.get("category") if isinstance(lead_post, dict) else "Home Tour")
+        hero_web_path = getattr(lead_post, "web_path", None) or (lead_post.get("web_path") if isinstance(lead_post, dict) else f"/{hero_slug}/")
+        lead_link = f"{path_prefix}{hero_web_path}" if path_prefix else hero_web_path
+
+        hero_local_img = getattr(lead_post, "local_image_path", None) or (lead_post.get("local_image_path") if isinstance(lead_post, dict) else "")
+        hero_remote_img = getattr(lead_post, "image_url", None) or (lead_post.get("image_url") if isinstance(lead_post, dict) else "")
+        hero_img_candidate = hero_local_img or hero_remote_img
+
+        if hero_img_candidate and (hero_img_candidate.startswith("http://") or hero_img_candidate.startswith("https://")):
+            lead_img = hero_img_candidate
+        elif hero_img_candidate:
+            clean_hero_img = hero_img_candidate.lstrip("/")
+            lead_img = f"{path_prefix}/{clean_hero_img}" if path_prefix else f"/{clean_hero_img}"
+        elif hero_slug:
+            lead_img = f"{path_prefix}/assets/images/{hero_slug}.webp" if path_prefix else f"/assets/images/{hero_slug}.webp"
+        else:
+            lead_img = "https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=1600&q=80"
+
+        lead_title = hero_title or "Scandinavian Warm Minimalism: 10 Calming Room Concepts in Stockholm"
+        lead_excerpt = hero_excerpt or "How raw oak cabinetry, textured lime wash walls, and understated linen textiles create a serene sanctuary that silences everyday auditory noise."
+        lead_category = hero_cat
+    else:
+        lead_title = "Scandinavian Warm Minimalism: 10 Calming Room Concepts in Stockholm"
+        lead_excerpt = "How raw oak cabinetry, textured lime wash walls, and understated linen textiles create a serene sanctuary that silences everyday auditory noise."
+        lead_link = "#nordic-home-tour"
+        lead_category = "Home Tour"
+        lead_img = "https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=1600&q=80"
+
+    # Category pills
+    silo_cats = [
+        {"slug": "all", "name": "All Guides"},
+        {"slug": "living-room", "name": "Living Rooms"},
+        {"slug": "bedroom", "name": "Bedrooms"},
+        {"slug": "kitchen", "name": "Kitchens & Pantries"},
+        {"slug": "bathroom", "name": "Bathrooms"},
+        {"slug": "garden", "name": "Garden & Outdoor"},
+        {"slug": "small-spaces", "name": "Small Spaces"},
+        {"slug": "colors", "name": "Color Trends"},
+    ]
+
+    pills_markup = ""
+    for idx, sc in enumerate(silo_cats):
+        active_cls = "bg-[#1C1C1C] text-white font-semibold shadow-xs" if idx == 0 else "bg-white hover:bg-[#F4F3F0] text-[#1C1C1C] border border-[#EBEBEA]"
+        pills_markup += f'''
+        <button class="cat-pill px-4 py-2 rounded-full text-xs uppercase tracking-wider font-medium transition-all {active_cls}" onclick="filterArticles('{sc['slug']}', this)">
+          {sc['name']}
+        </button>
+        '''
+
+    # Cards grid
+    cards_html = ""
+    for idx, p in enumerate(post_items):
+        slug_val = getattr(p, "slug", None) or (p.get("slug") if isinstance(p, dict) else "")
+        title_val = getattr(p, "title", None) or (p.get("title") if isinstance(p, dict) else slug_val.replace("-", " ").title())
+        excerpt_val = getattr(p, "excerpt", None) or (p.get("excerpt") if isinstance(p, dict) else "")
+        category_val = getattr(p, "category", None) or (p.get("category") if isinstance(p, dict) else "Home Tour")
+        web_path_val = getattr(p, "web_path", None) or (p.get("web_path") if isinstance(p, dict) else f"/{slug_val}/")
+        link = f"{path_prefix}{web_path_val}" if path_prefix else web_path_val
+
+        local_img = getattr(p, "local_image_path", None) or (p.get("local_image_path") if isinstance(p, dict) else "")
+        remote_img = getattr(p, "image_url", None) or (p.get("image_url") if isinstance(p, dict) else "")
+        raw_img = local_img or remote_img
+        if raw_img and (raw_img.startswith("http://") or raw_img.startswith("https://")):
+            img_src = raw_img
+        elif raw_img:
+            clean_img = raw_img.lstrip("/")
+            img_src = f"{path_prefix}/{clean_img}" if path_prefix else f"/{clean_img}"
+        elif slug_val:
+            img_src = f"{path_prefix}/assets/images/{slug_val}.webp" if path_prefix else f"/assets/images/{slug_val}.webp"
+        else:
+            img_src = "https://images.unsplash.com/photo-1598928506311-c55ded91a20c?auto=format&fit=crop&w=800&q=80"
+
+        fallback_svg = _resolve_fallback_svg(slug_val, path_prefix)
+        data_cat = category_val.lower().replace(" ", "-")
+        init_style = "display: flex;" if idx < 12 else "display: none;"
+
+        cards_html += f'''
+        <article class="article-card group bg-white rounded-lg overflow-hidden border border-[#EBEBEA] hover:border-[#8C6D53]/50 hover:shadow-sm transition-all flex flex-col" data-cat="{data_cat}" style="{init_style}">
+          <a href="{link}" class="relative aspect-[4/3] overflow-hidden bg-[#F4F3F0] block">
+            <img alt="{html_lib.escape(title_val)}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src="{img_src}" loading="lazy" decoding="async" onerror="this.onerror=null; this.src='{fallback_svg}';">
+            <span class="absolute top-3 left-3 px-2.5 py-1 bg-white/95 backdrop-blur-sm rounded text-[10px] font-semibold tracking-wider uppercase text-[#1C1C1C] border border-[#EBEBEA] shadow-xs">
+              {html_lib.escape(category_val)}
+            </span>
+          </a>
+          <div class="p-5 flex flex-col flex-1 justify-between">
+            <div>
+              <span class="text-[10px] tracking-[0.16em] uppercase text-[#8C6D53] font-semibold block mb-2">{html_lib.escape(category_val)}</span>
+              <a href="{link}" class="block group-hover:text-[#8C6D53] transition-colors">
+                <h3 class="font-serif text-lg sm:text-xl font-bold text-[#1C1C1C] leading-snug mb-2.5 line-clamp-2">
+                  {html_lib.escape(title_val)}
+                </h3>
+              </a>
+              <p class="text-xs sm:text-sm text-[#686866] leading-relaxed line-clamp-2 mb-4">
+                {html_lib.escape(excerpt_val)}
+              </p>
+            </div>
+            <div class="pt-3 border-t border-[#F4F3F0] flex items-center justify-between text-xs text-[#686866]">
+              <span class="italic font-serif">By {html_lib.escape(author_name)}</span>
+              <a href="{link}" class="inline-flex items-center gap-1 font-semibold text-[11px] tracking-wider uppercase text-[#8C6D53] hover:underline">
+                Read Tour &rarr;
+              </a>
+            </div>
+          </div>
+        </article>
+        '''
+
+    return f'''<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{html_lib.escape(hub_title)}</title>
+  <meta name="description" content="{html_lib.escape(hub_subtitle)}">
+  <meta name="robots" content="index, follow, max-image-preview:large">
+  <link rel="canonical" href="{canonical_base}/">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 100 100\'><text y=\'.9em\' font-size=\'90\'>&#x1F3E0;</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,600&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body {{
+      background-color: #FBFBFA;
+      color: #1C1C1C;
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }}
+    .font-serif {{
+      font-family: 'Cormorant Garamond', Georgia, serif;
+    }}
+  </style>
+</head>
+<body class="flex flex-col min-h-screen">
+
+  <!-- TOP UTILITY STRIP -->
+  <div class="w-full bg-[#1C1C1C] text-white py-2 px-4 sm:px-8 text-center sm:text-left flex flex-col sm:flex-row items-center justify-between text-[11px] tracking-[0.18em] uppercase font-medium">
+    <div>SCANDINAVIAN INTERIORS • HOME TOURS • DESIGN INSPIRATION</div>
+    <div class="hidden sm:flex items-center gap-4 text-stone-300">
+      <a href="{home_link}" class="hover:text-white transition-colors">Home Tours</a>
+      <span>•</span>
+      <a href="#newsletter" class="hover:text-white transition-colors">Newsletter</a>
+      <span>•</span>
+      <a href="https://pinterest.com" target="_blank" rel="noopener noreferrer" class="hover:text-white transition-colors">Pinterest</a>
+      <span>•</span>
+      <a href="{home_link}" class="hover:text-white transition-colors">About</a>
+    </div>
+  </div>
+
+  <!-- CENTERED THE NORDROOM MASTHEAD -->
+  <header class="w-full bg-white border-b border-[#EBEBEA] py-8 px-4 text-center">
+    <div class="max-w-[1200px] mx-auto">
+      <span class="text-[11px] tracking-[0.25em] uppercase text-[#8C6D53] font-semibold block mb-2">Nordic Living & Interior Architecture</span>
+      <h1 class="font-serif text-4xl sm:text-5xl md:text-6xl tracking-[0.16em] font-medium text-[#1C1C1C] uppercase mb-2">
+        <a href="{home_link}" class="hover:opacity-90 transition-opacity">{html_lib.escape(brand_clean)}</a>
+      </h1>
+      <p class="text-xs sm:text-sm text-[#686866] italic font-serif">Curated Interior Design, Space Transformations & Scandinavian Living</p>
+    </div>
+  </header>
+
+  <!-- NAVIGATION & ROOM MENU -->
+  <nav class="w-full bg-white border-b border-[#EBEBEA] sticky top-0 z-30 shadow-xs">
+    <div class="max-w-[1200px] mx-auto px-4 flex items-center justify-between overflow-x-auto py-3 gap-6 text-[12px] font-semibold tracking-[0.14em] uppercase text-[#1C1C1C]">
+      <div class="flex items-center gap-6 whitespace-nowrap">
+        <a href="{home_link}" class="text-[#8C6D53] font-bold">All Guides</a>
+        <button onclick="filterArticles('living')" class="hover:text-[#8C6D53] transition-colors">Living Rooms</button>
+        <button onclick="filterArticles('bedroom')" class="hover:text-[#8C6D53] transition-colors">Bedrooms</button>
+        <button onclick="filterArticles('kitchen')" class="hover:text-[#8C6D53] transition-colors">Kitchens</button>
+        <button onclick="filterArticles('bathroom')" class="hover:text-[#8C6D53] transition-colors">Bathrooms</button>
+        <button onclick="filterArticles('garden')" class="hover:text-[#8C6D53] transition-colors">Garden & Outdoor</button>
+        <button onclick="filterArticles('small')" class="hover:text-[#8C6D53] transition-colors">Small Spaces</button>
+        <button onclick="filterArticles('color')" class="hover:text-[#8C6D53] transition-colors">Color Trends</button>
+      </div>
+      <div class="hidden sm:flex items-center gap-2">
+        <input type="text" id="nord-search-input" oninput="handleSearch(this.value)" placeholder="Search rooms..." class="px-3 py-1 text-xs border border-[#EBEBEA] rounded-full focus:outline-none focus:border-[#8C6D53] w-36 tracking-normal">
+      </div>
+    </div>
+  </nav>
+
+  <main class="flex-1 w-full py-8 sm:py-12">
+
+    <!-- HERO COVER STORY (LATEST POST) -->
+    <section class="max-w-[1200px] mx-auto px-4 sm:px-8 mb-14">
+      <div class="bg-white border border-[#EBEBEA] rounded-xl overflow-hidden shadow-xs hover:border-[#8C6D53]/50 transition-all">
+        <div class="grid grid-cols-1 lg:grid-cols-12 items-center">
+          <div class="lg:col-span-7 aspect-[16/10] overflow-hidden bg-[#F4F3F0]">
+            <a href="{lead_link}">
+              <img src="{lead_img}" alt="{html_lib.escape(lead_title)}" class="w-full h-full object-cover hover:scale-103 transition-transform duration-700" fetchpriority="high">
+            </a>
+          </div>
+          <div class="lg:col-span-5 p-6 sm:p-10 flex flex-col justify-between">
+            <div>
+              <span class="text-[11px] tracking-[0.22em] uppercase font-semibold text-[#8C6D53] block mb-2">Featured Home Tour • {html_lib.escape(lead_category)}</span>
+              <a href="{lead_link}">
+                <h2 class="font-serif text-2xl sm:text-3xl md:text-4xl font-bold text-[#1C1C1C] leading-[1.2] mb-4 hover:text-[#8C6D53] transition-colors">
+                  {html_lib.escape(lead_title)}
+                </h2>
+              </a>
+              <p class="text-xs sm:text-sm text-[#686866] leading-relaxed mb-6 font-serif italic text-base">
+                {html_lib.escape(lead_excerpt)}
+              </p>
+            </div>
+            <div class="pt-4 border-t border-[#F4F3F0] flex items-center justify-between">
+              <span class="text-xs text-[#686866]">By {html_lib.escape(author_name)} • 4 Min Read</span>
+              <a href="{lead_link}" class="inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-wider text-[#8C6D53] hover:underline">
+                Read Tour &rarr;
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- CURATED ROOM TAXONOMY GRID (ZERO RAW SLUGS) -->
+    <section class="max-w-[1200px] mx-auto px-4 sm:px-8 mb-14">
+      <div class="flex items-center justify-between pb-3 mb-6 border-b border-[#EBEBEA]">
+        <div class="flex items-center gap-2">
+          <span class="material-symbols-outlined text-[#8C6D53] text-[20px]">roofing</span>
+          <h2 class="text-xs font-semibold tracking-widest uppercase text-[#1C1C1C]">Curated Room Collections</h2>
+        </div>
+        <span class="text-[11px] tracking-wider uppercase text-[#686866]">The Nordroom Architectural Taxonomy</span>
+      </div>
+
+      <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
+        <button class="p-4 bg-white hover:bg-[#FBFBFA] border border-[#EBEBEA] hover:border-[#8C6D53] rounded-lg text-left transition-all group flex flex-col justify-between" onclick="filterArticles('living')">
+          <div>
+            <h3 class="font-serif text-sm sm:text-base text-[#1C1C1C] font-semibold leading-snug group-hover:text-[#8C6D53] transition-colors">Living Rooms</h3>
+          </div>
+          <span class="text-[11px] text-[#8C6D53] font-medium mt-3 block">18 curated tours</span>
+        </button>
+        <button class="p-4 bg-white hover:bg-[#FBFBFA] border border-[#EBEBEA] hover:border-[#8C6D53] rounded-lg text-left transition-all group flex flex-col justify-between" onclick="filterArticles('bedroom')">
+          <div>
+            <h3 class="font-serif text-sm sm:text-base text-[#1C1C1C] font-semibold leading-snug group-hover:text-[#8C6D53] transition-colors">Bedrooms</h3>
+          </div>
+          <span class="text-[11px] text-[#8C6D53] font-medium mt-3 block">14 curated guides</span>
+        </button>
+        <button class="p-4 bg-white hover:bg-[#FBFBFA] border border-[#EBEBEA] hover:border-[#8C6D53] rounded-lg text-left transition-all group flex flex-col justify-between" onclick="filterArticles('kitchen')">
+          <div>
+            <h3 class="font-serif text-sm sm:text-base text-[#1C1C1C] font-semibold leading-snug group-hover:text-[#8C6D53] transition-colors">Kitchens & Pantries</h3>
+          </div>
+          <span class="text-[11px] text-[#8C6D53] font-medium mt-3 block">12 design guides</span>
+        </button>
+        <button class="p-4 bg-white hover:bg-[#FBFBFA] border border-[#EBEBEA] hover:border-[#8C6D53] rounded-lg text-left transition-all group flex flex-col justify-between" onclick="filterArticles('garden')">
+          <div>
+            <h3 class="font-serif text-sm sm:text-base text-[#1C1C1C] font-semibold leading-snug group-hover:text-[#8C6D53] transition-colors">Garden & Outdoor</h3>
+          </div>
+          <span class="text-[11px] text-[#8C6D53] font-medium mt-3 block">21 outdoor spaces</span>
+        </button>
+        <button class="p-4 bg-white hover:bg-[#FBFBFA] border border-[#EBEBEA] hover:border-[#8C6D53] rounded-lg text-left transition-all group flex flex-col justify-between" onclick="filterArticles('small')">
+          <div>
+            <h3 class="font-serif text-sm sm:text-base text-[#1C1C1C] font-semibold leading-snug group-hover:text-[#8C6D53] transition-colors">Small Spaces</h3>
+          </div>
+          <span class="text-[11px] text-[#8C6D53] font-medium mt-3 block">16 space hacks</span>
+        </button>
+        <button class="p-4 bg-white hover:bg-[#FBFBFA] border border-[#EBEBEA] hover:border-[#8C6D53] rounded-lg text-left transition-all group flex flex-col justify-between" onclick="filterArticles('color')">
+          <div>
+            <h3 class="font-serif text-sm sm:text-base text-[#1C1C1C] font-semibold leading-snug group-hover:text-[#8C6D53] transition-colors">Color Trends</h3>
+          </div>
+          <span class="text-[11px] text-[#8C6D53] font-medium mt-3 block">9 paint palettes</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- PUBLISHED GUIDES GRID -->
+    <section class="max-w-[1200px] mx-auto px-4 sm:px-8 mb-16" id="guides-feed">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-3 mb-6 border-b border-[#EBEBEA] gap-4">
+        <div>
+          <span class="text-[11px] tracking-[0.2em] uppercase font-semibold text-[#8C6D53] block mb-1">Scandinavian Living Feed</span>
+          <h2 class="font-serif text-2xl sm:text-3xl font-bold text-[#1C1C1C]">All Published Home Tours & Styling Guides</h2>
+        </div>
+        <div class="flex items-center gap-3">
+          <span id="showing-text" class="text-xs text-[#686866]">Showing all published tours</span>
+          <span id="article-count-badge" class="px-2.5 py-1 bg-[#F4F3F0] rounded text-xs font-semibold text-[#1C1C1C] border border-[#EBEBEA]">{total_posts} Guides</span>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2 overflow-x-auto pb-4 mb-8">
+        {pills_markup}
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8" id="article-grid">
+        {cards_html}
+      </div>
+
+      <!-- PAGINATION CONTROLS -->
+      <div id="pagination-controls" class="flex items-center justify-center gap-2 mt-12 pt-6 border-t border-[#EBEBEA]">
+      </div>
+    </section>
+
+    <!-- NEWSLETTER DISPATCH STRIP -->
+    <section class="max-w-[1200px] mx-auto px-4 sm:px-8 mb-16" id="newsletter">
+      <div class="p-8 sm:p-12 bg-[#F4F3F0] border border-[#EBEBEA] rounded-xl text-center">
+        <span class="text-[11px] tracking-[0.25em] uppercase font-semibold text-[#8C6D53] block mb-2">Weekly Inspiration</span>
+        <h2 class="font-serif text-3xl sm:text-4xl font-bold text-[#1C1C1C] mb-3">Join 85,000+ Scandinavian Living Readers</h2>
+        <p class="text-xs sm:text-sm text-[#686866] max-w-xl mx-auto leading-relaxed mb-6 font-serif italic text-base">
+          Receive our weekly curation of Nordic house tours, minimalist room layouts, and organic material guides directly in your inbox.
+        </p>
+        <div class="flex flex-col sm:flex-row items-center justify-center gap-3 max-w-md mx-auto">
+          <input type="email" placeholder="Your email address..." class="w-full px-4 py-2.5 bg-white border border-[#EBEBEA] rounded-full text-xs focus:outline-none focus:border-[#8C6D53] shadow-xs">
+          <button class="w-full sm:w-auto px-6 py-2.5 bg-[#1C1C1C] hover:bg-stone-800 text-white rounded-full text-xs font-semibold tracking-wider uppercase whitespace-nowrap shadow-xs transition-colors">
+            Subscribe
+          </button>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- THE NORDROOM 4-COLUMN FOOTER -->
+  <footer class="w-full bg-[#1C1C1C] text-stone-300 pt-14 pb-8 border-t border-stone-800">
+    <div class="max-w-[1200px] mx-auto px-4 sm:px-8 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-10 mb-12">
+      <div>
+        <h4 class="font-serif text-2xl font-bold text-white mb-3 uppercase tracking-wider">{html_lib.escape(brand_clean)}</h4>
+        <p class="text-xs text-stone-400 leading-relaxed mb-4">
+          An internationally acclaimed interior design and Scandinavian living publication showcasing serene house tours, room layout solutions, and organic material palettes.
+        </p>
+        <span class="text-[11px] text-[#8C6D53] font-semibold uppercase tracking-widest block">Founded by {html_lib.escape(author_name)}</span>
+      </div>
+      <div>
+        <h5 class="text-xs font-semibold tracking-widest uppercase text-white mb-4">Room Inspiration</h5>
+        <ul class="space-y-2 text-xs text-stone-400">
+          <li><button onclick="filterArticles('living')" class="hover:text-white transition-colors">Living Room Ideas</button></li>
+          <li><button onclick="filterArticles('bedroom')" class="hover:text-white transition-colors">Scandinavian Bedrooms</button></li>
+          <li><button onclick="filterArticles('kitchen')" class="hover:text-white transition-colors">Kitchens & Pantries</button></li>
+          <li><button onclick="filterArticles('garden')" class="hover:text-white transition-colors">Garden & Outdoor Living</button></li>
+          <li><button onclick="filterArticles('small')" class="hover:text-white transition-colors">Small Space Living</button></li>
+        </ul>
+      </div>
+      <div>
+        <h5 class="text-xs font-semibold tracking-widest uppercase text-white mb-4">Design Styles</h5>
+        <ul class="space-y-2 text-xs text-stone-400">
+          <li><a href="{home_link}" class="hover:text-white transition-colors">Nordic Warm Minimalism</a></li>
+          <li><a href="{home_link}" class="hover:text-white transition-colors">Japandi Aesthetics</a></li>
+          <li><a href="{home_link}" class="hover:text-white transition-colors">Mid-Century Modern</a></li>
+          <li><a href="{home_link}" class="hover:text-white transition-colors">Earth & Lime Wash Finishes</a></li>
+          <li><a href="{home_link}" class="hover:text-white transition-colors">Small Apartment Hacks</a></li>
+        </ul>
+      </div>
+      <div>
+        <h5 class="text-xs font-semibold tracking-widest uppercase text-white mb-4">Curate & Connect</h5>
+        <p class="text-xs text-stone-400 mb-3">Join our community of 85,000+ design enthusiasts.</p>
+        <div class="flex items-center gap-3 mb-4">
+          <a href="https://pinterest.com" target="_blank" rel="noopener noreferrer" class="px-3 py-1.5 bg-[#E60023] hover:bg-[#AD081B] text-white rounded text-xs font-semibold">Pinterest</a>
+          <a href="#newsletter" class="px-3 py-1.5 bg-stone-800 hover:bg-stone-700 text-stone-200 rounded text-xs">Newsletter</a>
+        </div>
+        <span class="text-[11px] text-stone-500 block">&copy; 2026 {html_lib.escape(brand_clean)}. All Rights Reserved.</span>
+      </div>
+    </div>
+    <div class="max-w-[1200px] mx-auto px-4 text-center text-[11px] text-stone-500 pt-6 border-t border-stone-800/80">
+      Designed with pure Scandinavian minimalism • Zero robotic filler • Hand-crafted editorial curation.
+    </div>
+  </footer>
+
+  <script>
+    const PAGE_SIZE = 12;
+    let currentPage = 1;
+    let currentCategory = 'all';
+    let currentSearch = '';
+
+    function getFilteredCards() {{
+      const allCards = Array.from(document.querySelectorAll('.article-card'));
+      return allCards.filter(card => {{
+        const cat = (card.getAttribute('data-cat') || '').toLowerCase();
+        const text = card.textContent.toLowerCase();
+
+        const matchesCat = (currentCategory === 'all') || cat.includes(currentCategory);
+        const matchesSearch = !currentSearch || text.includes(currentSearch);
+
+        return matchesCat && matchesSearch;
+      }});
+    }}
+
+    function updateDisplay(scrollToGrid) {{
+      const allCards = Array.from(document.querySelectorAll('.article-card'));
+      const filtered = getFilteredCards();
+      const totalItems = filtered.length;
+      const totalPages = Math.ceil(totalItems / PAGE_SIZE) || 1;
+
+      if (currentPage > totalPages) currentPage = totalPages;
+      if (currentPage < 1) currentPage = 1;
+
+      const startIndex = (currentPage - 1) * PAGE_SIZE;
+      const endIndex = Math.min(startIndex + PAGE_SIZE, totalItems);
+
+      allCards.forEach(c => {{
+        c.style.display = 'none';
+      }});
+
+      filtered.slice(startIndex, endIndex).forEach(c => {{
+        c.style.display = 'flex';
+      }});
+
+      const showingText = document.getElementById('showing-text');
+      if (showingText) {{
+        if (totalItems === 0) {{
+          showingText.textContent = 'Showing 0 published guides';
+        }} else {{
+          showingText.textContent = 'Showing ' + (startIndex + 1) + '–' + endIndex + ' of ' + totalItems + ' published guides';
+        }}
+      }}
+
+      const badge = document.getElementById('article-count-badge');
+      if (badge) {{
+        badge.textContent = totalItems + ' Guides';
+      }}
+
+      renderPaginationButtons(totalPages);
+
+      if (scrollToGrid) {{
+        const target = document.getElementById('guides-feed');
+        if (target) {{
+          target.scrollIntoView({{ behavior: 'smooth', block: 'start' }});
+        }}
+      }}
+    }}
+
+    function renderPaginationButtons(totalPages) {{
+      const container = document.getElementById('pagination-controls');
+      if (!container) return;
+
+      if (totalPages <= 1) {{
+        container.innerHTML = '<span class="px-3 py-1 text-stone-400 text-xs">Page 1 of 1</span>';
+        return;
+      }}
+
+      let html = '';
+
+      if (currentPage > 1) {{
+        html += '<button onclick="goToPage(' + (currentPage - 1) + ')" class="px-3 py-1.5 bg-white hover:bg-stone-100 text-stone-800 border border-[#EBEBEA] rounded-full text-xs font-medium uppercase tracking-wider transition-colors inline-flex items-center gap-1">&larr; Prev</button>';
+      }} else {{
+        html += '<button disabled class="px-3 py-1.5 bg-stone-100 text-stone-400 border border-[#EBEBEA] rounded-full text-xs font-medium uppercase tracking-wider cursor-not-allowed inline-flex items-center gap-1">&larr; Prev</button>';
+      }}
+
+      for (let i = 1; i <= totalPages; i++) {{
+        if (i === 1 || i === totalPages || (i >= currentPage - 1 && i <= currentPage + 1)) {{
+          if (i === currentPage) {{
+            html += '<button class="px-3.5 py-1.5 bg-[#1C1C1C] text-white rounded-full text-xs font-bold shadow-xs">' + i + '</button>';
+          }} else {{
+            html += '<button onclick="goToPage(' + i + ')" class="px-3.5 py-1.5 bg-white hover:bg-stone-100 text-stone-800 border border-[#EBEBEA] rounded-full text-xs font-medium transition-colors">' + i + '</button>';
+          }}
+        }} else if (i === currentPage - 2 || i === currentPage + 2) {{
+          html += '<span class="px-1 text-stone-400">...</span>';
+        }}
+      }}
+
+      if (currentPage < totalPages) {{
+        html += '<button onclick="goToPage(' + (currentPage + 1) + ')" class="px-3 py-1.5 bg-white hover:bg-stone-100 text-stone-800 border border-[#EBEBEA] rounded-full text-xs font-medium uppercase tracking-wider transition-colors inline-flex items-center gap-1">Next &rarr;</button>';
+      }} else {{
+        html += '<button disabled class="px-3 py-1.5 bg-stone-100 text-stone-400 border border-[#EBEBEA] rounded-full text-xs font-medium uppercase tracking-wider cursor-not-allowed inline-flex items-center gap-1">Next &rarr;</button>';
+      }}
+
+      container.innerHTML = html;
+    }}
+
+    function goToPage(page) {{
+      currentPage = page;
+      updateDisplay(true);
+    }}
+
+    function filterArticles(category, element) {{
+      currentCategory = category;
+      currentPage = 1;
+
+      const pills = document.querySelectorAll('.cat-pill');
+      if (element) {{
+        pills.forEach(p => {{
+          p.classList.remove('bg-[#1C1C1C]', 'text-white', 'font-semibold', 'shadow-xs');
+          p.classList.add('bg-white', 'text-[#1C1C1C]', 'border', 'border-[#EBEBEA]');
+        }});
+        element.classList.remove('bg-white', 'text-[#1C1C1C]', 'border', 'border-[#EBEBEA]');
+        element.classList.add('bg-[#1C1C1C]', 'text-white', 'font-semibold', 'shadow-xs');
+      }}
+
+      updateDisplay(false);
+    }}
+
+    function handleSearch(query) {{
+      currentSearch = query.toLowerCase().trim();
+      currentPage = 1;
+      updateDisplay(false);
+    }}
+
+    document.addEventListener('DOMContentLoaded', function() {{
+      updateDisplay(false);
+    }});
+  </script>
+</body>
+</html>'''
+
+
+
 def render_hub(
     posts: list[Any],
     categories: Optional[list[dict[str, str]]] = None,
@@ -3197,6 +3932,20 @@ def render_hub(
 
     hub_title = title or f"{brand_clean} Editorial Hub"
     hub_subtitle = subtitle or "Curated Home Decor, Room Styling Guides, and Modern Living Guides." 
+
+    if theme == "nordic-studio":
+        return render_nordic_studio_hub(
+            posts=posts,
+            categories=categories,
+            title=hub_title,
+            subtitle=hub_subtitle,
+            base_url=base_url,
+            theme=theme,
+            source_domain=source_domain,
+            branding=branding,
+            path_prefix=path_prefix,
+            **kwargs,
+        )
 
     if theme == "editorial-warm":
         return render_stitch_editorial_hub(

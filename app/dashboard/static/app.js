@@ -1520,7 +1520,7 @@
 
       const bld = cfg.build || {};
 
-      const activeTheme = bld.theme || 'editorial-warm';
+      const activeTheme = bld.theme || 'nordic-studio';
 
       const activeRouting = bld.routing_mode || 'single';
 
@@ -1604,7 +1604,7 @@
 
       // Populate Preview Options
 
-      DOM.previewThemeSelect.value = bld.theme || 'editorial-warm';
+      DOM.previewThemeSelect.value = bld.theme || 'nordic-studio';
 
       DOM.previewRoutingSelect.value = bld.routing_mode || 'single';
 
@@ -2318,7 +2318,7 @@
 
         });
 
-        const accentMap = { 'editorial-warm': '#E60023', 'nordic-studio': '#0F766E', 'pinterest-mag': '#BE123C' };
+        const accentMap = { 'editorial-warm': '#E60023', 'nordic-studio': '#8C6D53', 'pinterest-mag': '#BE123C' };
 
         btn.style.boxShadow = `0 0 0 2px ${accentMap[theme] || '#666'}`;
 
@@ -2443,7 +2443,7 @@
 
 
 
-    const theme = DOM.previewThemeSelect.value || DOM.cfgTheme?.value || 'editorial-warm';
+    const theme = DOM.previewThemeSelect.value || DOM.cfgTheme?.value || 'nordic-studio';
 
     const routingMode = DOM.previewRoutingSelect.value || DOM.cfgRoutingMode?.value || 'single';
 
@@ -3939,7 +3939,7 @@
 
     async function openTemplateModal(themeKey, routingKey, defaultView = 'hub') {
 
-      const theme = themeKey || (DOM.cfgTheme && DOM.cfgTheme.value) || 'editorial-warm';
+      const theme = themeKey || (DOM.cfgTheme && DOM.cfgTheme.value) || 'nordic-studio';
 
       const routing = routingKey || (DOM.cfgRoutingMode && DOM.cfgRoutingMode.value) || 'single';
 
@@ -3964,9 +3964,9 @@
 
       const themeNames = {
 
-        'editorial-warm': 'Editorial Warm (Signature Kinfolk)',
+        'editorial-warm': 'Model 1 · Kinfolk Journal',
 
-        'nordic-studio': 'Nordic Studio (Minimalist Scandinavian)',
+        'nordic-studio': 'The Nordroom (Scandinavian Minimalist)',
 
         'pinterest-mag': 'Pinterest Mag (Visual Discovery & Pin Focus)',
 
@@ -4160,7 +4160,7 @@
 
       DOM.applyTemplateThemeBtn.addEventListener('click', () => {
 
-        const chosen = state.modalActiveTheme || 'editorial-warm';
+        const chosen = state.modalActiveTheme || 'nordic-studio';
 
         if (DOM.cfgTheme) DOM.cfgTheme.value = chosen;
 

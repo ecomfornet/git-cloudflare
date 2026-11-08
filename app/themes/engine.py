@@ -21,9 +21,9 @@ from app.themes.templates import (
 class ThemeEngine:
     """Core theme rendering engine managing layouts, visual palettes, and interactive components."""
 
-    def __init__(self, default_theme: str = "editorial-warm") -> None:
+    def __init__(self, default_theme: str = "nordic-studio") -> None:
         if default_theme not in THEMES:
-            self.default_theme = "editorial-warm"
+            self.default_theme = "nordic-studio"
         else:
             self.default_theme = default_theme
 
@@ -35,7 +35,7 @@ class ThemeEngine:
     @classmethod
     def get_theme(cls, theme_name: Optional[str] = None) -> dict[str, str]:
         """Retrieves dictionary of theme tokens for specified or default theme."""
-        key = theme_name or "editorial-warm"
+        key = theme_name or "nordic-studio"
         return get_theme_tokens(key)
 
     def render_post(
