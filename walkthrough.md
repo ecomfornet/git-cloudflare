@@ -177,6 +177,54 @@ In this update:
 
 ---
 
+## 7. Model 1 · Kinfolk Journal (`editorial-warm`) Aesthetic & Interactivity Refinement
+
+**Milestones K1–K4 Verification Summary**:
+- **Front Cover Hero Image**: Now dynamically pulls the featured image (`local_image_path` or `image_url`), title, excerpt, and target link directly from the latest ingested article (`posts[0]`), ensuring the front page always showcases the freshest content.
+- **Excised Metadata & Badges**:
+  - Removed `"Featured Cover Story"` badge.
+  - Removed `"schedule 8 Min Read"` time chip.
+  - Removed `"Volume 48 • Autumn/Winter"` volume label.
+  - Removed top notice bar `"The Spatial Journal • Vol. XII"` badge.
+  - Removed top notice bar `"auto_stories {total_posts} Guides Published"` counter.
+  - Centered the publication dispatch subtitle cleanly.
+- **Topic Silos & Categories**:
+  - Completely removed slug indicators (`/bedroom-inspo/`, `/fire-pits/`, `/patio-design/`, `/gazebos-pergolas/`, etc.) from all category cards.
+  - Retained only the clean, elegant category title (`Bedroom Inspo Guides`, `Fire Pits & Hearths`, etc.) and the curated guide count.
+- **All Published Guides Grid**:
+  - Made both the thumbnail image and title clickable anchor links pointing to the article URL (`<a href="{link}">...</a>`).
+  - Removed the monospace slug preview (`{web_path_val}`) from the card body.
+
+### Visual Verification
+
+````carousel
+![Refined Kinfolk Hero](file:///C:/Users/mouni/.gemini/antigravity/brain/c74d76e0-2737-467a-9b30-b696007f0f5f/kinfolk_hero_refined.png)
+<!-- slide -->
+![Topic Silos & Published Guides Grid](file:///C:/Users/mouni/.gemini/antigravity/brain/c74d76e0-2737-467a-9b30-b696007f0f5f/kinfolk_silos_and_guides.png)
+````
+
+
+---
+
+## 8. Live Template Preview Dual-View (Homepage Hub & Article Guide)
+
+**Milestones H1–H4 Verification Summary**:
+- **Root Cause Identified**: The dashboard preview engine previously only invoked `render_post(...)`, rendering an individual article page when users clicked `👁️ Preview` on **Model 1 · Kinfolk Journal**, hiding the refined Magazine Homepage Hub (`render_stitch_editorial_hub`).
+- **Dual-View Modal Header**:
+  - Added interactive view toggle buttons directly to the template preview modal: `[🏛️ Front / Hub | 📄 Article Guide]`.
+  - Clicking `👁️ Preview` on **Model 1 · Kinfolk Journal** in Step 2 now defaults directly to the **Front / Homepage Hub** view, dynamically showcasing the user's latest ingested article (`New Ingested Guide`), the clean Topic Silos with zero slugs, and clickable guide cards.
+  - Clicking `📄 Article Guide` toggles instantly to the single article layout.
+- **Step 4 Live Preview Integration**:
+  - Added `🏛️ Front / Homepage Hub (Model 1 Kinfolk Journal)` as the top choice in `#previewPostSelect`.
+  - Added a dedicated `🏛️ Model 1: Kinfolk Homepage Hub` quick switcher button.
+
+### Visual Verification
+
+![Modal Template Preview - Kinfolk Journal Front Hub](file:///C:/Users/mouni/.gemini/antigravity/brain/c74d76e0-2737-467a-9b30-b696007f0f5f/modal_template_preview_hub.png)
+
+
+---
+
 ## 9. The Nordroom Scandinavian Design System & Default Theme (Template 2)
 
 **Milestones N1–N4 Verification Summary**:
@@ -206,4 +254,62 @@ In this update:
 ![The Nordroom Homepage Hub](file:///C:/Users/mouni/.gemini/antigravity/brain/c74d76e0-2737-467a-9b30-b696007f0f5f/thenordroom_hub_preview.png)
 <!-- slide -->
 ![The Nordroom Single Article Guide](file:///C:/Users/mouni/.gemini/antigravity/brain/c74d76e0-2737-467a-9b30-b696007f0f5f/thenordroom_article_preview.png)
+````
+
+
+---
+
+## 10. Production Static Site & pSEO Architecture across All 3 Templates + Model 3 Styleire Magazine Replacement
+
+**Milestones S1–S4 Verification Summary**:
+- **Reference Architecture Forensic Analysis**: Audited `C:\Users\mouni\Desktop\github cloudlare\static-site` (82 directories, 78 HTML pages, 128 optimized JPGs, Tailwind v4 consolidated bundle, and multi-schema JSON-LD structured data).
+- **Universal 3-Template pSEO System**:
+  - **URL & Directory Routing (`pseo_nested_silo`)**:
+    - Articles: `/blog/<slug>/index.html` (clean URL: `/blog/<slug>/`)
+    - Category Silos: `/category/<category_slug>/index.html` (clean URL: `/category/<category_slug>/`)
+    - E-E-A-T Author Page: `/author/sophia-bennett/index.html` (clean URL: `/author/sophia-bennett/`)
+    - HTML Sitemap Directory: `/sitemap/index.html` (clean URL: `/sitemap/`)
+    - 9 Legal/Trust Compliance Pages: `/about/`, `/contact/`, `/editorial-policy/`, `/fact-checking-policy/`, `/privacy-policy/`, `/cookie-policy/`, `/terms/`, `/disclaimer/`, `/copyright/`
+    - Technical SEO Assets: `/robots.txt`, `/sitemap.xml` (with priorities 1.0, 0.8, 0.6, 0.5, 0.4), `/ads.txt` (IAB Tech Lab spec 1.1)
+  - **3-Tier Multi-Schema JSON-LD**:
+    - **Schema 1: `@type: "Article"`**: headline, description, images, ISO publish/modified dates, Person author with profile URL, and Organization publisher with logo.
+    - **Schema 2: `@type: "FAQPage"`**: mainEntity array of Question and Answer matching the visible on-page FAQ accordion.
+    - **Schema 3: `@type: "BreadcrumbList"`**: `Home` -> `Category` -> `Article Title`.
+    - **Homepage Schema**: `@type: "WebSite"` with publisher Organization.
+    - **Author Schema**: `@type: "Person"` with jobTitle, bio, credentials, and image.
+  - **Universal Support**: Works seamlessly across **all 3 templates** (`editorial-warm` [Kinfolk], `nordic-studio` [The Nordroom], and `pinterest-mag` / `styleire` [Styleire]).
+
+- **Replaced Template 3 with Styleire Editorial Magazine (`render_styleire_layout` & `render_styleire_hub`)**:
+  - **Modern Editorial Aesthetic**: Replaced the previous rudimentary pinboard with the exact Styleire layout from `static-site`.
+  - **Sticky Blurred Masthead**: Clean backdrop-blur header with bold serif brand logo, category links (`Living Room`, `Bedroom`, `Kitchen & Dining`, `Outdoor Spaces`, `DIY & Craft`, `Seasonal & Trends`), and mobile horizontal scroll bar.
+  - **Single Post Reading Architecture (`render_styleire_layout`)**:
+    - 768px (`max-w-3xl`) centered container.
+    - Breadcrumbs `<nav aria-label="Breadcrumb">` (`Home / Category / Article Title`).
+    - Uppercase category kicker (`text-xs font-semibold uppercase tracking-widest text-stone-500`).
+    - Serif H1 headline (`font-serif text-4xl font-bold leading-tight md:text-5xl`).
+    - Byline with clickable author profile link (`By Sophia Bennett • May 20, 2026 • 5 min read`).
+    - Hero image with hover-activated Pinterest Save pill (`📌 Save`).
+    - Clean prose typography (`prose prose-stone`).
+    - **Key Takeaways Box**: Styled callout (`rounded-xl border border-stone-200 bg-stone-50 p-6`) with bullet points.
+    - **Interactive FAQ Accordion**: Expandable `<details>` cards matching the `@type: "FAQPage"` schema.
+    - **Rich E-E-A-T Author Card**: 96x96 circular avatar, "Written by" kicker, name linking to author profile, credentials ("Senior Home Decor Editor & Interior Stylist"), and bio.
+    - **Related Reading Grid**: 3-column cards with aspect 3:2 photography, category kicker, serif title, clamp excerpt, date, and reading time.
+    - **4-Column Trust Footer**: Brand summary, Explore categories, 10 Company & Legal links, and copyright notice.
+  - **Homepage Hub Layout (`render_styleire_hub`)**:
+    - Large featured cover story (`posts[0]`) with 16:10 photo, category kicker, title, excerpt, and byline.
+    - Curated Room Silos grid with 6 rooms and guide counts.
+    - Latest Published Guides 3-column grid.
+    - Newsletter dispatch banner.
+    - Full legal footer with links to all 9 trust pages and HTML sitemap.
+- **Dashboard Enhancements**:
+  - Step 2 Model 3 updated to **Model 3 · Styleire Magazine** (Editorial & Trust Suite).
+  - Step 2 Route Architecture updated with dedicated **pSEO Silo (Styleire)** card and option.
+  - Modal Live Preview updated with seamless switching between Styleire Front Hub and Article Guide.
+
+### Visual Verification
+
+````carousel
+![Styleire Magazine Homepage Hub](file:///C:/Users/mouni/.gemini/antigravity/brain/c74d76e0-2737-467a-9b30-b696007f0f5f/styleire_modal_hub_preview.png)
+<!-- slide -->
+![Styleire Magazine Single Article Guide](file:///C:/Users/mouni/.gemini/antigravity/brain/c74d76e0-2737-467a-9b30-b696007f0f5f/styleire_modal_article_preview.png)
 ````
