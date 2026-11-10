@@ -67,15 +67,15 @@
           <button class="tab-btn" data-tab="tab-ingest" id="tabBtnIngest"></button>
           <button class="tab-btn" data-tab="tab-posts" id="tabBtnPosts"></button>
           <button class="tab-btn" data-tab="tab-preview" id="tabBtnPreview"></button>
-          <a id="cockpitCfUrlLink" href="https://gardenhome.laurainsley01.workers.dev" target="_blank" rel="noopener"></a>
-          <a id="cockpitGhUrlLink" href="https://annadeco.github.io" target="_blank" rel="noopener"></a>
-          <a id="cfLiveUrlPreview" href="https://gardenhome.laurainsley01.workers.dev" target="_blank" rel="noopener"></a>
-          <strong id="cockpitCfWorker">gardenhome</strong>
-          <strong id="cockpitCfSubdomain">laurainsley01</strong>
+          <a id="cockpitCfUrlLink" href="#" target="_blank" rel="noopener"></a>
+          <a id="cockpitGhUrlLink" href="#" target="_blank" rel="noopener"></a>
+          <a id="cfLiveUrlPreview" href="#" target="_blank" rel="noopener"></a>
+          <strong id="cockpitCfWorker">—</strong>
+          <strong id="cockpitCfSubdomain">—</strong>
           <strong id="cockpitTheme">pinterest-mag</strong>
-          <code id="cockpitOutputDir">dist/gardenhome</code>
-          <a id="cockpitGhRepoText" href="https://annadeco.github.io" target="_blank" rel="noopener"></a>
-          <strong id="cockpitGhRepo">annadeco.github.io</strong>
+          <code id="cockpitOutputDir">dist/</code>
+          <a id="cockpitGhRepoText" href="#" target="_blank" rel="noopener"></a>
+          <strong id="cockpitGhRepo">—</strong>
           <strong id="cockpitGhBranch">main</strong>
         </div>
       </div>
@@ -103,8 +103,8 @@
           <code id="statTheme" class="telemetry-model">editorial-warm</code>
         </div>
         <div class="telemetry-pill target-pill" id="statPlatformCard" title="Target Deployment Edge Destination">
-          <a id="statTargetUrl" class="target-link" href="https://gardenhome.laurainsley01.workers.dev" target="_blank" rel="noopener">
-            https://gardenhome.laurainsley01.workers.dev ↗
+          <a id="statTargetUrl" class="target-link" href="#" target="_blank" rel="noopener">
+            —
           </a>
         </div>
         <!-- Hidden elements for test & script compatibility -->
@@ -180,6 +180,33 @@
               <button type="button" id="syncAssetsSettingsBtn" class="btn btn-secondary btn-sm" style="width: 100%; margin-top: 0.5rem;">
                 🔄 Sync Image Assets to Project
               </button>
+
+              <!-- Quick Deploy Theme Selector -->
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 0.65rem; background: rgba(15, 23, 42, 0.5); border: 1px solid rgba(56, 189, 248, 0.25); border-radius: 6px; padding: 0.4rem 0.65rem;">
+                <span style="font-size: 0.72rem; color: #94A3B8; font-weight: 600; display: flex; align-items: center; gap: 0.35rem;">
+                  <span>🎨</span>
+                  <span>Active Theme:</span>
+                </span>
+                <select id="quickDeployThemeSelect" class="form-control" style="width: auto; padding: 0.2rem 0.6rem; font-size: 0.75rem; height: auto; background: #0F172A; border: 1px solid #38BDF8; color: #38BDF8; font-weight: 600; border-radius: 4px; cursor: pointer;">
+                  <option value="editorial-warm">Kinfolk Journal (Editorial Warm)</option>
+                  <option value="nordic-studio">The Nordroom (Nordic Studio)</option>
+                  <option value="pinterest-mag">Styleire Magazine (Editorial pSEO)</option>
+                </select>
+              </div>
+
+              <!-- Static Compilation Progress Bar -->
+              <div id="buildProgressBarContainer" style="display: none; margin-top: 0.75rem; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(56, 189, 248, 0.25); border-radius: 8px; padding: 0.65rem 0.85rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem;">
+                  <span id="buildProgressLabel" style="font-size: 0.75rem; color: #38BDF8; font-weight: 600; display: inline-flex; align-items: center; gap: 0.35rem;">
+                    <span class="spinner" style="display: inline-block; width: 12px; height: 12px; border: 2px solid #38BDF8; border-top-color: transparent; border-radius: 50%; animation: spin 0.8s linear infinite;"></span>
+                    <span>Compiling static pages...</span>
+                  </span>
+                  <span id="buildProgressPercent" style="font-size: 0.75rem; color: #94A3B8; font-family: var(--font-mono); font-weight: 600;">0%</span>
+                </div>
+                <div style="width: 100%; height: 6px; background: rgba(255, 255, 255, 0.08); border-radius: 3px; overflow: hidden;">
+                  <div id="buildProgressBar" style="width: 0%; height: 100%; background: linear-gradient(90deg, #38BDF8, #818CF8); transition: width 0.3s ease;"></div>
+                </div>
+              </div>
             </div>
 
             <!-- Right Column: Edge Production Deployment -->
@@ -201,6 +228,20 @@
               <button type="button" id="triggerCfDeployBtn" class="btn btn-cloudflare btn-lg" style="width: 100%; margin-top: 0.75rem;">
                 🚀 Deploy to Cloudflare Edge
               </button>
+
+              <!-- Cloudflare Deployment Progress Bar -->
+              <div id="deployProgressBarContainer" style="display: none; margin-top: 0.75rem; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(249, 115, 22, 0.35); border-radius: 8px; padding: 0.65rem 0.85rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem;">
+                  <span id="deployProgressLabel" style="font-size: 0.75rem; color: #FB923C; font-weight: 600; display: inline-flex; align-items: center; gap: 0.35rem;">
+                    <span class="spinner" style="display: inline-block; width: 12px; height: 12px; border: 2px solid #FB923C; border-top-color: transparent; border-radius: 50%; animation: spin 0.8s linear infinite;"></span>
+                    <span>Deploying to Cloudflare Workers...</span>
+                  </span>
+                  <span id="deployProgressPercent" style="font-size: 0.75rem; color: #94A3B8; font-family: var(--font-mono); font-weight: 600;">0%</span>
+                </div>
+                <div style="width: 100%; height: 6px; background: rgba(255, 255, 255, 0.08); border-radius: 3px; overflow: hidden;">
+                  <div id="deployProgressBar" style="width: 0%; height: 100%; background: linear-gradient(90deg, #F97316, #FB923C); transition: width 0.3s ease;"></div>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -260,6 +301,20 @@
               <button type="button" id="triggerDeployBtn" class="btn btn-success btn-lg" style="width: 100%; margin-top: 0.75rem;">
                 🚀 Deploy to GitHub Pages
               </button>
+
+              <!-- GitHub Deployment Progress Bar -->
+              <div id="ghDeployProgressBarContainer" style="display: none; margin-top: 0.75rem; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(16, 185, 129, 0.35); border-radius: 8px; padding: 0.65rem 0.85rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem;">
+                  <span id="ghDeployProgressLabel" style="font-size: 0.75rem; color: #34D399; font-weight: 600; display: inline-flex; align-items: center; gap: 0.35rem;">
+                    <span class="spinner" style="display: inline-block; width: 12px; height: 12px; border: 2px solid #34D399; border-top-color: transparent; border-radius: 50%; animation: spin 0.8s linear infinite;"></span>
+                    <span>Deploying to GitHub Pages...</span>
+                  </span>
+                  <span id="ghDeployProgressPercent" style="font-size: 0.75rem; color: #94A3B8; font-family: var(--font-mono); font-weight: 600;">0%</span>
+                </div>
+                <div style="width: 100%; height: 6px; background: rgba(255, 255, 255, 0.08); border-radius: 3px; overflow: hidden;">
+                  <div id="ghDeployProgressBar" style="width: 0%; height: 100%; background: linear-gradient(90deg, #10B981, #34D399); transition: width 0.3s ease;"></div>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -283,11 +338,11 @@
         <button type="button" id="viewToggleBoth" data-view="both"></button>
         <button type="button" id="triggerDualDeployBtn"></button>
         <button type="button" id="heroCfDeployBtn"></button>
-        <strong id="splitCfWorkerName">gardenhome</strong>
+        <strong id="splitCfWorkerName">—</strong>
         <button type="button" id="splitBtnBuildCf" onclick="document.getElementById('triggerBuildBtn').click();"></button>
         <button type="button" id="splitBtnDeployCf" onclick="document.getElementById('triggerCfDeployBtn').click();"></button>
         <button type="button" id="heroGhDeployBtn"></button>
-        <strong id="splitGhRepoName">annadeco.github.io</strong>
+        <strong id="splitGhRepoName">—</strong>
         <button type="button" id="splitBtnBuildGh" onclick="document.getElementById('triggerBuildGhBtn').click();"></button>
         <button type="button" id="splitBtnDeployGh" onclick="document.getElementById('triggerDeployBtn').click();"></button>
       </div>
@@ -321,6 +376,9 @@
               <span>📁 Import Custom Logo</span>
               <input type="file" id="quickLogoFileInput" accept="image/png,image/jpeg,image/webp,image/svg+xml" style="display: none;">
             </label>
+            <button type="button" id="quickBtnCropLogo" class="btn btn-secondary btn-xs" style="color: #38BDF8; border-color: rgba(56, 189, 248, 0.4);" title="Crop &amp; Zoom Logo">
+              <span>✂️ Crop &amp; Zoom</span>
+            </button>
             <button type="button" id="quickBtnResetLogo" class="btn btn-secondary btn-xs" style="color: #FCA5A5;">
               <span>🔄 Reset</span>
             </button>
@@ -363,7 +421,7 @@
             </div>
 
             <!-- Model 2 (Default Theme) -->
-            <div class="theme-card active" data-theme="nordic-studio">
+            <div class="theme-card" data-theme="nordic-studio">
               <div class="theme-card-header">
                 <span class="theme-badge" style="background: rgba(140, 109, 83, 0.2); color: #E4C8B1; border: 1px solid rgba(140, 109, 83, 0.5);">
                   Model 2 · The Nordroom (⭐ Default)
@@ -509,6 +567,85 @@
             <button type="submit" class="btn btn-primary btn-sm">💾 Save Settings</button>
           </div>
         </div>
+
+        <!-- 4. Social Media Networks & Profiles Zone -->
+        <div class="card compact-card" style="margin-top: 0.85rem;" id="socialNetworksZone">
+          <div class="card-compact-header">
+            <span class="tag-badge" style="background: rgba(230, 0, 35, 0.15); color: #FF4D6D; border: 1px solid rgba(230, 0, 35, 0.3);">
+              4. SOCIAL MEDIA NETWORKS &amp; CHANNELS
+            </span>
+            <span style="font-size: 0.72rem; color: #38BDF8;">Custom brand channels rendered in header &amp; footer across all 3 theme models</span>
+          </div>
+
+          <div class="dashboard-grid three-cols" style="gap: 0.75rem; margin-top: 0.5rem;">
+            <!-- Pinterest -->
+            <div class="form-group compact-group">
+              <label class="form-label" for="cfgSocialPinterest" style="display: flex; align-items: center; gap: 0.35rem;">
+                <span style="color: #E60023;">📌</span>
+                <span>Pinterest Profile / Board</span>
+              </label>
+              <input type="url" id="cfgSocialPinterest" class="form-control" placeholder="https://www.pinterest.com/yourbrand/">
+              <span style="font-size: 0.65rem; color: #94A3B8;">Powers header 'Save Ideas' &amp; footer links</span>
+            </div>
+
+            <!-- Facebook -->
+            <div class="form-group compact-group">
+              <label class="form-label" for="cfgSocialFacebook" style="display: flex; align-items: center; gap: 0.35rem;">
+                <span style="color: #1877F2;">📘</span>
+                <span>Facebook Page</span>
+              </label>
+              <input type="url" id="cfgSocialFacebook" class="form-control" placeholder="https://www.facebook.com/yourpage">
+              <span style="font-size: 0.65rem; color: #94A3B8;">Header utility bar &amp; footer community</span>
+            </div>
+
+            <!-- Instagram -->
+            <div class="form-group compact-group">
+              <label class="form-label" for="cfgSocialInstagram" style="display: flex; align-items: center; gap: 0.35rem;">
+                <span style="color: #E1306C;">📸</span>
+                <span>Instagram Profile</span>
+              </label>
+              <input type="url" id="cfgSocialInstagram" class="form-control" placeholder="https://www.instagram.com/yourprofile">
+              <span style="font-size: 0.65rem; color: #94A3B8;">Header / footer visual feed chip</span>
+            </div>
+
+            <!-- Twitter / X -->
+            <div class="form-group compact-group">
+              <label class="form-label" for="cfgSocialTwitter" style="display: flex; align-items: center; gap: 0.35rem;">
+                <span style="color: #F8FAFC;">𝕏</span>
+                <span>Twitter / X Profile</span>
+              </label>
+              <input type="url" id="cfgSocialTwitter" class="form-control" placeholder="https://x.com/yourhandle">
+              <span style="font-size: 0.65rem; color: #94A3B8;">Editorial announcements &amp; news</span>
+            </div>
+
+            <!-- TikTok -->
+            <div class="form-group compact-group">
+              <label class="form-label" for="cfgSocialTiktok" style="display: flex; align-items: center; gap: 0.35rem;">
+                <span style="color: #25F4EE;">🎵</span>
+                <span>TikTok Profile</span>
+              </label>
+              <input type="url" id="cfgSocialTiktok" class="form-control" placeholder="https://www.tiktok.com/@yourhandle">
+              <span style="font-size: 0.65rem; color: #94A3B8;">Short-form interior styling videos</span>
+            </div>
+
+            <!-- YouTube -->
+            <div class="form-group compact-group">
+              <label class="form-label" for="cfgSocialYoutube" style="display: flex; align-items: center; gap: 0.35rem;">
+                <span style="color: #FF0000;">▶️</span>
+                <span>YouTube Channel</span>
+              </label>
+              <input type="url" id="cfgSocialYoutube" class="form-control" placeholder="https://www.youtube.com/@yourchannel">
+              <span style="font-size: 0.65rem; color: #94A3B8;">Room tours &amp; design transformations</span>
+            </div>
+          </div>
+
+          <div style="margin-top: 0.75rem; display: flex; align-items: center; justify-content: space-between;">
+            <div style="font-size: 0.7rem; color: #64748B;">
+              ✨ Tip: Custom social links dynamically update across the masthead, footer chips, and bylines.
+            </div>
+            <button type="submit" class="btn btn-primary btn-sm" id="btnSaveSocialLinks">💾 Save Social &amp; Theme Settings</button>
+          </div>
+        </div>
       </form>
 
       <div class="step-nav-footer">
@@ -583,7 +720,7 @@
                     <label class="form-label" for="cfgCfProjectName" style="display: flex; align-items: center; gap: 0.25rem;">
                       <span>Worker Name</span>
                     </label>
-                    <input type="text" id="cfgCfProjectName" class="form-control" value="gardenhome" placeholder="e.g. gardenhome">
+                    <input type="text" id="cfgCfProjectName" class="form-control" value="" placeholder="e.g. styleire">
                   </div>
                   <div class="form-group compact-group">
                     <label class="form-label" for="cfgCfCustomDomain">Custom Domain (Optional)</label>
@@ -611,13 +748,13 @@
                     <select id="cfgStep1GithubAccount" class="form-control" style="font-size: 0.78rem; padding: 0.3rem 0.5rem;">
                       <option value="">🔄 Detecting organizations from saved token...</option>
                     </select>
-                    <input type="text" id="cfgStep1GithubOwner" class="form-control" value="annadeco" placeholder="e.g. annadeco" style="margin-top: 0.3rem; font-size: 0.78rem; height: 28px;">
+                    <input type="text" id="cfgStep1GithubOwner" class="form-control" value="" placeholder="e.g. organization" style="margin-top: 0.3rem; font-size: 0.78rem; height: 28px;">
                   </div>
 
                   <!-- Repository Name & Root Domain Mode -->
                   <div class="form-group compact-group">
                     <label class="form-label" for="cfgStep1GithubRepo">Repository Name</label>
-                    <input type="text" id="cfgStep1GithubRepo" class="form-control" value="annadeco.github.io" placeholder="e.g. annadeco.github.io" style="font-size: 0.78rem; height: 28px;">
+                    <input type="text" id="cfgStep1GithubRepo" class="form-control" value="" placeholder="e.g. org.github.io" style="font-size: 0.78rem; height: 28px;">
                     <div style="margin-top: 0.35rem;">
                       <label class="checkbox-label" for="cfgStep1AutoRootOrg" style="font-size: 0.72rem; color: #10B981;">
                         <input type="checkbox" id="cfgStep1AutoRootOrg" checked>
@@ -638,7 +775,7 @@
                   <a id="linkStep1OpenGithubOrg" href="https://github.com/account/organizations/new?plan=free" target="_blank" rel="noopener" class="btn btn-xs" style="display: none; border: 1px solid #3B82F6; color: #60A5FA;">
                     ↗ GitHub Page
                   </a>
-                  <span id="step1RootDomainPreview" style="font-size: 0.72rem; color: #34D399; font-family: var(--font-mono); margin-left: auto;">Target: https://annadeco.github.io/</span>
+                  <span id="step1RootDomainPreview" style="font-size: 0.72rem; color: #34D399; font-family: var(--font-mono); margin-left: auto;">Target: Not Configured</span>
                 </div>
                 <div id="step1OrgStatusFeedback" class="feedback-box" style="display: none; margin-top: 0.4rem;"></div>
               </div>
@@ -650,6 +787,20 @@
               <button type="button" id="scanSitemapBtn" class="btn btn-secondary btn-sm">🔍 Scan URLs</button>
               <button type="submit" id="startIngestBtn" class="btn btn-primary btn-sm">🚀 Ingest &amp; Diff</button>
               <button type="button" id="syncAssetsBtn" class="btn btn-secondary btn-sm">🖼️ Save Assets</button>
+            </div>
+
+            <!-- Ingest Real-Time Progress Bar -->
+            <div id="ingestProgressBarContainer" style="display: none; margin-top: 0.75rem; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(56, 189, 248, 0.25); border-radius: 8px; padding: 0.65rem 0.85rem;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem;">
+                <span id="ingestProgressLabel" style="font-size: 0.75rem; color: #38BDF8; font-weight: 600; display: inline-flex; align-items: center; gap: 0.35rem;">
+                  <span class="spinner" style="display: inline-block; width: 12px; height: 12px; border: 2px solid #38BDF8; border-top-color: transparent; border-radius: 50%; animation: spin 0.8s linear infinite;"></span>
+                  <span>Ingesting articles in background...</span>
+                </span>
+                <span id="ingestProgressCount" style="font-size: 0.75rem; color: #94A3B8; font-family: var(--font-mono); font-weight: 600;">0 / 0</span>
+              </div>
+              <div style="width: 100%; height: 6px; background: rgba(255, 255, 255, 0.08); border-radius: 3px; overflow: hidden;">
+                <div id="ingestProgressBar" style="width: 0%; height: 100%; background: linear-gradient(90deg, #38BDF8, #818CF8); transition: width 0.3s ease;"></div>
+              </div>
             </div>
           </form>
         </div>
@@ -678,7 +829,7 @@
 
         <div class="step-nav-footer">
           <span style="font-size: 0.8rem; color: #64748B;">Step 1: Ingestion &amp; Manifest Sync</span>
-          <button type="button" class="btn btn-primary btn-sm" onclick="switchTab('tab-themes')">
+          <button type="button" id="btnStep1Next" class="btn btn-primary btn-sm">
             <span>Proceed to Step 2: Models &amp; Design →</span>
           </button>
         </div>
@@ -935,7 +1086,7 @@
         <form id="newProjectForm">
           <div class="form-group compact-group">
             <label class="form-label" for="newProjName">Project Name *</label>
-            <input type="text" id="newProjName" class="form-control" placeholder="e.g. Modern Decor or gardenhome" required>
+            <input type="text" id="newProjName" class="form-control" placeholder="e.g. Modern Decor or my-site" required>
             <span style="font-size: 0.72rem; color: #94A3B8;">Will create an isolated catalog under <code>scraped_data/&lt;slug&gt;/</code>.</span>
           </div>
 
@@ -965,11 +1116,11 @@
               <select id="newProjGhOwnerSelect" class="form-control" style="font-size: 0.78rem; margin-bottom: 0.25rem;">
                 <option value="">-- Choose detected account --</option>
               </select>
-              <input type="text" id="newProjGhOwner" class="form-control" placeholder="e.g. annadeco">
+              <input type="text" id="newProjGhOwner" class="form-control" placeholder="e.g. username">
             </div>
             <div class="form-group compact-group">
               <label class="form-label" for="newProjGhRepo">GitHub Repository</label>
-              <input type="text" id="newProjGhRepo" class="form-control" placeholder="e.g. annadeco.github.io">
+              <input type="text" id="newProjGhRepo" class="form-control" placeholder="e.g. username.github.io">
             </div>
           </div>
 
@@ -1115,16 +1266,16 @@
 
             <!-- Hidden compatibility elements to guarantee zero script/test regressions -->
             <div style="display: none;" aria-hidden="true">
-              <input type="text" id="cfgGithubOwner" value="annadeco">
-              <input type="text" id="cfgGithubRepo" value="annadeco.github.io">
+              <input type="text" id="cfgGithubOwner" value="">
+              <input type="text" id="cfgGithubRepo" value="">
               <input type="checkbox" id="cfgGithubIsOrg" checked>
               <input type="checkbox" id="cfgAutoRootOrg" checked>
-              <select id="selectGithubAccount"><option value="annadeco">annadeco</option></select>
+              <select id="selectGithubAccount"><option value="">Select account...</option></select>
               <button type="button" id="btnRefreshOrgs"></button>
               <button type="button" id="btnCheckCreateOrg"></button>
               <button type="button" id="btnCreateRepoNow"></button>
               <a id="linkOpenGithubOrg" href="#"></a>
-              <span id="rootDomainPreview">Target: https://annadeco.github.io/</span>
+              <span id="rootDomainPreview">Target: —</span>
               <div id="orgStatusFeedback"></div>
             </div>
           </form>
@@ -1168,9 +1319,170 @@
     </div>
   </div>
 
+  <!-- ================================================================= -->
+  <!-- MODAL: INTERACTIVE LOGO CROPPER & ZOOM STUDIO                      -->
+  <!-- ================================================================= -->
+  <div id="logoCropperModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="cropperModalTitle" style="display: none;">
+    <div class="modal-content" style="max-width: 920px; width: 95vw; background: #0b1120; border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 12px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7); overflow: hidden; display: flex; flex-direction: column; max-height: 92vh;">
+      
+      <!-- Studio Header -->
+      <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.85rem 1.25rem; background: #0f172a; border-bottom: 1px solid rgba(255, 255, 255, 0.08);">
+        <div style="display: flex; align-items: center; gap: 0.6rem;">
+          <span style="font-size: 1.25rem;">✂️</span>
+          <div>
+            <h2 id="cropperModalTitle" style="margin: 0; font-size: 1rem; font-weight: 700; color: #f8fafc;">Logo Cropper &amp; Zoom Studio</h2>
+            <div style="font-size: 0.72rem; color: #94a3b8;">Crop, zoom &amp; position your brand logo with real-time pre-build header preview</div>
+          </div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 0.5rem;">
+          <button type="button" id="closeCropperModalBtn" class="btn btn-secondary btn-xs" style="padding: 0.35rem 0.65rem;">✕ Close</button>
+        </div>
+      </div>
+
+      <!-- Studio Two-Column Body -->
+      <div style="display: grid; grid-template-columns: 1.15fr 0.85fr; gap: 1rem; padding: 1.25rem; overflow-y: auto; background: #0b1120;">
+        
+        <!-- Left Column: Canvas Workspace & Controls -->
+        <div style="display: flex; flex-direction: column; gap: 0.85rem;">
+          
+          <!-- Canvas Viewport Box -->
+          <div style="position: relative; width: 100%; height: 320px; background: repeating-conic-gradient(#1e293b 0% 25%, #0f172a 0% 50%) 50% / 20px 20px; border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 8px; overflow: hidden; display: flex; align-items: center; justify-content: center; cursor: grab;" id="cropCanvasContainer">
+            <canvas id="cropCanvas" width="480" height="320" style="display: block; max-width: 100%; max-height: 100%;"></canvas>
+            <div id="cropHintOverlay" style="position: absolute; bottom: 8px; left: 8px; background: rgba(15, 23, 42, 0.8); color: #cbd5e1; font-size: 0.68rem; padding: 0.2rem 0.55rem; border-radius: 4px; pointer-events: none; border: 1px solid rgba(255,255,255,0.1);">
+              👆 Drag image to position | Scroll to zoom
+            </div>
+          </div>
+
+          <!-- Zoom Bar (0% to 100%) -->
+          <div style="background: #0f172a; border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 0.65rem 0.85rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem;">
+              <span style="font-size: 0.75rem; font-weight: 600; color: #38bdf8; display: flex; align-items: center; gap: 0.35rem;">
+                <span>🔍</span>
+                <span>Zoom Level</span>
+              </span>
+              <div style="display: flex; align-items: center; gap: 0.4rem;">
+                <span id="cropZoomValue" style="font-size: 0.75rem; font-family: var(--font-mono); font-weight: 700; color: #38bdf8; background: rgba(56, 189, 248, 0.15); padding: 0.1rem 0.45rem; border-radius: 4px; border: 1px solid rgba(56, 189, 248, 0.3);">0%</span>
+                <button type="button" id="cropResetFitBtn" class="btn btn-secondary btn-xs" style="font-size: 0.68rem; padding: 0.15rem 0.45rem;" title="Reset Zoom &amp; Center">⟲ Center</button>
+              </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 0.6rem;">
+              <button type="button" id="cropZoomOutBtn" class="btn btn-secondary btn-xs" style="padding: 0.2rem 0.5rem; font-weight: bold;" title="Zoom Out">−</button>
+              <input type="range" id="cropZoomSlider" min="0" max="100" value="0" step="1" style="flex: 1; accent-color: #38bdf8; cursor: pointer; height: 6px;">
+              <button type="button" id="cropZoomInBtn" class="btn btn-secondary btn-xs" style="padding: 0.2rem 0.5rem; font-weight: bold;" title="Zoom In">+</button>
+            </div>
+          </div>
+
+          <!-- Aspect Ratio Presets & Rotation -->
+          <div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem; background: #0f172a; border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 0.65rem 0.85rem;">
+            <div>
+              <div style="font-size: 0.68rem; color: #94a3b8; margin-bottom: 0.3rem; font-weight: 600;">ASPECT RATIO PRESET</div>
+              <div class="btn-group" id="cropAspectGroup" style="display: inline-flex; gap: 0.25rem;">
+                <button type="button" class="btn btn-xs btn-primary crop-aspect-btn active" data-aspect="4:1">4:1 Header</button>
+                <button type="button" class="btn btn-xs btn-secondary crop-aspect-btn" data-aspect="3:1">3:1 Wide</button>
+                <button type="button" class="btn btn-xs btn-secondary crop-aspect-btn" data-aspect="2:1">2:1 Classic</button>
+                <button type="button" class="btn btn-xs btn-secondary crop-aspect-btn" data-aspect="1:1">1:1 Square</button>
+                <button type="button" class="btn btn-xs btn-secondary crop-aspect-btn" data-aspect="free">Free</button>
+              </div>
+            </div>
+            <div>
+              <div style="font-size: 0.68rem; color: #94a3b8; margin-bottom: 0.3rem; font-weight: 600;">ROTATE</div>
+              <div style="display: flex; gap: 0.25rem;">
+                <button type="button" id="cropRotateCcwBtn" class="btn btn-secondary btn-xs" title="Rotate Counter-Clockwise 90°">⟲ 90°</button>
+                <button type="button" id="cropRotateCwBtn" class="btn btn-secondary btn-xs" title="Rotate Clockwise 90°">⟳ 90°</button>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Right Column: Live Header Pre-Build Verification Studio -->
+        <div style="display: flex; flex-direction: column; gap: 0.85rem;">
+          
+          <div style="background: #0f172a; border: 1px solid rgba(56, 189, 248, 0.25); border-radius: 8px; padding: 0.85rem; display: flex; flex-direction: column; gap: 0.75rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <span style="font-size: 0.78rem; font-weight: 700; color: #38bdf8; display: flex; align-items: center; gap: 0.35rem;">
+                <span>👁️</span>
+                <span>Pre-Build Header Preview</span>
+              </span>
+              <!-- Header theme switcher -->
+              <div style="display: flex; align-items: center; gap: 0.25rem; background: rgba(0,0,0,0.4); border-radius: 4px; padding: 2px;">
+                <button type="button" id="previewThemeLightBtn" class="btn btn-xs btn-primary" style="font-size: 0.65rem; padding: 0.15rem 0.4rem;">☀️ Light</button>
+                <button type="button" id="previewThemeDarkBtn" class="btn btn-xs btn-secondary" style="font-size: 0.65rem; padding: 0.15rem 0.4rem;">🌙 Dark</button>
+              </div>
+            </div>
+
+            <!-- Header Preview Mockup Box (Light / Dark) -->
+            <div id="cropHeaderPreviewBox" style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 6px; padding: 0.65rem 0.85rem; transition: all 0.2s ease;">
+              <!-- Simulated Top Utility Bar -->
+              <div id="previewSimTopBar" style="border-bottom: 1px solid #f1f5f9; padding-bottom: 0.35rem; margin-bottom: 0.45rem; display: flex; justify-content: flex-end; align-items: center; gap: 0.65rem; font-size: 0.62rem; color: #64748b;">
+                <span>Facebook</span>
+                <span>Pinterest</span>
+                <span>Contact</span>
+              </div>
+              <!-- Simulated Header Nav -->
+              <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.75rem;">
+                <div style="display: flex; align-items: center; gap: 0.5rem; max-width: 60%;">
+                  <img id="cropHeaderLogoImg" src="" alt="Live Cropped Logo Preview" style="max-height: 36px; max-width: 160px; object-fit: contain; display: block;">
+                  <div id="cropHeaderBrandText" style="display: flex; flex-direction: column; line-height: 1.1;">
+                    <span id="cropHeaderBrandName" style="font-family: 'Playfair Display', Georgia, serif; font-weight: 700; font-size: 0.88rem; color: #1c1917; text-transform: uppercase; letter-spacing: 0.08em; white-space: nowrap;">Anna Deco</span>
+                    <span id="cropHeaderTagline" style="font-size: 0.5rem; font-weight: 700; color: #78716c; letter-spacing: 0.14em; text-transform: uppercase;">HOME · INTERIORS · LIVING</span>
+                  </div>
+                </div>
+                <div id="previewSimNavLinks" style="display: flex; gap: 0.5rem; font-size: 0.62rem; font-weight: 600; color: #475569; white-space: nowrap; overflow: hidden;">
+                  <span>Bedroom Inspo</span>
+                  <span>Patio Design</span>
+                  <span>About</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Standalone Logo Output Preview (Transparency Check) -->
+            <div>
+              <div style="font-size: 0.68rem; color: #94a3b8; margin-bottom: 0.3rem; font-weight: 600;">TRANSPARENT EXPORT TILE</div>
+              <div style="background: repeating-conic-gradient(#1e293b 0% 25%, #0f172a 0% 50%) 50% / 12px 12px; border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 0.75rem; display: flex; align-items: center; justify-content: center; min-height: 80px;">
+                <img id="cropStandalonePreviewImg" src="" alt="Cropped Output" style="max-height: 60px; max-width: 100%; object-fit: contain;">
+              </div>
+            </div>
+
+            <!-- Resolution & Metrics -->
+            <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255,255,255,0.06); border-radius: 6px; padding: 0.5rem 0.65rem; font-size: 0.68rem; color: #94a3b8; font-family: var(--font-mono); display: flex; flex-direction: column; gap: 0.25rem;">
+              <div style="display: flex; justify-content: space-between;">
+                <span>Export Dimensions:</span>
+                <strong id="cropMetricDims" style="color: #38bdf8;">-- × -- px</strong>
+              </div>
+              <div style="display: flex; justify-content: space-between;">
+                <span>Aspect Ratio:</span>
+                <strong id="cropMetricAspect" style="color: #34d399;">4:1 (Header)</strong>
+              </div>
+              <div style="display: flex; justify-content: space-between;">
+                <span>Optimized Format:</span>
+                <strong style="color: #f1f5f9;">WebP (2x Retina)</strong>
+              </div>
+            </div>
+
+          </div>
+
+        </div>
+
+      </div>
+
+      <!-- Studio Footer -->
+      <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 1.25rem; background: #0f172a; border-top: 1px solid rgba(255, 255, 255, 0.08);">
+        <button type="button" id="cancelCropperBtn" class="btn btn-secondary btn-sm">Cancel</button>
+        <div style="display: flex; align-items: center; gap: 0.5rem;">
+          <button type="button" id="applyCroppedLogoBtn" class="btn btn-primary btn-sm" style="font-weight: 700; background: linear-gradient(135deg, #0284c7, #2563eb); border: none; padding: 0.45rem 1.1rem; cursor: pointer;">
+            <span>✓ Apply &amp; Save Logo</span>
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
   <!-- Toast Notification Container -->
   <div id="toastContainer" class="toast-container"></div>
 
-  <script src="app.js?v=3.2"></script>
+  <script src="cropper.js?v=1.0"></script>
+  <script src="app.js?v=3.5"></script>
 </body>
 </html>

@@ -43,15 +43,15 @@ def extract_subdomain(url: str) -> str:
         url: Raw URL string or domain name.
 
     Returns:
-        Clean alphanumeric subdomain string (e.g. 'stylesdays', 'asqstyle', 'gardenhome').
+        Clean alphanumeric subdomain string (e.g. 'my-site', 'magazine', 'blog').
         Falls back to 'default' if input is empty or invalid.
 
     Permutations handled per Section 22.2:
-        'https://stylesdays.com/sitemap_index.xml' -> 'stylesdays'
-        'https://asqstyle.com/post-sitemap6.xml' -> 'asqstyle'
-        'https://blog.stylesdays.com/' -> 'blog'
-        'https://gardenhome.laurainsley01.workers.dev' -> 'gardenhome'
-        'http://www.homestylesdeco.com/page-1/' -> 'homestylesdeco'
+        'https://mysite.com/sitemap_index.xml' -> 'mysite'
+        'https://magazine.com/post-sitemap.xml' -> 'magazine'
+        'https://blog.mysite.com/' -> 'blog'
+        'https://mybrand.workers.dev' -> 'mybrand'
+        'http://www.homedecor.com/page-1/' -> 'homedecor'
         'https://decor.studio.co.uk:8080/article/' -> 'decor'
         'https://minimalist-living.co.uk/feed/' -> 'minimalist-living'
         'myblog.net' -> 'myblog'
@@ -638,9 +638,10 @@ def scrape_sitemap(
     batch_size: int = 20,
     inter_batch_delay: float = 0.0,
     max_retries: int = 3,
+    project_id: Optional[str] = None,
 ) -> List[PostItem]:
     """Recursively parses XML sitemap, fetches every article page in batches, extracts full content and WebP images."""
-    subdomain = extract_subdomain(sitemap_url)
+    subdomain = (project_id or "").strip() or extract_subdomain(sitemap_url)
     storage = get_domain_storage_paths(subdomain, base_dir=base_dir)
 
     def _report_progress(level: str, msg: str, processed: int = 0, total: int = 0, current_url: str = "") -> None:
@@ -649,7 +650,10 @@ def scrape_sitemap(
         try:
             import inspect
             sig = inspect.signature(progress_callback)
-            if len(sig.parameters) == 3:
+            params = len(sig.parameters)
+            if params >= 5:
+                progress_callback(level, msg, processed, total, current_url)
+            elif params == 3:
                 progress_callback(processed, total, current_url)
             else:
                 progress_callback(level, msg)
@@ -758,17 +762,28 @@ def scrape_sitemap(
 
         # Batch persistence of PostManifest
         try:
+            seen_cats: set[str] = set()
+            derived_categories: list[dict[str, str]] = []
+            for p in scraped_posts:
+                c_name = (p.category or "").strip()
+                c_slug = (p.category_slug or "").strip()
+                if c_name and c_slug and c_slug not in seen_cats:
+                    seen_cats.add(c_slug)
+                    derived_categories.append({"name": c_name, "slug": c_slug})
+
             manifest_data = {
+                "version": "2.0",
                 "subdomain": subdomain,
                 "domain": subdomain,
                 "source_url": sitemap_url,
                 "updated_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
                 "scraped_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
                 "total_posts": len(scraped_posts),
-                "posts": [p.to_dict() for p in scraped_posts],
+                "posts": {p.slug: p.to_dict() for p in scraped_posts},
+                "categories": derived_categories,
             }
             with open(storage["manifest_file"], "w", encoding="utf-8") as f:
-                json.dump(manifest_data, f, indent=2)
+                json.dump(manifest_data, f, indent=2, ensure_ascii=False)
         except Exception as exc:
             logger.warning("Could not write interim domain manifest: %s", exc)
 
@@ -805,7 +820,10 @@ def scrape_url_list(
         try:
             import inspect
             sig = inspect.signature(progress_callback)
-            if len(sig.parameters) == 3:
+            params = len(sig.parameters)
+            if params >= 5:
+                progress_callback(level, msg, processed, total, current_url)
+            elif params == 3:
                 progress_callback(processed, total, current_url)
             else:
                 progress_callback(level, msg)
@@ -891,16 +909,27 @@ def scrape_url_list(
     for sub, posts_list in subdomain_posts.items():
         try:
             sub_storage = get_domain_storage_paths(sub, base_dir=base_dir)
+            seen_cats: set[str] = set()
+            derived_categories: list[dict[str, str]] = []
+            for p in posts_list:
+                c_name = (p.category or "").strip()
+                c_slug = (p.category_slug or "").strip()
+                if c_name and c_slug and c_slug not in seen_cats:
+                    seen_cats.add(c_slug)
+                    derived_categories.append({"name": c_name, "slug": c_slug})
+
             manifest_data = {
+                "version": "2.0",
                 "subdomain": sub,
                 "domain": sub,
                 "updated_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
                 "scraped_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
                 "total_posts": len(posts_list),
-                "posts": [p.to_dict() for p in posts_list],
+                "posts": {p.slug: p.to_dict() for p in posts_list},
+                "categories": derived_categories,
             }
             with open(sub_storage["manifest_file"], "w", encoding="utf-8") as f:
-                json.dump(manifest_data, f, indent=2)
+                json.dump(manifest_data, f, indent=2, ensure_ascii=False)
         except Exception as exc:
             logger.warning("Could not persist manifest for subdomain %s: %s", sub, exc)
 

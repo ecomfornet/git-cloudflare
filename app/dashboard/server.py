@@ -21,7 +21,7 @@ import urllib.request
 from typing import Any, Optional
 
 from app.config import AppConfig, BuildConfig, DashboardConfig, GitHubConfig, IngestionConfig
-from app.models import DeployJob, DiffSummary, Manifest, PostItem, ProjectItem, RouteResult
+from app.models import DeployJob, DiffSummary, IngestJob, Manifest, PostItem, ProjectItem, RouteResult
 from app.themes.engine import ThemeEngine
 from app.themes.templates import THEMES, render_category_index, render_hub, render_post
 
@@ -69,7 +69,7 @@ def resolve_project_output_dir(
             subdomain
             or getattr(cf, "project_name", "")
             or project_name
-            or "gardenhome"
+            or "styleire"
         ).strip()
     elif tc in ("github", "gh"):
         token = (
@@ -77,22 +77,18 @@ def resolve_project_output_dir(
             or getattr(gh, "repo", "").replace(".github.io", "")
             or project_name
             or subdomain
-            or "annadeco"
+            or "styleire"
         ).strip()
     else:
-        # Auto-detect strictly adhering to active platform
-        if active_plat in ("cloudflare", "cf") and getattr(cf, "project_name", None):
+        # Auto-detect: prioritize explicit project identifiers, then platform configs
+        if subdomain or project_name:
+            token = (subdomain or project_name).strip()
+        elif active_plat in ("cloudflare", "cf") and getattr(cf, "project_name", None):
             token = cf.project_name.strip()
         elif active_plat in ("github", "gh") and getattr(gh, "owner", None):
             token = gh.owner.strip()
-        elif subdomain or project_name:
-            token = (subdomain or project_name).strip()
-        elif getattr(cf, "project_name", None):
-            token = cf.project_name.strip()
-        elif getattr(gh, "owner", None):
-            token = gh.owner.strip()
         else:
-            token = (getattr(cf, "project_name", "") or "default").strip()
+            token = (getattr(cf, "project_name", "") or getattr(gh, "owner", "") or "default").strip()
 
     # Sanitize token for filesystem safety
     clean_token = re.sub(r"[^a-zA-Z0-9_-]", "-", token).strip("-_") or "default"
@@ -136,79 +132,47 @@ class DashboardManager:
         # State tracking
         self.theme_engine = ThemeEngine(default_theme=self.config.build.theme)
         self.deploy_job = DeployJob(status="idle")
+        self.ingest_job = IngestJob(status="idle")
         self.logs: list[str] = []
         self.last_build_time: str = ""
         self.last_build_files: int = 0
-        self.active_project_id: str = getattr(self.config, "active_project", None) or "stylesdays"
+        self.active_project_id: str = getattr(self.config, "active_project", None) or "styleire"
         self.active_manifest_path: str = self.manifest_path
         self.projects: dict[str, ProjectItem] = {}
         self._init_projects()
         self.log("Dashboard system initialized and ready.")
 
     def _init_projects(self) -> None:
-        """Discovers existing projects from scraped_data/ and config, and sets up active manifest."""
-        # 1. First, check configured projects
+        """Loads configured projects from config and sets up active manifest."""
+        self.projects = {}
+        # 1. Load explicitly configured projects
         for pid, pdata in getattr(self.config, "projects", {}).items():
             if isinstance(pdata, dict):
                 item = ProjectItem.from_dict(pdata)
                 item.id = pid
                 self.projects[pid] = item
 
-        # 2. Scan scraped_data directories
-        scraped_base = os.path.abspath("scraped_data")
-        if os.path.exists(scraped_base):
-            for entry in os.listdir(scraped_base):
-                pdir = os.path.join(scraped_base, entry)
-                if os.path.isdir(pdir):
-                    manifest_file = os.path.join(pdir, "manifest.json")
-                    if os.path.exists(manifest_file) and entry not in self.projects:
-                        self.projects[entry] = ProjectItem(
-                            id=entry,
-                            name=entry.replace("-", " ").replace(".", " ").title(),
-                            created_at=datetime.datetime.now(datetime.timezone.utc).isoformat(),
-                            manifest_path=os.path.relpath(manifest_file),
-                            output_dir=os.path.join("dist", entry),
-                        )
-
-        # 3. Ensure stylesdays exists as baseline project
-        if "stylesdays" not in self.projects:
-            self.projects["stylesdays"] = ProjectItem(
-                id="stylesdays",
-                name="StylesDays",
-                created_at=datetime.datetime.now(datetime.timezone.utc).isoformat(),
-                cf_project_name=getattr(self.config.cloudflare, "project_name", "") or "gardenhomejdhd",
-                gh_owner=getattr(self.config.github, "owner", "") or "annadeco",
-                gh_repo=getattr(self.config.github, "repo", "") or "annadeco.github.io",
-                sitemap_url=getattr(self.config.ingestion, "sitemap_url", ""),
-                manifest_path=os.path.join("scraped_data", "stylesdays", "manifest.json") if os.path.exists(os.path.join("scraped_data", "stylesdays", "manifest.json")) else self.manifest_path,
-                output_dir=os.path.join("dist", "stylesdays"),
-            )
-
-        # Ensure active_project_id is valid
-        if self.active_project_id not in self.projects:
-            self.active_project_id = "stylesdays" if "stylesdays" in self.projects else list(self.projects.keys())[0]
-
-        # Load active project manifest if switched to a non-stylesdays project
-        if self.active_project_id != "stylesdays":
+        # 2. Pick or initialize active project
+        if self.projects:
+            if self.active_project_id not in self.projects:
+                active_p = getattr(self.config, "active_project", "")
+                self.active_project_id = active_p if active_p in self.projects else list(self.projects.keys())[0]
             proj_manifest = os.path.abspath(os.path.join("scraped_data", self.active_project_id, "manifest.json"))
             if os.path.exists(proj_manifest):
                 try:
                     self.manifest = Manifest.load_from_json(proj_manifest)
                     self.active_manifest_path = proj_manifest
-                except Exception:
-                    pass
-        elif not self.manifest.posts:
-            proj_manifest = os.path.abspath(os.path.join("scraped_data", "stylesdays", "manifest.json"))
-            if os.path.exists(proj_manifest):
-                try:
-                    self.manifest = Manifest.load_from_json(proj_manifest)
+                except Exception as e:
+                    self.log(f"Notice: Error loading project manifest {proj_manifest}: {e}")
+                    self.manifest = Manifest.create_empty(self.active_project_id)
                     self.active_manifest_path = proj_manifest
-                except Exception:
-                    pass
             else:
-                self.active_manifest_path = self.manifest_path
+                self.manifest = Manifest.create_empty(self.active_project_id)
+                self.active_manifest_path = proj_manifest
         else:
-            self.active_manifest_path = self.manifest_path
+            self.active_project_id = ""
+            self.manifest = Manifest.create_empty("")
+            self.active_manifest_path = ""
 
     def list_projects(self) -> list[dict[str, Any]]:
         """Returns serialized list of registered projects with post/category metrics."""
@@ -254,6 +218,8 @@ class DashboardManager:
         gh_branch: str = "main",
         gh_is_org: bool = True,
         sitemap_url: str = "",
+        theme: Optional[str] = None,
+        routing_mode: Optional[str] = None,
     ) -> dict[str, Any]:
         """Creates a brand new isolated project with an EMPTY manifest (0 posts, 0 categories)."""
         clean_name = str(name).strip()
@@ -282,7 +248,7 @@ class DashboardManager:
 
             # Defaults
             cf_proj = cf_project_name.strip() or pid
-            gh_own = gh_owner.strip() or getattr(self.config.github, "owner", "") or "annadeco"
+            gh_own = gh_owner.strip() or getattr(self.config.github, "owner", "")
             gh_rp = gh_repo.strip() or (f"{gh_own}.github.io" if gh_own else f"{pid}.github.io")
 
             item = ProjectItem(
@@ -298,8 +264,8 @@ class DashboardManager:
                 gh_is_org=gh_is_org,
                 gh_base_path="",
                 sitemap_url=sitemap_url.strip(),
-                theme=self.config.build.theme,
-                routing_mode=self.config.build.routing_mode,
+                theme=theme.strip() if theme else (self.config.build.theme or "editorial-warm"),
+                routing_mode=routing_mode.strip() if routing_mode else (self.config.build.routing_mode or "single"),
                 manifest_path=os.path.relpath(manifest_file),
                 output_dir=os.path.join("dist", cf_proj if platform == "cloudflare" else pid),
             )
@@ -337,6 +303,118 @@ class DashboardManager:
                 "message": f"Project '{clean_name}' created successfully with empty categories.",
             }
 
+    def update_project(self, project_id: str, updates: dict[str, Any]) -> dict[str, Any]:
+        """Updates configuration fields for a registered project and persists to disk."""
+        with self.lock:
+            pid = (project_id or self.active_project_id).strip()
+            if pid not in self.projects:
+                raise KeyError(f"Project '{pid}' not found.")
+
+            item = self.projects[pid]
+
+            # 1. Unpack nested updates payload if present
+            raw_updates = dict(updates or {})
+            if "updates" in raw_updates and isinstance(raw_updates["updates"], dict):
+                raw_updates.update(raw_updates["updates"])
+
+            # 2. Map input aliases to internal dataclass field names
+            if "custom_domain" in raw_updates and "cf_custom_domain" not in raw_updates:
+                raw_updates["cf_custom_domain"] = raw_updates["custom_domain"]
+            if "worker_name" in raw_updates and "cf_project_name" not in raw_updates:
+                raw_updates["cf_project_name"] = raw_updates["worker_name"]
+            if "github_owner" in raw_updates and "gh_owner" not in raw_updates:
+                raw_updates["gh_owner"] = raw_updates["github_owner"]
+            if "github_repo" in raw_updates and "gh_repo" not in raw_updates:
+                raw_updates["gh_repo"] = raw_updates["github_repo"]
+
+            domain_changed = False
+            for field_name in (
+                "name", "platform", "cf_project_name", "cf_custom_domain",
+                "gh_owner", "gh_repo", "gh_branch", "gh_is_org", "sitemap_url",
+                "theme", "routing_mode", "max_posts", "download_images",
+            ):
+                if field_name in raw_updates and raw_updates[field_name] is not None:
+                    val = raw_updates[field_name]
+                    if field_name == "max_posts":
+                        try:
+                            val = int(val)
+                        except (ValueError, TypeError):
+                            val = 60
+                    elif field_name == "download_images":
+                        val = bool(val)
+                    elif isinstance(val, str):
+                        val = val.strip()
+                    if field_name == "cf_custom_domain":
+                        old_cd = getattr(item, "cf_custom_domain", "") or ""
+                        val = re.sub(r"^https?://", "", str(val).strip(), flags=re.IGNORECASE).strip("/ ")
+                        if old_cd != val:
+                            domain_changed = True
+                    setattr(item, field_name, val)
+
+            # Sync to active config if updating the currently active project
+            if pid == self.active_project_id:
+                if item.theme:
+                    self.config.build.theme = item.theme
+                    self.theme_engine.default_theme = item.theme
+                if item.routing_mode:
+                    self.config.build.routing_mode = item.routing_mode
+                if item.cf_project_name:
+                    self.config.cloudflare.project_name = item.cf_project_name
+                if item.cf_custom_domain is not None:
+                    clean_cd = re.sub(r"^https?://", "", str(item.cf_custom_domain).strip(), flags=re.IGNORECASE).strip("/ ")
+                    item.cf_custom_domain = clean_cd
+                    self.config.cloudflare.custom_domain = clean_cd
+                    if clean_cd:
+                        cur_brand = (getattr(self.config.branding, "brand_name", "") or "").strip()
+                        if not cur_brand or (pid and cur_brand.lower() == pid.lower()):
+                            from app.generator.site_builder import derive_brand_from_domain
+                            derived = derive_brand_from_domain(clean_cd, worker_name=pid)
+                            self.config.branding.brand_name = derived
+                if item.gh_owner:
+                    self.config.github.owner = item.gh_owner
+                if item.gh_repo:
+                    self.config.github.repo = item.gh_repo
+                if item.sitemap_url:
+                    self.config.ingestion.sitemap_url = item.sitemap_url
+                if hasattr(item, "max_posts") and item.max_posts:
+                    self.config.ingestion.max_posts = int(item.max_posts)
+                if hasattr(item, "download_images") and item.download_images is not None:
+                    self.config.ingestion.download_images = bool(item.download_images)
+                if "social_links" in raw_updates and isinstance(raw_updates["social_links"], dict):
+                    self.config.branding.social_links.update({str(k): str(v).strip() for k, v in raw_updates["social_links"].items() if v is not None})
+
+            # Persist project item in config
+            if not hasattr(self.config, "projects"):
+                self.config.projects = {}
+            self.config.projects[pid] = item.to_dict()
+            self.save_config()
+
+            # Immediate sanitization pass: purge worker name from HTML theme text in dist and worker public
+            clean_domain = (getattr(item, "cf_custom_domain", "") or "").strip()
+            if clean_domain or domain_changed:
+                try:
+                    from app.generator.site_builder import SiteBuilder, derive_brand_from_domain
+                    brand = derive_brand_from_domain(clean_domain, worker_name=pid) if clean_domain else "Styleire"
+                    # Preserve worker name in final domain URLs; user connects custom domain manually
+                    worker_base_url = self.config.cloudflare.get_live_url()
+                    dist_dir = os.path.abspath(os.path.join("dist", pid))
+                    worker_pub = os.path.abspath(os.path.join(self.config.cloudflare.worker_dir or "my-worker", "public"))
+                    for target_dir in (dist_dir, worker_pub):
+                        if os.path.exists(target_dir):
+                            SiteBuilder.sanitize_directory(
+                                output_dir=target_dir,
+                                worker_names=[pid, item.cf_project_name],
+                                base_url=worker_base_url,
+                                brand_name=brand,
+                                config=self.config,
+                            )
+                except Exception as exc:
+                    self.log(f"[WARN] Sanitization on project update encountered error: {exc}")
+
+        self.log(f"[PROJECT] Updated settings for '{item.name}' (id={pid}, custom_domain='{item.cf_custom_domain}').")
+        return {"success": True, "status": "success", "project": item.to_dict()}
+
+
     def switch_project(self, project_id: str) -> dict[str, Any]:
         """Switches active project, dynamically re-pointing manifest and reloading isolated categories."""
         pid = str(project_id).strip()
@@ -350,6 +428,7 @@ class DashboardManager:
                         created_at=datetime.datetime.now(datetime.timezone.utc).isoformat(),
                         manifest_path=os.path.relpath(cand),
                         output_dir=os.path.join("dist", pid),
+                        cf_project_name=pid,
                     )
                 else:
                     raise KeyError(f"Project '{pid}' does not exist.")
@@ -371,8 +450,12 @@ class DashboardManager:
             self.config.active_project = pid
 
             # Apply project attributes to active config
-            if item.cf_project_name:
-                self.config.cloudflare.project_name = item.cf_project_name
+            if item.theme:
+                self.config.build.theme = item.theme
+                self.theme_engine.default_theme = item.theme
+            if item.routing_mode:
+                self.config.build.routing_mode = item.routing_mode
+            self.config.cloudflare.project_name = item.cf_project_name or item.id
             if item.cf_custom_domain is not None:
                 self.config.cloudflare.custom_domain = item.cf_custom_domain
             if item.gh_owner:
@@ -393,6 +476,32 @@ class DashboardManager:
                 "message": f"Switched to project '{item.name}'.",
             }
 
+    def delete_project(self, project_id: str) -> dict[str, Any]:
+        """Deletes a project from config and memory."""
+        pid = str(project_id).strip()
+        with self.lock:
+            if pid not in self.projects:
+                raise KeyError(f"Project '{pid}' does not exist.")
+            del self.projects[pid]
+            if hasattr(self.config, "projects") and pid in self.config.projects:
+                del self.config.projects[pid]
+            if self.active_project_id == pid:
+                self.active_project_id = list(self.projects.keys())[0] if self.projects else ""
+                self.config.active_project = self.active_project_id
+            self.save_config()
+            return {"success": True, "deleted": pid, "active_project": self.active_project_id}
+
+    def reset_all_projects(self) -> dict[str, Any]:
+        """Resets all projects from config and memory, establishing an empty blank slate."""
+        with self.lock:
+            self.projects.clear()
+            self.config.projects = {}
+            self.active_project_id = ""
+            self.config.active_project = ""
+            self.manifest = Manifest.create_empty("")
+            self.save_config()
+            return {"success": True, "message": "All projects reset to empty blank slate."}
+
     def resolve_output_dir(
         self,
         target_cloud: Optional[str] = None,
@@ -400,11 +509,13 @@ class DashboardManager:
         project_name: Optional[str] = None,
     ) -> tuple[str, str]:
         """Resolves the isolated local output directory for the given or active project."""
+        effective_sub = subdomain or self.active_project_id
+        effective_proj = project_name or self.active_project_id
         return resolve_project_output_dir(
             self.config,
             target_cloud=target_cloud,
-            subdomain=subdomain,
-            project_name=project_name,
+            subdomain=effective_sub,
+            project_name=effective_proj,
         )
 
     def log(self, message: str) -> None:
@@ -506,6 +617,11 @@ class DashboardManager:
             raw["cloudflare"]["live_url"] = self.config.cloudflare.get_live_url()
             return raw
 
+    def get_categories(self) -> dict[str, Any]:
+        """Returns categories dictionary from active manifest safely."""
+        with self.lock:
+            return getattr(self.manifest, "categories", {}) or {}
+
     def update_config_from_dict(self, data: dict[str, Any]) -> dict[str, Any]:
         """Updates configuration and persists changes."""
         with self.lock:
@@ -605,8 +721,26 @@ class DashboardManager:
                 self.config.branding.enable_eeat = bool(br_data["enable_eeat"])
             elif "enable_eeat" in data:
                 self.config.branding.enable_eeat = bool(data["enable_eeat"])
+            if "social_links" in br_data and isinstance(br_data["social_links"], dict):
+                self.config.branding.social_links.update({str(k): str(v).strip() for k, v in br_data["social_links"].items() if v is not None})
+            elif "social_links" in data and isinstance(data["social_links"], dict):
+                self.config.branding.social_links.update({str(k): str(v).strip() for k, v in data["social_links"].items() if v is not None})
 
             self.theme_engine.default_theme = self.config.build.theme
+
+            # Synchronize theme and routing_mode to active project item
+            if self.active_project_id:
+                if self.active_project_id in self.projects:
+                    self.projects[self.active_project_id].theme = self.config.build.theme
+                    self.projects[self.active_project_id].routing_mode = self.config.build.routing_mode
+                if hasattr(self.config, "projects") and self.active_project_id in self.config.projects:
+                    cfg_proj = self.config.projects[self.active_project_id]
+                    if isinstance(cfg_proj, dict):
+                        cfg_proj["theme"] = self.config.build.theme
+                        cfg_proj["routing_mode"] = self.config.build.routing_mode
+                    else:
+                        cfg_proj.theme = self.config.build.theme
+                        cfg_proj.routing_mode = self.config.build.routing_mode
 
             # Synchronize active ProjectItem metadata if active project exists
             if self.active_project_id and self.active_project_id in self.config.projects:
@@ -857,15 +991,156 @@ class DashboardManager:
                     ],
                 )
 
+        # Resolve custom domain if present for preview source_domain & base_url
+        active_proj = self.projects.get(self.active_project_id) if hasattr(self, "projects") else None
+        custom_dom = ""
+        if active_proj:
+            custom_dom = (getattr(active_proj, "cf_custom_domain", "") or getattr(active_proj, "custom_domain", "") or "").strip()
+        if not custom_dom and hasattr(self.config, "cloudflare") and self.config.cloudflare.custom_domain:
+            custom_dom = self.config.cloudflare.custom_domain.strip()
+        preview_source_domain = re.sub(r"^https?://", "", custom_dom, flags=re.IGNORECASE).strip("/ ") if custom_dom else (self.config.ingestion.wp_api_url or "stylesdays.com")
+        preview_base_url = f"https://{preview_source_domain}" if custom_dom else ""
+
         all_posts_list = list(self.manifest.posts.values())
         return render_post(
             post=target_post,
             all_posts=all_posts_list,
-            base_url="",
+            base_url=preview_base_url,
             theme=theme_name,
-            source_domain=self.config.ingestion.wp_api_url or "stylesdays.com",
+            source_domain=preview_source_domain,
             branding=self.config.branding,
+            categories=self.get_categories(),
+            routing_mode=r_mode,
         )
+
+    def start_ingest_job(
+        self,
+        source_type: str = "sitemap",
+        url_or_list: str = "",
+        max_posts: Optional[int] = None,
+        download_images: Optional[bool] = None,
+        force_full_resync: bool = False,
+        cf_custom_domain: Optional[str] = None,
+        cf_project_name: Optional[str] = None,
+    ) -> dict[str, Any]:
+        """Launches an asynchronous ingestion job in a background daemon thread."""
+        with self.lock:
+            if self.ingest_job.status == "running":
+                return {
+                    "success": False,
+                    "error": "An ingestion job is already running.",
+                    "job": self.ingest_job.to_dict(),
+                }
+
+            # Persist entered sitemap_url & max_posts into active project immediately
+            if url_or_list and source_type == "sitemap":
+                self.config.ingestion.sitemap_url = url_or_list.strip()
+                if self.active_project_id in self.projects:
+                    self.projects[self.active_project_id].sitemap_url = url_or_list.strip()
+            if max_posts is not None:
+                self.config.ingestion.max_posts = int(max_posts)
+                if self.active_project_id in self.projects:
+                    self.projects[self.active_project_id].max_posts = int(max_posts)
+            if download_images is not None:
+                self.config.ingestion.download_images = bool(download_images)
+                if self.active_project_id in self.projects:
+                    self.projects[self.active_project_id].download_images = bool(download_images)
+
+            if cf_custom_domain is not None:
+                clean_cd = re.sub(r"^https?://", "", str(cf_custom_domain).strip(), flags=re.IGNORECASE).strip("/ ")
+                self.config.cloudflare.custom_domain = clean_cd
+                if self.active_project_id in self.projects:
+                    self.projects[self.active_project_id].cf_custom_domain = clean_cd
+                if clean_cd:
+                    from app.generator.site_builder import derive_brand_from_domain
+                    self.config.branding.brand_name = derive_brand_from_domain(clean_cd, worker_name=self.active_project_id)
+
+            if cf_project_name is not None and str(cf_project_name).strip():
+                clean_pn = str(cf_project_name).strip()
+                self.config.cloudflare.project_name = clean_pn
+                if self.active_project_id in self.projects:
+                    self.projects[self.active_project_id].cf_project_name = clean_pn
+
+            if self.active_project_id in self.projects:
+                if not hasattr(self.config, "projects"):
+                    self.config.projects = {}
+                self.config.projects[self.active_project_id] = self.projects[self.active_project_id].to_dict()
+            self.save_config()
+
+            now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
+            self.ingest_job = IngestJob(
+                status="running",
+                started_at=now_iso,
+                message=f"Starting ingestion (source={source_type})...",
+                counts={"new": 0, "updated": 0, "synced": 0, "total": 0},
+            )
+
+        def _worker() -> None:
+            try:
+                def progress_cb(level: str, msg: str, processed: int = 0, total: int = 0, current_url: str = "") -> None:
+                    with self.lock:
+                        if total > 0:
+                            self.ingest_job.total_count = total
+                        if processed > 0:
+                            self.ingest_job.processed_count = processed
+                        if current_url:
+                            self.ingest_job.current_post = current_url
+                        self.ingest_job.message = msg
+                    self.log(f"[{level.upper()}] {msg}")
+
+                diff_summary = self.run_ingest(
+                    source_type=source_type,
+                    url_or_list=url_or_list,
+                    max_posts=max_posts,
+                    download_images=download_images,
+                    force_full_resync=force_full_resync,
+                    progress_callback=progress_cb,
+                )
+                with self.lock:
+                    self.ingest_job.status = "success"
+                    self.ingest_job.completed_at = datetime.datetime.now(datetime.timezone.utc).isoformat()
+                    self.ingest_job.counts = diff_summary.to_dict().get("counts", {})
+                    self.ingest_job.new_posts = [p.to_dict() for p in diff_summary.new_posts]
+                    self.ingest_job.updated_posts = [p.to_dict() for p in diff_summary.updated_posts]
+                    self.ingest_job.synced_posts = [p.to_dict() for p in diff_summary.synced_posts]
+                    self.ingest_job.message = (
+                        f"Ingestion complete: {len(diff_summary.new_posts)} new, "
+                        f"{len(diff_summary.updated_posts)} updated, {len(diff_summary.synced_posts)} synced."
+                    )
+
+                # Automatically re-compile static build and update worker public assets
+                try:
+                    self.run_build(
+                        clean=False,
+                        target_cloud="cloudflare",
+                        project_name=self.active_project_id,
+                        subdomain=self.active_project_id,
+                    )
+                except Exception as auto_bld_err:
+                    self.log(f"[WARN] Ingestion post-build sync encountered notice: {auto_bld_err}")
+            except Exception as e:
+                err_msg = str(e)
+                self.log(f"[ERROR] Ingestion job failed: {err_msg}")
+                with self.lock:
+                    self.ingest_job.status = "error"
+                    self.ingest_job.completed_at = datetime.datetime.now(datetime.timezone.utc).isoformat()
+                    self.ingest_job.error = err_msg
+                    self.ingest_job.message = f"Ingestion failed: {err_msg}"
+
+        t = threading.Thread(target=_worker, daemon=True)
+        t.start()
+        return {
+            "success": True,
+            "status": "running",
+            "job_id": f"job_{int(time.time())}",
+            "message": "Ingestion job started in background.",
+            "job": self.ingest_job.to_dict(),
+        }
+
+    def get_ingest_status(self) -> dict[str, Any]:
+        """Returns the serialized status of the background ingestion job."""
+        with self.lock:
+            return self.ingest_job.to_dict()
 
     def run_ingest(
         self,
@@ -874,6 +1149,7 @@ class DashboardManager:
         max_posts: Optional[int] = None,
         download_images: Optional[bool] = None,
         force_full_resync: bool = False,
+        progress_callback: Optional[Any] = None,
     ) -> DiffSummary:
         """Executes ingestion from sitemap XML, URL list, or WordPress REST API."""
         self.log(f"Starting ingestion (source={source_type})...")
@@ -889,12 +1165,14 @@ class DashboardManager:
             self.log(f"Scraping full article content and images from XML sitemap: {sitemap_url}...")
             try:
                 from app.ingestion.web_scraper import scrape_sitemap
+                cb = progress_callback or (lambda lvl, msg: self.log(f"[{lvl.upper()}] {msg}"))
                 discovered_posts = scrape_sitemap(
                     sitemap_url=sitemap_url,
                     max_posts=max_count,
                     download_images=dl_images,
                     base_dir=".",
-                    progress_callback=lambda lvl, msg: self.log(f"[{lvl.upper()}] {msg}"),
+                    progress_callback=cb,
+                    project_id=self.active_project_id,
                 )
             except Exception as exc:
                 self.log(f"Notice: Sitemap scraper fallback ({exc}); attempting WP REST client...")
@@ -933,14 +1211,15 @@ class DashboardManager:
         else:
             discovered_posts = self._fallback_ingestion(source_type, url_or_list, max_count)
 
-        # Execute diffing while preserving custom edits
+        # Execute diffing while preserving custom edits on matching slugs
         diff_summary = DiffSummary()
+        scoped_posts: dict[str, PostItem] = {}
         with self.lock:
             for new_p in discovered_posts:
                 existing = self.manifest.get_post(new_p.slug)
                 if not existing:
                     diff_summary.new_posts.append(new_p)
-                    self.manifest.upsert_post(new_p)
+                    scoped_posts[new_p.slug] = new_p
                 else:
                     if existing.custom_edited and not force_full_resync:
                         # Strictly preserve user custom edits!
@@ -948,33 +1227,41 @@ class DashboardManager:
                         if new_p.local_image_path:
                             existing.local_image_path = new_p.local_image_path
                         diff_summary.synced_posts.append(existing)
+                        scoped_posts[new_p.slug] = existing
                     else:
                         if existing.modified != new_p.modified or existing.title != new_p.title:
                             new_p.checklist = existing.checklist or new_p.checklist
                             new_p.takeaways = existing.takeaways or new_p.takeaways
                             diff_summary.updated_posts.append(new_p)
-                            self.manifest.upsert_post(new_p)
+                            scoped_posts[new_p.slug] = new_p
                         else:
                             diff_summary.synced_posts.append(existing)
+                            scoped_posts[new_p.slug] = existing
 
-            # Download & save images to project assets/images/
+            # Rebind manifest.posts strictly to discovered posts, purging alien posts
+            self.manifest.posts = scoped_posts
+            self.manifest.recompute_categories()
+
+            # Download & save images to project assets
             if dl_images:
-                self.log("Downloading/saving featured images to project assets/images/...")
+                self.log("Downloading/saving featured images to project assets...")
                 try:
                     from app.ingestion.image_downloader import download_post_image
+                    domain_to_use = self.active_project_id if self.active_project_id not in ("styleire", "stylesdays", "default") else None
                     for p in (diff_summary.new_posts + diff_summary.updated_posts):
-                        saved_path = download_post_image(p, output_dir=".", force=force_full_resync, domain=p.domain)
+                        saved_path = download_post_image(p, output_dir=".", force=force_full_resync, domain=domain_to_use or p.domain)
                         p.local_image_path = saved_path
                         self.manifest.upsert_post(p)
                     for p in diff_summary.synced_posts:
                         if not p.local_image_path or not os.path.exists(p.local_image_path):
-                            saved_path = download_post_image(p, output_dir=".", domain=p.domain)
+                            saved_path = download_post_image(p, output_dir=".", domain=domain_to_use or p.domain)
                             p.local_image_path = saved_path
                             self.manifest.upsert_post(p)
                 except Exception as exc:
                     self.log(f"Notice: Image download encountered an issue: {exc}")
 
-        self.save_manifest()
+            self.manifest.recompute_categories()
+            self.save_manifest()
         self.log(
             f"Ingestion complete: {len(diff_summary.new_posts)} new, "
             f"{len(diff_summary.updated_posts)} updated, {len(diff_summary.synced_posts)} synced."
@@ -985,16 +1272,23 @@ class DashboardManager:
         """Ensures every post in the manifest has an image saved in the project assets/images/ directory."""
         self.log("Syncing all post images to project assets/images/...")
         from app.ingestion.image_downloader import download_post_image
-        proj_assets_dir = os.path.abspath(os.path.join("assets", "images"))
+        if self.active_project_id in ("styleire", "stylesdays", "default"):
+            proj_assets_dir = os.path.abspath(os.path.join("assets", "images"))
+            domain_param = None
+            asset_rel_prefix = "assets/images"
+        else:
+            proj_assets_dir = os.path.abspath(os.path.join("assets", self.active_project_id, "images"))
+            domain_param = self.active_project_id
+            asset_rel_prefix = f"assets/{self.active_project_id}/images"
         os.makedirs(proj_assets_dir, exist_ok=True)
 
-        # Ensure placeholder.svg exists
+        # Ensure placeholder.svg exists in target directory
         placeholder_src = os.path.join(proj_assets_dir, "placeholder.svg")
         if not os.path.exists(placeholder_src):
             try:
                 from app.generator.site_builder import _generate_svg_fallback
                 with open(placeholder_src, "w", encoding="utf-8") as f:
-                    f.write(_generate_svg_fallback("Editorial Organization Guide", "StylesDays", "#B45309"))
+                    f.write(_generate_svg_fallback("Editorial Organization Guide", self.active_project_id.title(), "#B45309"))
             except Exception:
                 pass
 
@@ -1012,14 +1306,14 @@ class DashboardManager:
                     for ext in (".webp", ".jpg", ".jpeg", ".png", ".svg"):
                         c = os.path.join(proj_assets_dir, f"{slug}{ext}")
                         if os.path.exists(c) and os.path.getsize(c) > 64:
-                            proj_img = f"assets/images/{slug}{ext}"
+                            proj_img = f"{asset_rel_prefix}/{slug}{ext}"
                             break
 
                 if proj_img and not force:
                     post.local_image_path = proj_img
                     synced += 1
                 else:
-                    res = download_post_image(post, output_dir=".", force=force)
+                    res = download_post_image(post, output_dir=".", force=force, domain=domain_param)
                     post.local_image_path = res
                     if res.endswith(".svg"):
                         svg_generated += 1
@@ -1028,6 +1322,18 @@ class DashboardManager:
                     synced += 1
             self.save_manifest()
         self.log(f"Image asset sync complete: {synced} total ({downloaded} downloaded, {svg_generated} generated SVGs).")
+
+        # Auto-compile static site and sync assets into my-worker/public
+        try:
+            self.run_build(
+                clean=False,
+                target_cloud="cloudflare",
+                project_name=self.active_project_id,
+                subdomain=self.active_project_id,
+            )
+        except Exception as bld_err:
+            self.log(f"[WARN] Post-asset-sync build auto-compilation: {bld_err}")
+
         return {
             "success": True,
             "total": synced,
@@ -1036,17 +1342,36 @@ class DashboardManager:
         }
 
     def optimize_all_images(self, quality: int = 82) -> dict[str, Any]:
-        """Batch optimizes all project images in assets/images/ to standard WebP and updates manifest."""
+        """Batch optimizes all project images to standard WebP and updates active project manifest."""
         self.log("Starting batch image optimization to WebP (16:10 / 1200x750)...")
         from app.ingestion.image_downloader import batch_optimize_directory
         with self.lock:
+            # Strictly resolve active manifest path
+            target_manifest = getattr(self, "active_manifest_path", None)
+            if not target_manifest:
+                target_manifest = os.path.abspath(
+                    os.path.join("scraped_data", self.active_project_id, "manifest.json")
+                )
+
+            # Resolve project image assets directory
+            if self.active_project_id in ("styleire", "stylesdays", "default"):
+                images_dir = os.path.abspath(os.path.join("assets", "images"))
+            else:
+                proj_images = os.path.abspath(os.path.join("assets", self.active_project_id, "images"))
+                if os.path.exists(proj_images):
+                    images_dir = proj_images
+                else:
+                    images_dir = os.path.abspath(os.path.join("assets", "images"))
+
             stats = batch_optimize_directory(
-                images_dir=os.path.join("assets", "images"),
-                manifest_path=self.manifest_path,
+                images_dir=images_dir,
+                manifest_path=target_manifest,
                 quality=quality,
             )
-            # Re-read manifest to keep in sync
-            self.manifest = Manifest.load(self.manifest_path)
+            # Re-read active manifest to keep state strictly in sync — NEVER reload root pseo_manifest.json for custom projects!
+            if os.path.exists(target_manifest):
+                self.manifest = Manifest.load_from_json(target_manifest)
+                self.active_manifest_path = target_manifest
         self.log(
             f"Optimization finished: {stats['converted']} files optimized. "
             f"Size reduced from {stats['original_bytes']:,} to {stats['optimized_bytes']:,} bytes "
@@ -1109,248 +1434,159 @@ class DashboardManager:
         target_cloud: Optional[str] = None,
         project_name: Optional[str] = None,
         subdomain: Optional[str] = None,
+        theme: Optional[str] = None,
+        routing_mode: Optional[str] = None,
     ) -> dict[str, Any]:
-        """Compiles the static site into the isolated local project directory."""
+        """Compiles the static site by delegating directly to the unified SiteBuilder pipeline."""
+        # 1. Resolve effective project identifier with strict active project fallback
+        effective_sub = (subdomain or project_name or self.active_project_id or "default").strip()
+
         project_token, output_dir = self.resolve_output_dir(
             target_cloud=target_cloud,
-            subdomain=subdomain,
-            project_name=project_name,
+            subdomain=effective_sub,
+            project_name=effective_sub,
         )
-        routing_mode = self.config.build.routing_mode
-        theme = self.config.build.theme
+
+        proj_item = self.projects.get(effective_sub) if hasattr(self, "projects") else None
+
+        # Check for configured Custom Domain (Highest Priority)
+        effective_custom_domain = ""
+        clean_dom = ""
+        if proj_item:
+            effective_custom_domain = (getattr(proj_item, "cf_custom_domain", "") or getattr(proj_item, "custom_domain", "") or "").strip()
+        if not effective_custom_domain and hasattr(self.config, "cloudflare") and self.config.cloudflare.custom_domain:
+            effective_custom_domain = self.config.cloudflare.custom_domain.strip()
+
+        # 2. Canonical base URL resolution and brand derivation
+        if effective_custom_domain:
+            clean_dom = re.sub(r"^https?://", "", effective_custom_domain, flags=re.IGNORECASE).strip("/ ")
+            if self.config.cloudflare.custom_domain != clean_dom:
+                self.config.cloudflare.custom_domain = clean_dom
+            if proj_item and getattr(proj_item, "cf_custom_domain", "") != clean_dom:
+                proj_item.cf_custom_domain = clean_dom
+            from app.generator.site_builder import derive_brand_from_domain
+            derived = derive_brand_from_domain(clean_dom, worker_name=effective_sub)
+            self.config.branding.brand_name = derived
 
         if base_url is None:
-            active_plat = getattr(getattr(self.config, "build", None), "active_platform", None) or getattr(self.config, "active_platform", None) or "cloudflare"
-            if target_cloud in ("cloudflare", "cf") or (target_cloud is None and active_plat in ("cloudflare", "cf") and self.config.cloudflare.project_name):
+            active_plat = (
+                getattr(getattr(self.config, "build", None), "active_platform", None)
+                or getattr(self.config, "active_platform", None)
+                or "cloudflare"
+            )
+            # If a custom domain is configured, static HTML must strictly use the domain as base_url
+            if clean_dom:
+                base_url = f"https://{clean_dom}"
+            elif target_cloud in ("cloudflare", "cf") or (target_cloud is None and active_plat in ("cloudflare", "cf")):
                 cf = self.config.cloudflare
-                base_url = cf.get_live_url()
-            elif target_cloud in ("github", "gh") or (target_cloud is None and active_plat in ("github", "gh") and self.config.github.owner):
-                base_url = (
-                    f"https://{self.config.github.repo}"
-                    if self.config.github.repo.endswith(".github.io")
-                    else (f"https://{self.config.github.owner}.github.io/{self.config.github.repo}" if self.config.github.owner else "")
-                )
-            elif self.config.cloudflare.project_name:
-                cf = self.config.cloudflare
-                base_url = cf.get_live_url()
-            else:
-                base_url = (
-                    f"https://{self.config.github.repo}"
-                    if self.config.github.repo.endswith(".github.io")
-                    else (f"https://{self.config.github.owner}.github.io/{self.config.github.repo}" if self.config.github.owner else "")
-                )
-
-        self.log(f"Building static site to isolated project folder {output_dir} (project={project_token}, mode={routing_mode}, theme={theme}, base_url={base_url or 'relative'})...")
-        os.makedirs(output_dir, exist_ok=True)
-        files_written = 0
-
-        # Attempt to use app.routing.resolver if available
-        def resolve_paths(p: PostItem) -> tuple[str, str]:
-            try:
-                from app.routing.resolver import resolve_post_route
-                res = resolve_post_route(p, mode=routing_mode, base_url=base_url)
-                return res["file_path"], res["web_path"]
-            except Exception:
-                slug = p.slug
-                parent = p.parent_slug or p.category_slug or "guides"
-                if routing_mode == "category_slug":
-                    return os.path.join(parent, slug, "index.html"), f"/{parent}/{slug}/"
-                elif routing_mode == "parent_slug":
-                    return os.path.join(parent, slug, "index.html"), f"/{parent}/{slug}/"
-                elif routing_mode == "silo_nested":
-                    return os.path.join("guides", parent, slug, "index.html"), f"/guides/{parent}/{slug}/"
+                if cf.account_subdomain and effective_sub:
+                    base_url = f"https://{effective_sub}.{cf.account_subdomain}.workers.dev"
+                elif cf.project_name == effective_sub:
+                    base_url = cf.get_live_url()
+                elif cf.custom_domain:
+                    base_url = f"https://{cf.custom_domain.strip('/')}"
+                elif effective_sub:
+                    base_url = f"https://{effective_sub}.workers.dev"
                 else:
-                    return os.path.join(slug, "index.html"), f"/{slug}/"
+                    base_url = cf.get_live_url()
+            elif target_cloud in ("github", "gh") or (target_cloud is None and active_plat in ("github", "gh")):
+                gh = self.config.github
+                if gh.repo.endswith(".github.io"):
+                    base_url = f"https://{gh.repo}"
+                elif gh.owner:
+                    base_url = f"https://{gh.owner}.github.io/{gh.repo}" if gh.repo else f"https://{gh.owner}.github.io"
+                else:
+                    base_url = ""
+            elif self.config.cloudflare.project_name:
+                base_url = self.config.cloudflare.get_live_url()
+            else:
+                base_url = ""
+        effective_routing_mode = (
+            routing_mode
+            or (getattr(proj_item, "routing_mode", None) if proj_item else None)
+            or getattr(getattr(self.config, "build", None), "routing_mode", None)
+            or "single"
+        )
+        effective_theme = (
+            theme
+            or (getattr(proj_item, "theme", None) if proj_item else None)
+            or getattr(getattr(self.config, "build", None), "theme", None)
+            or "editorial-warm"
+        )
+        # Harmonize project item, build config, and theme engine with effective theme
+        if proj_item:
+            proj_item.theme = effective_theme
+            proj_item.routing_mode = effective_routing_mode
+        self.config.build.theme = effective_theme
+        self.config.build.routing_mode = effective_routing_mode
+        self.theme_engine.default_theme = effective_theme
+        routing_mode = effective_routing_mode
+        theme = effective_theme
+
+        self.log(
+            f"Building static site via SiteBuilder to {output_dir} "
+            f"(project={effective_sub}, mode={routing_mode}, theme={theme}, base_url={base_url or 'relative'})..."
+        )
 
         with self.lock:
-            all_posts = list(self.manifest.posts.values())
-            silo_map: dict[str, list[PostItem]] = {}
+            # Persist active manifest to disk prior to compilation
+            self.save_manifest()
 
-            # 1. Synchronize image assets into project (assets/images/) and into output_dir/assets/images/
-            proj_assets_dir = os.path.abspath(os.path.join("assets", "images"))
-            os.makedirs(proj_assets_dir, exist_ok=True)
-            target_assets_dir = os.path.abspath(os.path.join(output_dir, "assets", "images"))
-            os.makedirs(target_assets_dir, exist_ok=True)
-
-            # Ensure placeholder.svg exists in proj_assets_dir
-            placeholder_src = os.path.join(proj_assets_dir, "placeholder.svg")
-            if not os.path.exists(placeholder_src):
-                try:
-                    from app.generator.site_builder import _generate_svg_fallback
-                    with open(placeholder_src, "w", encoding="utf-8") as f:
-                        f.write(_generate_svg_fallback("Editorial Organization Guide", "StylesDays", "#B45309"))
-                except Exception:
-                    pass
-
-            # Ensure each post has a local image saved in proj_assets_dir
-            for post in all_posts:
-                slug = post.slug
-                found_src = None
-                clean_path = (post.local_image_path or "").lstrip("/").replace("\\", "/")
-                if clean_path and os.path.exists(clean_path) and os.path.getsize(clean_path) > 64:
-                    found_src = clean_path
-                    post.local_image_path = clean_path
-                else:
-                    for ext in (".webp", ".jpg", ".jpeg", ".png", ".svg"):
-                        cand = os.path.join(proj_assets_dir, f"{slug}{ext}")
-                        if os.path.exists(cand) and os.path.getsize(cand) > 64:
-                            found_src = cand
-                            post.local_image_path = f"assets/images/{slug}{ext}"
-                            break
-
-                if not found_src:
-                    try:
-                        from app.ingestion.image_downloader import download_post_image
-                        saved_path = download_post_image(post, output_dir=".")
-                        post.local_image_path = saved_path
-                    except Exception:
-                        pass
-
-            # Copy all files from proj_assets_dir to target_assets_dir
-            assets_copied = 0
-            if os.path.exists(proj_assets_dir):
-                for item in os.listdir(proj_assets_dir):
-                    src_file = os.path.join(proj_assets_dir, item)
-                    if os.path.isfile(src_file):
-                        dst_file = os.path.join(target_assets_dir, item)
-                        shutil.copy2(src_file, dst_file)
-                        assets_copied += 1
-                        files_written += 1
-            self.log(f"Synchronized {assets_copied} image assets into {target_assets_dir}")
-
-            # Generate individual post pages
-            for post in all_posts:
-                rel_file, web_path = resolve_paths(post)
-                dest_file = os.path.join(output_dir, rel_file)
-                os.makedirs(os.path.dirname(dest_file), exist_ok=True)
-
-                html_content = render_post(
-                    post=post,
-                    all_posts=all_posts,
-                    base_url=base_url,
-                    theme=theme,
-                    source_domain=self.config.ingestion.wp_api_url or "stylesdays.com",
-                    branding=self.config.branding,
-                )
-                with open(dest_file, "w", encoding="utf-8") as f:
-                    f.write(html_content)
-                files_written += 1
-
-                # Group into silos
-                top_seg = web_path.strip("/").split("/")[0]
-                if web_path.count("/") > 2:
-                    silo_map.setdefault(top_seg, []).append(post)
-
-            # Generate intermediate category silo index pages for ALL categories (never 404!)
-            try:
-                from app.routing.resolver import get_intermediate_routes
-                category_routes = get_intermediate_routes(all_posts, mode=routing_mode, base_url=base_url)
-            except Exception:
-                category_routes = []
-
-            for cat_route in category_routes:
-                cat_dir = os.path.join(output_dir, cat_route.slug)
-                os.makedirs(cat_dir, exist_ok=True)
-                cat_index_file = os.path.join(cat_dir, "index.html")
-
-                cat_name = cat_route.title or cat_route.slug.replace("-", " ").title()
-                cat_html = render_category_index(
-                    category_name=cat_name,
-                    category_slug=cat_route.slug,
-                    posts=cat_route.posts,
-                    all_categories=self.manifest.categories,
-                    base_url=base_url,
-                    theme=theme,
-                    source_domain=self.config.ingestion.wp_api_url or "stylesdays.com",
-                    branding=self.config.branding,
-                    routing_mode=routing_mode,
-                )
-                with open(cat_index_file, "w", encoding="utf-8") as f:
-                    f.write(cat_html)
-                files_written += 1
-
-            # Generate Root Hub page (/index.html)
-            root_hub_file = os.path.join(output_dir, "index.html")
-            if self.config.branding and self.config.branding.brand_name:
-                brand_clean = self.config.branding.brand_name.strip()
-            else:
-                if base_url and ("workers.dev" in base_url or "pages.dev" in base_url):
-                    brand = self.config.cloudflare.project_name or self.config.ingestion.wp_api_url or "AnnaDeco"
-                elif self.config.cloudflare.project_name and not self.config.github.owner:
-                    brand = self.config.cloudflare.project_name
-                elif self.config.github.owner:
-                    brand = self.config.github.owner
-                else:
-                    brand = self.config.ingestion.wp_api_url or "AnnaDeco"
-                brand_clean = (
-                    brand.replace("https://", "")
-                    .replace("http://", "")
-                    .replace(".com", "")
-                    .replace(".github.io", "")
-                    .replace("-", " ")
-                    .title()
-                )
-            hub_title = f"{brand_clean} Editorial Hub"
-            hub_html = render_hub(
-                posts=all_posts,
-                categories=self.manifest.categories,
-                title=hub_title,
-                subtitle="Curated Home Organization, Room Checklists, and DIY Tutorials.",
+            from app.generator.site_builder import SiteBuilder
+            builder = SiteBuilder(
+                config=self.config,
+                output_dir=output_dir,
+                subdomain=effective_sub,
                 base_url=base_url,
                 theme=theme,
-                source_domain=self.config.ingestion.wp_api_url or "stylesdays.com",
-                branding=self.config.branding,
                 routing_mode=routing_mode,
             )
-            with open(root_hub_file, "w", encoding="utf-8") as f:
-                f.write(hub_html)
-            files_written += 1
 
-            # Generate robots.txt and sitemap.xml
-            try:
-                from app.seo.robots import generate_robots_txt
-                robots_txt = generate_robots_txt(f"{base_url}/sitemap.xml" if base_url else "/sitemap.xml")
-            except Exception:
-                robots_txt = f"User-agent: *\nAllow: /\nAllow: /assets/images/\n\nUser-agent: Pinterestbot\nAllow: /\nAllow: /assets/images/\n\nSitemap: {base_url}/sitemap.xml\n"
-
-            with open(os.path.join(output_dir, "robots.txt"), "w", encoding="utf-8") as f:
-                f.write(robots_txt)
-            files_written += 1
-
-            try:
-                from app.seo.sitemap import generate_sitemap_xml
-                cat_hub_urls = [r.web_path for r in category_routes] if category_routes else []
-                sitemap_xml = generate_sitemap_xml(
-                    all_posts,
-                    base_url=base_url or "https://home-organization.github.io",
-                    hub_urls=["/"] + cat_hub_urls,
-                )
-            except Exception:
-                today = datetime.date.today().isoformat()
-                sitemap_xml = f'<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n  <url><loc>{base_url}/</loc><lastmod>{today}</lastmod></url>\n</urlset>'
-
-            with open(os.path.join(output_dir, "sitemap.xml"), "w", encoding="utf-8") as f:
-                f.write(sitemap_xml)
-            files_written += 1
-
-            # Save manifest into project and output directory
-            self.save_manifest()
-            manifest_out = os.path.join(output_dir, "pseo_manifest.json")
-            with open(manifest_out, "w", encoding="utf-8") as f:
-                f.write(self.manifest.to_json(indent=2))
-            files_written += 1
+            # Build strictly with the active project manifest (never allow None fallback)
+            summary = builder.build(manifest_or_posts=self.manifest, subdomain=effective_sub)
 
             self.last_build_time = datetime.datetime.now(datetime.timezone.utc).isoformat()
-            self.last_build_files = files_written
+            self.last_build_files = len(summary.files_created)
 
-        self.log(f"Build completed successfully: {files_written} files generated in {output_dir}")
+        # Log errors if any occurred during build
+        if summary.errors:
+            for err in summary.errors:
+                self.log(f"[BUILD ERROR] {err}")
+
+        self.log(
+            f"Build completed successfully via SiteBuilder: {len(summary.files_created)} files generated "
+            f"in {output_dir} ({summary.duration_seconds}s)."
+        )
+
+        # Auto-sync to my-worker/public for Cloudflare edge deployment
+        try:
+            worker_pub = os.path.abspath(os.path.join(self.config.cloudflare.worker_dir or "my-worker", "public"))
+            if os.path.exists(os.path.dirname(worker_pub)):
+                from app.deployer.cloudflare import CloudflareDeployer
+                deployer = CloudflareDeployer(self.config.cloudflare)
+                deployer.sync_worker_assets(output_dir=output_dir, subdomain=effective_sub)
+        except Exception as auto_sync_exc:
+            self.log(f"[WARN] Auto-sync to worker public assets: {auto_sync_exc}")
+
+        # Return backward-compatible response dictionary conforming to app.js and test expectations
         return {
-            "success": True,
+            "success": summary.status in ("success", "partial_success"),
+            "status": summary.status,
             "project_name": project_token,
             "output_dir": output_dir,
-            "files_generated": files_written,
-            "assets_copied": assets_copied,
+            "files_generated": len(summary.files_created),
+            "files_count": len(summary.files_created),
+            "assets_copied": summary.images_copied,
+            "images_copied": summary.images_copied,
+            "total_posts": summary.total_posts,
+            "post_pages_generated": summary.post_pages_generated,
+            "intermediate_pages_generated": summary.intermediate_pages_generated,
+            "total_pages_generated": summary.total_pages_generated,
+            "duration_seconds": summary.duration_seconds,
+            "theme": theme,
+            "routing_mode": routing_mode,
             "timestamp": self.last_build_time,
+            "errors": [str(e) for e in summary.errors],
         }
 
     def run_deploy(self, dry_run: bool = False, project_name: Optional[str] = None) -> dict[str, Any]:
@@ -1493,42 +1729,155 @@ class DashboardManager:
             self.log(f"[WARNING] Cloudflare token check failed: {res.get('message')}")
         return res
 
+    def start_cloudflare_deploy_job(
+        self,
+        dry_run: bool = False,
+        subdomain: Optional[str] = None,
+        verify_edge: bool = True,
+        theme: Optional[str] = None,
+    ) -> dict[str, Any]:
+        """Launches Cloudflare deployment in a background daemon thread."""
+        with self.lock:
+            if self.deploy_job.status == "running":
+                return {
+                    "success": False,
+                    "status": "running",
+                    "error": "A deployment job is already in progress.",
+                    "job": self.deploy_job.to_dict(),
+                }
+
+            project_token, dist_dir = self.resolve_output_dir(
+                target_cloud="cloudflare",
+                subdomain=subdomain,
+            )
+            effective_sub = project_token or self.active_project_id
+
+            self.deploy_job = DeployJob(
+                status="running",
+                stage="setup",
+                percent=10,
+                message=f"Starting Cloudflare deployment for '{effective_sub}'...",
+                target="Cloudflare Workers",
+                subdomain=effective_sub,
+                started_at=datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            )
+
+        def _worker():
+            try:
+                def progress_cb(stage: str, percent: int, msg: str):
+                    with self.lock:
+                        self.deploy_job.stage = stage
+                        self.deploy_job.percent = percent
+                        self.deploy_job.message = msg
+
+                res = self.run_cloudflare_deploy(
+                    dry_run=dry_run,
+                    subdomain=subdomain,
+                    verify_edge=verify_edge,
+                    theme=theme,
+                    progress_callback=progress_cb,
+                )
+                with self.lock:
+                    self.deploy_job.status = "success" if res.get("success") else "error"
+                    self.deploy_job.percent = 100
+                    self.deploy_job.completed_at = datetime.datetime.now(datetime.timezone.utc).isoformat()
+                    self.deploy_job.live_url = res.get("live_url", "")
+                    self.deploy_job.duration = res.get("duration", 0.0)
+                    self.deploy_job.files_count = res.get("files_count", 0)
+                    self.deploy_job.edge_verification = res.get("edge_verification", {})
+                    self.deploy_job.output = res.get("output", "")
+                    if res.get("success"):
+                        self.deploy_job.message = res.get("message") or f"Deployment succeeded! Live URL: {self.deploy_job.live_url}"
+                    else:
+                        self.deploy_job.error = res.get("error") or "Deployment failed."
+                        self.deploy_job.message = self.deploy_job.error
+            except Exception as e:
+                err_msg = str(e)
+                self.log(f"[ERROR] Deployment worker failed: {err_msg}")
+                with self.lock:
+                    self.deploy_job.status = "error"
+                    self.deploy_job.completed_at = datetime.datetime.now(datetime.timezone.utc).isoformat()
+                    self.deploy_job.error = err_msg
+                    self.deploy_job.message = f"Deployment failed: {err_msg}"
+
+        t = threading.Thread(target=_worker, daemon=True)
+        t.start()
+
+        return {
+            "success": True,
+            "status": "running",
+            "job_id": f"deploy_{int(time.time())}",
+            "message": "Cloudflare deployment job started in background.",
+            "job": self.deploy_job.to_dict(),
+        }
+
     def run_cloudflare_deploy(
         self,
         dry_run: bool = False,
         subdomain: Optional[str] = None,
         verify_edge: bool = True,
+        theme: Optional[str] = None,
+        progress_callback: Optional[Callable[[str, int, str], None]] = None,
     ) -> dict[str, Any]:
         """Deploys static site to Cloudflare Workers with Static Assets."""
+        def report(stage: str, percent: int, msg: str) -> None:
+            if progress_callback:
+                try:
+                    progress_callback(stage, percent, msg)
+                except Exception:
+                    pass
+            self.log(msg)
+
+        effective_sub = (subdomain or self.active_project_id or "").strip()
         project_token, dist_dir = self.resolve_output_dir(
             target_cloud="cloudflare",
-            subdomain=subdomain,
+            subdomain=effective_sub,
+            project_name=effective_sub,
         )
-        effective_sub = project_token
-        self.log(f"Starting Cloudflare Workers deployment (Worker Name={effective_sub}, local dir={dist_dir}, dry_run={dry_run})...")
+        effective_sub = project_token or self.active_project_id
+        report("setup", 10, f"Starting Cloudflare Workers deployment (Worker Name={effective_sub}, local dir={dist_dir}, dry_run={dry_run})...")
         from app.deployer.cloudflare import CloudflareDeployer
 
         # If effective_sub is specified, sync project_name
         if effective_sub and self.config.cloudflare.project_name != effective_sub:
             self.config.cloudflare.project_name = effective_sub
 
+        # Check for configured Custom Domain (Highest Priority)
+        proj_item = self.projects.get(effective_sub) if hasattr(self, "projects") else None
+        eff_cd = ""
+        if proj_item:
+            eff_cd = (getattr(proj_item, "cf_custom_domain", "") or getattr(proj_item, "custom_domain", "") or "").strip()
+        if not eff_cd and hasattr(self.config, "cloudflare") and self.config.cloudflare.custom_domain:
+            eff_cd = self.config.cloudflare.custom_domain.strip()
+
+        if eff_cd:
+            clean_dom = re.sub(r"^https?://", "", eff_cd, flags=re.IGNORECASE).strip("/ ")
+            self.config.cloudflare.custom_domain = clean_dom
+            if proj_item and getattr(proj_item, "cf_custom_domain", "") != clean_dom:
+                proj_item.cf_custom_domain = clean_dom
+            from app.generator.site_builder import derive_brand_from_domain
+            derived = derive_brand_from_domain(clean_dom, worker_name=effective_sub)
+            self.config.branding.brand_name = derived
+
+        # Final domain retains worker name; user connects custom domain manually in Cloudflare
         cf_base_url = self.config.cloudflare.get_live_url()
 
-        # Compile site into isolated subdomain dist directory using SiteBuilder or run_build
-        try:
-            from app.generator.site_builder import SiteBuilder
-            builder = SiteBuilder(
-                config=self.config,
-                output_dir=dist_dir,
-                subdomain=effective_sub,
-                base_url=cf_base_url,
-            )
-            posts = list(self.manifest.posts.values())
-            builder.build(posts)
-            self.log(f"Compiled static site for subdomain '{effective_sub}' into '{dist_dir}'.")
-        except Exception as exc:
-            self.log(f"Notice: SiteBuilder compile note ({exc}); falling back to standard run_build.")
-            self.run_build(clean=False, base_url=cf_base_url, target_cloud="cloudflare")
+        # Compile site into isolated subdomain dist directory using unified run_build pipeline
+        report("compiling", 25, f"Compiling static site for subdomain '{effective_sub}' into '{dist_dir}'...")
+        build_res = self.run_build(
+            clean=False,
+            base_url=cf_base_url,
+            target_cloud="cloudflare",
+            subdomain=effective_sub,
+            project_name=effective_sub,
+            theme=theme,
+        )
+        if not build_res.get("success"):
+            err_list = build_res.get("errors") or ["Unknown build error"]
+            raise RuntimeError(f"Static site compilation failed: {'; '.join(str(e) for e in err_list)}")
+        if build_res.get("output_dir"):
+            dist_dir = build_res["output_dir"]
+        report("compiling", 35, f"Compiled static site for subdomain '{effective_sub}' into '{dist_dir}'.")
 
         deployer = CloudflareDeployer(self.config.cloudflare)
         res = deployer.deploy(
@@ -1537,6 +1886,7 @@ class DashboardManager:
             subdomain=effective_sub,
             verify_edge=verify_edge,
             log_callback=self.log,
+            progress_callback=progress_callback,
         )
         res["target"] = "Cloudflare Workers"
         if effective_sub:
@@ -1664,6 +2014,11 @@ class DashboardRequestHandler(http.server.BaseHTTPRequestHandler):
             self.send_json(self.manager.get_status())
             return
 
+        # API: Ingestion Job Status Polling
+        if path == "/api/ingest/status":
+            self.send_json(self.manager.ingest_job.to_dict())
+            return
+
         # 2. API: Config
         if path == "/api/config":
             self.send_json(self.manager.get_config_dict())
@@ -1720,11 +2075,10 @@ class DashboardRequestHandler(http.server.BaseHTTPRequestHandler):
         # 6. API: Deployment Status & Logs
         if path in ("/api/deploy/status", "/api/deploy/logs"):
             with self.manager.lock:
-                self.send_json({
-                    "status": self.manager.deploy_job.status,
-                    "job": self.manager.deploy_job.to_dict(),
-                    "logs": list(self.manager.logs),
-                })
+                d = self.manager.deploy_job.to_dict()
+                d["job"] = self.manager.deploy_job.to_dict()
+                d["logs"] = list(self.manager.logs)
+                self.send_json(d)
             return
 
         # 7. API: List Available GitHub Organizations and User Accounts
@@ -1790,15 +2144,15 @@ class DashboardRequestHandler(http.server.BaseHTTPRequestHandler):
             self.send_json({"success": True, "accounts": accounts, "detected_from_token": True})
             return
 
-        # Image Asset Route: Serves root-level assets/images/ with correct MIME types
-        if path.startswith("/assets/images/"):
-            rel = path[len("/assets/images/"):].lstrip("/")
-            img_path = os.path.abspath(os.path.join("assets", "images", rel))
-            assets_root = os.path.abspath(os.path.join("assets", "images"))
+        # Asset Route: Serves assets/ (including project-scoped assets/<pid>/images/ and root assets/images/) with correct MIME types
+        if path.startswith("/assets/"):
+            rel = path[len("/assets/"):].lstrip("/")
+            img_path = os.path.abspath(os.path.join("assets", rel))
+            assets_root = os.path.abspath("assets")
             if (
                 os.path.exists(img_path)
                 and os.path.isfile(img_path)
-                and img_path.startswith(assets_root)
+                and (img_path == assets_root or img_path.startswith(assets_root + os.sep))
             ):
                 mime_type, _ = mimetypes.guess_type(img_path)
                 mime_type = mime_type or "application/octet-stream"
@@ -1860,10 +2214,26 @@ class DashboardRequestHandler(http.server.BaseHTTPRequestHandler):
                     gh_branch=body.get("gh_branch", "main"),
                     gh_is_org=bool(body.get("gh_is_org", True)),
                     sitemap_url=body.get("sitemap_url", ""),
+                    theme=body.get("theme"),
+                    routing_mode=body.get("routing_mode"),
                 )
                 self.send_json(res)
             except Exception as e:
                 self.send_json({"success": False, "error": str(e)}, status=500)
+            return
+
+        # API: Update project configuration
+        if path == "/api/projects/update":
+            pid = (body.get("project_id") or body.get("id") or self.manager.active_project_id).strip()
+            try:
+                raw_updates = body.get("updates", {})
+                merged = dict(body)
+                if isinstance(raw_updates, dict):
+                    merged.update(raw_updates)
+                res = self.manager.update_project(pid, merged)
+                self.send_json(res)
+            except Exception as e:
+                self.send_json({"success": False, "error": str(e)}, status=400)
             return
 
         # API: Switch active project
@@ -1874,6 +2244,28 @@ class DashboardRequestHandler(http.server.BaseHTTPRequestHandler):
                 return
             try:
                 res = self.manager.switch_project(pid)
+                self.send_json(res)
+            except Exception as e:
+                self.send_json({"success": False, "error": str(e)}, status=500)
+            return
+
+        # API: Delete project
+        if path == "/api/projects/delete":
+            pid = (body.get("project_id") or body.get("id") or "").strip()
+            if not pid:
+                self.send_json({"success": False, "error": "Project ID is required."}, status=400)
+                return
+            try:
+                res = self.manager.delete_project(pid)
+                self.send_json(res)
+            except Exception as e:
+                self.send_json({"success": False, "error": str(e)}, status=400)
+            return
+
+        # API: Reset all projects (empty slate)
+        if path == "/api/projects/reset":
+            try:
+                res = self.manager.reset_all_projects()
                 self.send_json(res)
             except Exception as e:
                 self.send_json({"success": False, "error": str(e)}, status=500)
@@ -1896,6 +2288,23 @@ class DashboardRequestHandler(http.server.BaseHTTPRequestHandler):
                             os.remove(p)
                         except Exception:
                             pass
+
+                # Also clean project-specific assets if active project exists
+                active_pid = getattr(self.manager, "active_project_id", "")
+                if active_pid:
+                    for sub_dir in (
+                        os.path.abspath(os.path.join("assets", active_pid, "images")),
+                        os.path.abspath(os.path.join("scraped_data", active_pid, "assets", "images")),
+                    ):
+                        if os.path.exists(sub_dir):
+                            for ext in (".png", ".jpg", ".jpeg", ".webp", ".svg"):
+                                p = os.path.join(sub_dir, f"custom-logo{ext}")
+                                if os.path.exists(p):
+                                    try:
+                                        os.remove(p)
+                                    except Exception:
+                                        pass
+
                 self.manager.config.branding.logo_path = ""
                 self.manager.save_config()
                 self.manager.log("Reset custom logo to default vector emblem.")
@@ -1939,8 +2348,8 @@ class DashboardRequestHandler(http.server.BaseHTTPRequestHandler):
                         ext = ".png"
 
                 image_bytes = base64.b64decode(base64_str)
-                if len(image_bytes) > 5 * 1024 * 1024:
-                    self.send_json({"success": False, "error": "Image file exceeds 5MB limit"}, status=400)
+                if len(image_bytes) > 10 * 1024 * 1024:
+                    self.send_json({"success": False, "error": "Image file exceeds 10MB limit"}, status=400)
                     return
 
                 assets_dir = os.path.abspath(os.path.join("assets", "images"))
@@ -1958,6 +2367,24 @@ class DashboardRequestHandler(http.server.BaseHTTPRequestHandler):
                 target_path = os.path.join(assets_dir, logo_filename)
                 with open(target_path, "wb") as f:
                     f.write(image_bytes)
+
+                # Synchronize to active project directories if active
+                active_pid = getattr(self.manager, "active_project_id", "")
+                if active_pid:
+                    for sub_dir in (
+                        os.path.abspath(os.path.join("assets", active_pid, "images")),
+                        os.path.abspath(os.path.join("scraped_data", active_pid, "assets", "images")),
+                    ):
+                        try:
+                            os.makedirs(sub_dir, exist_ok=True)
+                            for prev_ext in (".png", ".jpg", ".jpeg", ".webp", ".svg"):
+                                p = os.path.join(sub_dir, f"custom-logo{prev_ext}")
+                                if os.path.exists(p):
+                                    os.remove(p)
+                            import shutil
+                            shutil.copy2(target_path, os.path.join(sub_dir, logo_filename))
+                        except Exception:
+                            pass
 
                 logo_rel_path = f"/assets/images/{logo_filename}"
                 self.manager.config.branding.logo_path = logo_rel_path
@@ -1988,22 +2415,26 @@ class DashboardRequestHandler(http.server.BaseHTTPRequestHandler):
             self.send_json({"success": True, "discovered_count": len(urls), "urls": urls})
             return
 
-        # 3. Trigger Ingestion
+        # 3. Trigger Ingestion (Asynchronous Background Job)
         if path == "/api/ingest":
             source_type = body.get("source_type", "sitemap")
             url_or_list = body.get("url_or_list", "")
             max_posts = body.get("max_posts")
             download_images = body.get("download_images")
             force = bool(body.get("force_full_resync", False))
+            cf_custom_domain = body.get("cf_custom_domain") or body.get("custom_domain")
+            cf_project_name = body.get("cf_project_name") or body.get("worker_name")
 
-            summary = self.manager.run_ingest(
+            res = self.manager.start_ingest_job(
                 source_type=source_type,
                 url_or_list=url_or_list,
                 max_posts=max_posts,
                 download_images=download_images,
                 force_full_resync=force,
+                cf_custom_domain=cf_custom_domain,
+                cf_project_name=cf_project_name,
             )
-            self.send_json({"success": True, "summary": summary.to_dict()})
+            self.send_json(res)
             return
 
         # 4. In-Memory Live Preview
@@ -2028,11 +2459,15 @@ class DashboardRequestHandler(http.server.BaseHTTPRequestHandler):
             clean = bool(body.get("clean", True))
             target_cloud = body.get("target_cloud") or body.get("platform")
             project_name = body.get("project_name") or body.get("subdomain") or body.get("worker_name")
+            theme = body.get("theme")
+            routing_mode = body.get("routing_mode")
             result = self.manager.run_build(
                 clean=clean,
                 target_cloud=target_cloud,
                 project_name=project_name,
                 subdomain=project_name,
+                theme=theme,
+                routing_mode=routing_mode,
             )
             self.send_json(result)
             return
@@ -2040,6 +2475,18 @@ class DashboardRequestHandler(http.server.BaseHTTPRequestHandler):
         # 5b. Asset Synchronization Trigger
         if path == "/api/assets/sync":
             force = bool(body.get("force", False))
+            cf_custom_domain = body.get("cf_custom_domain") or body.get("custom_domain")
+            cf_project_name = body.get("cf_project_name") or body.get("worker_name")
+            if cf_custom_domain is not None or cf_project_name is not None:
+                p_updates = {}
+                if cf_custom_domain is not None:
+                    p_updates["cf_custom_domain"] = cf_custom_domain
+                if cf_project_name is not None:
+                    p_updates["cf_project_name"] = cf_project_name
+                try:
+                    self.manager.update_project(self.manager.active_project_id, p_updates)
+                except Exception:
+                    pass
             result = self.manager.sync_all_post_images(force=force)
             self.send_json(result)
             return
@@ -2064,10 +2511,12 @@ class DashboardRequestHandler(http.server.BaseHTTPRequestHandler):
             dry_run = bool(body.get("dry_run", False))
             subdomain = body.get("subdomain") or body.get("project_name") or body.get("worker_name")
             verify_edge = bool(body.get("verify_edge", True))
-            result = self.manager.run_cloudflare_deploy(
+            theme = body.get("theme")
+            result = self.manager.start_cloudflare_deploy_job(
                 dry_run=dry_run,
                 subdomain=subdomain,
                 verify_edge=verify_edge,
+                theme=theme,
             )
             self.send_json(result)
             return

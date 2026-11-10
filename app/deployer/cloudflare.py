@@ -125,7 +125,7 @@ class CloudflareDeployer:
         """Copies static site build artifacts into worker public assets folder.
 
         Args:
-            output_dir: Subdomain build directory or base dist directory (e.g. 'dist', 'dist/stylesdays', or 'dist/gardenhome').
+            output_dir: Subdomain build directory or base dist directory (e.g. 'dist' or 'dist/<project>').
             target_dir: Destination directory (defaults to my-worker/public).
             subdomain: Optional subdomain to synchronize from dist/<subdomain>/.
 
@@ -150,6 +150,20 @@ class CloudflareDeployer:
             raise FileNotFoundError(f"Static build directory does not exist: {source_candidate}")
 
         os.makedirs(dest_dir, exist_ok=True)
+
+        # Clean stale files and directories from destination to ensure 100% theme/project isolation
+        for item in os.listdir(dest_dir):
+            if item in (".gitkeep", "_worker.js", ".git"):
+                continue
+            item_path = os.path.join(dest_dir, item)
+            if os.path.isdir(item_path):
+                shutil.rmtree(item_path, ignore_errors=True)
+            else:
+                try:
+                    os.remove(item_path)
+                except OSError:
+                    pass
+
         copied = 0
 
         for root, dirs, files in os.walk(source_candidate):
@@ -160,10 +174,26 @@ class CloudflareDeployer:
             for f in files:
                 src_file = os.path.join(root, f)
                 dst_file = os.path.join(target_sub, f)
-                # Overwrite if destination doesn't exist or size differs
-                if not os.path.exists(dst_file) or os.path.getsize(src_file) != os.path.getsize(dst_file):
-                    shutil.copy2(src_file, dst_file)
+                # Clean drop-in copy of all build artifacts
+                shutil.copy2(src_file, dst_file)
                 copied += 1
+
+        # Universal edge assets sanitization: ensure my-worker/public has 0 worker leakage
+        try:
+            from app.generator.site_builder import SiteBuilder, derive_brand_from_domain
+            eff_brand = ""
+            cd = getattr(self.config, "custom_domain", "") or ""
+            if cd:
+                eff_brand = derive_brand_from_domain(cd, worker_name=sub)
+            SiteBuilder.sanitize_directory(
+                output_dir=dest_dir,
+                worker_names=[sub, getattr(self.config, "project_name", "")],
+                base_url=f"https://{cd.strip('/')}" if cd else self.config.get_live_url(),
+                brand_name=eff_brand,
+                config=self.config,
+            )
+        except Exception as exc:
+            logger.warning(f"Error sanitizing worker assets directory: {exc}")
 
         return copied
 
@@ -171,20 +201,21 @@ class CloudflareDeployer:
         self,
         url: Optional[str] = None,
         timeout: int = 10,
+        max_retries: int = 5,
+        retry_delay: float = 3.0,
         log_callback: Optional[Callable[[str], None]] = None,
     ) -> Dict[str, Any]:
-        """Probes live Cloudflare Workers edge endpoint to verify HTTP 200 and text/html content."""
+        """Probes live Cloudflare Workers edge endpoint with smart propagation retry to verify HTTP 200."""
         def log(msg: str) -> None:
             if log_callback:
                 log_callback(msg)
             logger.info(msg)
 
-        target_url = (url or self.config.get_live_url() or "https://gardenhome.laurainsley01.workers.dev").strip()
+        target_url = (url or self.config.get_live_url() or (f"https://{self.config.custom_domain}" if getattr(self.config, "custom_domain", None) else "")).strip()
         if not target_url.startswith("http://") and not target_url.startswith("https://"):
             target_url = f"https://{target_url}"
 
         log(f"[CLOUDFLARE] Probing live edge endpoint: {target_url}...")
-        start_time = time.time()
 
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Antigravity-Edge-Probe/1.0",
@@ -192,60 +223,115 @@ class CloudflareDeployer:
             "Accept-Language": "en-US,en;q=0.9",
         }
 
-        try:
-            req = urllib.request.Request(target_url, headers=headers)
-            with urllib.request.urlopen(req, timeout=timeout) as resp:
-                status_code = resp.status
-                content_type = resp.headers.get("Content-Type", "")
-                raw_body = resp.read()
+        last_err = ""
+        last_code = 0
 
-            latency_ms = round((time.time() - start_time) * 1000, 2)
-            has_html_content = b"<html" in raw_body.lower() or b"<!doctype" in raw_body.lower() or "text/html" in content_type.lower()
-            is_valid = (status_code == 200) and ("text/html" in content_type.lower() or has_html_content)
+        for attempt in range(1, max_retries + 1):
+            start_time = time.time()
+            try:
+                req = urllib.request.Request(target_url, headers=headers)
+                with urllib.request.urlopen(req, timeout=timeout) as resp:
+                    status_code = resp.status
+                    content_type = resp.headers.get("Content-Type", "")
+                    raw_body = resp.read()
 
-            msg = (
-                f"Edge endpoint {target_url} returned HTTP {status_code} ({content_type}) "
-                f"in {latency_ms}ms ({len(raw_body)} bytes) -- LIVE VERIFIED."
-                if is_valid
-                else f"Edge probe warning: HTTP {status_code}, Content-Type: {content_type}"
-            )
-            log(f"[CLOUDFLARE] {msg}")
+                latency_ms = round((time.time() - start_time) * 1000, 2)
+                has_html_content = b"<html" in raw_body.lower() or b"<!doctype" in raw_body.lower() or "text/html" in content_type.lower()
+                is_valid = (status_code == 200) and ("text/html" in content_type.lower() or has_html_content)
 
-            return {
-                "success": is_valid,
-                "verified": is_valid,
-                "status_code": status_code,
-                "content_type": content_type,
-                "latency_ms": latency_ms,
-                "body_length": len(raw_body),
-                "url": target_url,
-                "message": msg,
-            }
+                if is_valid:
+                    msg = (
+                        f"Edge endpoint {target_url} returned HTTP {status_code} ({content_type}) "
+                        f"in {latency_ms}ms ({len(raw_body)} bytes) -- LIVE VERIFIED."
+                    )
+                    log(f"[CLOUDFLARE] {msg}")
+                    return {
+                        "success": True,
+                        "verified": True,
+                        "status_code": status_code,
+                        "content_type": content_type,
+                        "latency_ms": latency_ms,
+                        "body_length": len(raw_body),
+                        "url": target_url,
+                        "message": msg,
+                    }
+                elif attempt < max_retries:
+                    log(f"[CLOUDFLARE] Edge probe attempt {attempt}/{max_retries} returned status {status_code}; awaiting propagation ({retry_delay}s)...")
+                    time.sleep(retry_delay)
+            except urllib.error.HTTPError as http_err:
+                latency_ms = round((time.time() - start_time) * 1000, 2)
+                last_code = http_err.code
+                last_err = f"HTTP Error {http_err.code}: {http_err.reason}"
+                if attempt < max_retries and http_err.code in (404, 502, 503, 504):
+                    log(f"[CLOUDFLARE] Edge probe attempt {attempt}/{max_retries} yielded {last_err}; awaiting edge CDN propagation ({retry_delay}s)...")
+                    time.sleep(retry_delay)
+                else:
+                    log(f"[CLOUDFLARE] Edge probe failed: {last_err} ({latency_ms}ms)")
+                    break
+            except Exception as exc:
+                latency_ms = round((time.time() - start_time) * 1000, 2)
+                last_err = f"Edge connection failed: {exc}"
+                if attempt < max_retries:
+                    time.sleep(retry_delay)
+                else:
+                    log(f"[CLOUDFLARE] Edge probe error: {last_err} ({latency_ms}ms)")
+                    break
 
-        except urllib.error.HTTPError as http_err:
-            latency_ms = round((time.time() - start_time) * 1000, 2)
-            err_msg = f"HTTP Error {http_err.code}: {http_err.reason}"
-            log(f"[CLOUDFLARE] Edge probe failed: {err_msg} ({latency_ms}ms)")
-            return {
-                "success": False,
-                "verified": False,
-                "status_code": http_err.code,
-                "latency_ms": latency_ms,
-                "url": target_url,
-                "message": err_msg,
-            }
-        except Exception as exc:
-            latency_ms = round((time.time() - start_time) * 1000, 2)
-            err_msg = f"Edge connection failed: {exc}"
-            log(f"[CLOUDFLARE] Edge probe error: {err_msg} ({latency_ms}ms)")
-            return {
-                "success": False,
-                "verified": False,
-                "status_code": 0,
-                "latency_ms": latency_ms,
-                "url": target_url,
-                "message": err_msg,
-            }
+        return {
+            "success": False,
+            "verified": False,
+            "status_code": last_code,
+            "latency_ms": 0,
+            "url": target_url,
+            "message": last_err or "Edge verification failed after retries.",
+        }
+
+    def ensure_worker_script(self) -> str:
+        """Ensures that my-worker/src/index.ts exists and correctly delegates to env.ASSETS.fetch()."""
+        src_dir = os.path.join(self.worker_dir, "src")
+        os.makedirs(src_dir, exist_ok=True)
+        script_path = os.path.join(src_dir, "index.ts")
+
+        valid_script = """/**
+ * Cloudflare Workers Static Assets Gateway
+ * Automatically routes all incoming edge traffic to static site assets in ./public.
+ */
+
+interface Env {
+	ASSETS: {
+		fetch: (request: Request | string) => Promise<Response>;
+	};
+}
+
+export default {
+	async fetch(request: Request, env: Env): Promise<Response> {
+		const url = new URL(request.url);
+
+		if (url.pathname === '/api/health') {
+			return new Response(JSON.stringify({ status: 'ok', worker: 'pSEO Static Edge' }), {
+				status: 200,
+				headers: {
+					'Content-Type': 'application/json',
+					'Cache-Control': 'no-store',
+				},
+			});
+		}
+
+		return env.ASSETS.fetch(request);
+	},
+};
+"""
+        if not os.path.exists(script_path):
+            with open(script_path, "w", encoding="utf-8") as f:
+                f.write(valid_script)
+        else:
+            with open(script_path, "r", encoding="utf-8") as f:
+                content = f.read()
+            if "env.ASSETS.fetch" not in content or "status: 404" in content:
+                with open(script_path, "w", encoding="utf-8") as f:
+                    f.write(valid_script)
+
+        return script_path
 
     def update_wrangler_config(
         self,
@@ -255,7 +341,8 @@ class CloudflareDeployer:
     ) -> str:
         """Ensures wrangler.jsonc contains valid worker name, asset directory, and compatibility date."""
         wrangler_path = os.path.join(self.worker_dir, "wrangler.jsonc")
-        name = worker_name or self.config.project_name or "homestylesdeco"
+        self.ensure_worker_script()
+        name = worker_name or self.config.project_name or "worker"
         comp_date = compatibility_date or self.config.compatibility_date or "2024-11-01"
 
         raw_content = ""
@@ -294,6 +381,12 @@ class CloudflareDeployer:
                 indent=2,
             )
 
+        # Custom domains are connected manually by the user in the Cloudflare dashboard.
+        # Ensure wrangler.jsonc does not contain automated custom domain routes.
+        if '"routes"' in raw_content:
+            raw_content = re.sub(r',\s*"routes"\s*:\s*\[[^\]]*\]', '', raw_content)
+            raw_content = re.sub(r'"routes"\s*:\s*\[[^\]]*\],?\s*', '', raw_content)
+
         os.makedirs(os.path.dirname(wrangler_path), exist_ok=True)
         with open(wrangler_path, "w", encoding="utf-8") as f:
             f.write(raw_content)
@@ -307,6 +400,7 @@ class CloudflareDeployer:
         subdomain: Optional[str] = None,
         verify_edge: bool = True,
         log_callback: Optional[Callable[[str], None]] = None,
+        progress_callback: Optional[Callable[[str, int, str], None]] = None,
     ) -> Dict[str, Any]:
         """Deploys static build to Cloudflare Workers with Static Assets."""
 
@@ -315,17 +409,30 @@ class CloudflareDeployer:
                 log_callback(msg)
             logger.info(msg)
 
+        def log(msg: str) -> None:
+            if log_callback:
+                log_callback(msg)
+            logger.info(msg)
+
+        def report(stage: str, percent: int, msg: str) -> None:
+            if progress_callback:
+                try:
+                    progress_callback(stage, percent, msg)
+                except Exception:
+                    pass
+            log(msg)
+
         start_time = time.time()
-        effective_project = (subdomain or self.config.project_name or "homestylesdeco").strip()
+        effective_project = (subdomain or self.config.project_name or "worker").strip()
         if subdomain and self.config.project_name != subdomain:
             self.config.project_name = subdomain
 
-        log(f"[CLOUDFLARE] Preparing deployment to Cloudflare Worker '{effective_project}'...")
+        report("setup", 15, f"[CLOUDFLARE] Preparing deployment to Cloudflare Worker '{effective_project}'...")
 
         # 1. Synchronize static build into worker/public
         try:
             files_count = self.sync_worker_assets(output_dir=output_dir, subdomain=subdomain)
-            log(f"[CLOUDFLARE] Synchronized {files_count} files from '{output_dir}' into worker assets directory.")
+            report("syncing", 40, f"[CLOUDFLARE] Synchronized {files_count} files from '{output_dir}' into worker assets directory.")
         except Exception as exc:
             err = f"[CLOUDFLARE] Failed synchronizing build assets: {exc}"
             log(err)
@@ -365,7 +472,7 @@ class CloudflareDeployer:
         if dry_run:
             cmd.append("--dry-run")
 
-        log(f"[CLOUDFLARE] Executing command: {' '.join(cmd)} (cwd={self.worker_dir}, dry_run={dry_run})")
+        report("uploading", 65, f"[CLOUDFLARE] Executing command: {' '.join(cmd)} (cwd={self.worker_dir}, dry_run={dry_run})")
 
         target_url = self.config.get_live_url()
 

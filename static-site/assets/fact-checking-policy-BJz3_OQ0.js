@@ -1,0 +1,1 @@
+import{v as e}from"./SiteLayout-CWdm9qNZ.js";import{r as t}from"./index-oamqMMDG.js";var n=e(),r=()=>(0,n.jsx)(t,{pageKey:`fact`});export{r as component};

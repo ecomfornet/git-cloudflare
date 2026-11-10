@@ -6,37 +6,37 @@ from typing import Optional
 
 
 def generate_robots_txt(
-    sitemap_url: str = "https://home-organization.github.io/sitemap.xml",
+    base_url: str = "",
+    sitemap_url: str = "",
     domain: Optional[str] = None,
 ) -> str:
     """
     Generates robots.txt strictly conforming to requirement R5:
     - User-agent: *
     - Allow: /
-    - Allow: /assets/images/
-    - User-agent: Pinterestbot
-    - Allow: /
-    - Allow: /assets/images/
-    - Sitemap: https://<domain>/sitemap.xml
+    - Sitemap: {base_url}/sitemap.xml
+
+    Accepts base_url as the primary parameter. sitemap_url and domain are
+    kept for backward-compatibility.
     """
-    resolved_sitemap = sitemap_url
-    if domain:
+    # Derive sitemap URL from base_url first, then fall back to legacy params
+    if base_url:
+        clean_base_url = base_url.rstrip("/")
+        resolved_sitemap = f"{clean_base_url}/sitemap.xml"
+    elif domain:
         clean_domain = domain.strip().replace("http://", "").replace("https://", "").strip("/")
         resolved_sitemap = f"https://{clean_domain}/sitemap.xml"
-    elif resolved_sitemap:
-        resolved_sitemap = resolved_sitemap.strip()
+    elif sitemap_url:
+        resolved_sitemap = sitemap_url.strip()
         if not (resolved_sitemap.startswith("http://") or resolved_sitemap.startswith("https://")):
             resolved_sitemap = f"https://{resolved_sitemap}"
         if not resolved_sitemap.endswith(".xml"):
             resolved_sitemap = f"{resolved_sitemap.rstrip('/')}/sitemap.xml"
+    else:
+        resolved_sitemap = "https://home-organization.github.io/sitemap.xml"
 
     return f"""User-agent: *
 Allow: /
-Allow: /assets/images/
-
-User-agent: Pinterestbot
-Allow: /
-Allow: /assets/images/
 
 Sitemap: {resolved_sitemap}
 """

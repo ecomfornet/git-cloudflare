@@ -450,6 +450,7 @@ def batch_optimize_directory(
     original_bytes = 0
     optimized_bytes = 0
     slug_to_webp: Dict[str, str] = {}
+    rel_prefix = os.path.relpath(abs_images_dir, os.path.abspath(".")).replace("\\", "/")
 
     for fname in os.listdir(abs_images_dir):
         full_path = os.path.join(abs_images_dir, fname)
@@ -485,14 +486,14 @@ def batch_optimize_directory(
 
                 optimized_bytes += new_size
                 converted += 1
-                slug_to_webp[stem] = f"assets/images/{stem}.webp"
+                slug_to_webp[stem] = f"{rel_prefix}/{stem}.webp"
             except Exception as exc:
                 logger.warning("Failed optimizing %s: %s", fname, exc)
                 optimized_bytes += orig_size
         else:
             optimized_bytes += orig_size
             if lower.endswith(".webp"):
-                slug_to_webp[stem] = f"assets/images/{fname}"
+                slug_to_webp[stem] = f"{rel_prefix}/{fname}"
 
     # Update manifest if provided
     if manifest_path and os.path.exists(manifest_path) and slug_to_webp:

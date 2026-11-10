@@ -56,24 +56,25 @@ class CloudflareConfig:
     api_token: str = ""
     account_id: str = ""
     account_subdomain: str = ""
-    project_name: str = "homestylesdeco"
+    project_name: str = ""
     deployment_type: str = "workers_assets"  # "workers_assets" | "pages"
     custom_domain: str = ""
     compatibility_date: str = "2024-11-01"
     worker_dir: str = "my-worker"
 
-    def get_live_url(self) -> str:
-        """Computes the authoritative public URL for the Cloudflare deployment."""
-        if self.custom_domain:
-            domain = self.custom_domain.replace("https://", "").replace("http://", "").strip("/")
-            return f"https://{domain}"
-        if self.deployment_type == "pages":
-            return f"https://{self.project_name or 'homestylesdeco'}.pages.dev"
+    def get_worker_url(self) -> str:
+        """Computes the authoritative workers.dev endpoint containing the worker name."""
+        proj = (self.project_name or "worker").strip().lower()
         if self.account_subdomain:
             sub = self.account_subdomain.strip().lower()
-            proj = (self.project_name or "homestylesdeco").strip().lower()
             return f"https://{proj}.{sub}.workers.dev"
-        return f"https://{self.project_name or 'homestylesdeco'}.workers.dev"
+        return f"https://{proj}.workers.dev"
+
+    def get_live_url(self) -> str:
+        """Computes the authoritative public URL for the Cloudflare deployment, keeping worker name in final domain."""
+        if self.deployment_type == "pages":
+            return f"https://{self.project_name or 'worker'}.pages.dev"
+        return self.get_worker_url()
 
     def to_dict(self) -> dict[str, Any]:
         d = {
@@ -97,7 +98,7 @@ class CloudflareConfig:
             api_token=str(data.get("api_token") or ""),
             account_id=str(data.get("account_id") or ""),
             account_subdomain=str(data.get("account_subdomain") or data.get("subdomain") or ""),
-            project_name=str(data.get("project_name") or "homestylesdeco"),
+            project_name=str(data.get("project_name") or ""),
             deployment_type=str(data.get("deployment_type") or "workers_assets"),
             custom_domain=str(data.get("custom_domain") or ""),
             compatibility_date=str(data.get("compatibility_date") or "2024-11-01"),
@@ -212,6 +213,14 @@ class BrandingConfig:
     enable_toc: bool = True
     enable_faq: bool = True
     enable_eeat: bool = True
+    social_links: dict[str, str] = field(default_factory=lambda: {
+        "pinterest": "",
+        "facebook": "",
+        "instagram": "",
+        "twitter": "",
+        "tiktok": "",
+        "youtube": "",
+    })
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -223,6 +232,7 @@ class BrandingConfig:
             "enable_toc": self.enable_toc,
             "enable_faq": self.enable_faq,
             "enable_eeat": self.enable_eeat,
+            "social_links": dict(self.social_links),
         }
 
     @classmethod
@@ -237,6 +247,22 @@ class BrandingConfig:
                 return val.lower() in ("true", "1", "yes")
             return bool(val)
 
+        raw_social = data.get("social_links")
+        social_dict = {
+            "pinterest": "",
+            "facebook": "",
+            "instagram": "",
+            "twitter": "",
+            "tiktok": "",
+            "youtube": "",
+        }
+        if isinstance(raw_social, dict):
+            for k, v in raw_social.items():
+                if k in social_dict and v is not None:
+                    social_dict[k] = str(v).strip()
+                elif v is not None:
+                    social_dict[k] = str(v).strip()
+
         return cls(
             brand_name=str(data.get("brand_name") or "Anna Deco"),
             tagline=str(data.get("tagline") or "Interior Design & Curated Living"),
@@ -246,6 +272,7 @@ class BrandingConfig:
             enable_toc=_bool(data.get("enable_toc"), True),
             enable_faq=_bool(data.get("enable_faq"), True),
             enable_eeat=_bool(data.get("enable_eeat"), True),
+            social_links=social_dict,
         )
 
 

@@ -2506,3 +2506,1098 @@ Template 3 (`pinterest-mag` / `styleire`) is fully rebuilt to match `static-site
 | **S2** | **Backend & UI Worker** | `app/routing/resolver.py`, `app/seo/schema.py`, `app/seo/sitemap.py`, `app/generator/site_builder.py`, `app/themes/templates.py`, `app/dashboard/` | Implement `pseo_nested_silo` routing, 3-tier schemas, Styleire layout (Template 3 replacement), universal author/trust/sitemap renderers |
 | **S3** | **QA Critic** | `python -m compileall`, automated test suite, live build into `dist/` | Build full site, assert exact 78 routes, 0 dead links, sitemap.xml validation, Playwright verification |
 | **S4** | **Master Orchestrator** | `plans/master-task-board.md`, `walkthrough.md`, git repo | Zero-placeholder audit, git clone sync, commit, walkthrough update |
+
+
+---
+
+## 39. Link Integrity & Zero 404 URL Normalization Architecture
+
+### 39.1 Overview & Root Cause Analysis
+Forensic link auditing across all generated HTML in `dist/` (`scratch/analyze_broken_links.py`) revealed 318 broken link instances across 3 distinct root causes:
+1. **Category Slugging Discrepancy**: Category name "DIY & Craft" evaluated through standard `slugify()` yielded `diy-craft`. The canonical directory structure derived from `static-site/` is `diy-decor`. This caused 18 broken breadcrumbs and silo navigation links.
+2. **Asset Prefix Bleed**: Ingestion manifest records and theme template renderers (`render_related_guides`, `render_styleire_category_index`, `render_styleire_layout`) retained raw `static-site/assets/` prefixes instead of rebasing to canonical `/assets/`. This caused 240 broken image references across related reading cards and category index grids.
+3. **Relative Path Traversal in Body Prose**: Extracted HTML body prose (`content_html`) from `static-site/blog/<slug>/index.html` contained depth-2 relative image references (`../../assets/inline-*.jpg`). When rendered at root depth (`dist/<slug>/index.html`), these references attempted to traverse above the web root, causing 60 broken inline images.
+
+### 39.2 Architectural Contracts & Fix Specifications
+1. **Canonical Category Normalization (`_resolve_category_slug`)**:
+   - Universal resolver mapping `"diy-craft"`, `"diy"`, and `"diy-decor"` strictly to `"diy-decor"`.
+   - Applied across `render_styleire_layout`, `render_styleire_hub`, `render_styleire_category_index`, and `scratch/rebuild_manifest.py`.
+2. **Asset Path Stripping**:
+   - In `render_related_guides`, `render_styleire_category_index`, and `render_styleire_layout`, ensure any relative image path starting with `static-site/` has that prefix stripped before URL resolution.
+   - Manifest rebuilder scrubbed to produce clean `assets/<filename>` entries.
+3. **Content HTML Asset Normalization (`_normalize_content_assets`)**:
+   - Regex normalizer that converts all `(?:href|src)=["'](?:(?:\.\./)+|\./|/?static-site/)?assets/([^"']+)["']` to `{attr}="{prefix}/assets/{filename}"`.
+   - Guaranteed depth-agnostic asset resolution for all 60 post bodies.
+
+### 39.3 Milestones Roadmap (L1-L4)
+| Milestone | Role | Target Modules | Verification Scope |
+| :---: | :--- | :--- | :--- |
+| **L1** | **Technical Architect** | `plans/architecture-spec.md`, `plans/master-task-board.md` | Author Section 39 blueprint, register milestones L1-L4 |
+| **L2** | **Backend & UI Worker** | `scratch/rebuild_manifest.py`, `pseo_manifest.json`, `app/themes/templates.py` | Implement category canonicalization, image prefix scrub, and content asset normalizer |
+| **L3** | **QA Critic** | `execute_live_pipeline.py`, `scratch/qa_link_checker.py`, `scratch/qa_schema_checker.py` | Live pipeline build, verify 0 broken links (100% pass), 0 schema errors |
+| **L4** | **Master Orchestrator** | `plans/master-task-board.md`, completion log | Zero placeholder audit, log updates, final deliverable confirmation |
+
+
+---
+
+## 40. Universal Brand Harmonization & Dashboard Project Alignment Architecture
+
+### 40.1 Overview & Root Cause Analysis
+Forensic codebase inspection revealed legacy string residue in `app/dashboard/server.py`, `app/deployer/cloudflare.py`, `app/dashboard/static/app.js`, and `app/themes/templates.py`:
+1. **Dashboard Baseline Project Misalignment**: `DashboardManager._init_projects()` hardcoded `stylesdays` as the baseline project with `cf_project_name="gardenhomejdhd"` and `gh_owner="annadeco"`. When users launched `run_dashboard.py`, the active project defaulted to `stylesdays` instead of `styleire`, pointing to stale scraped data rather than `pseo_manifest.json`.
+2. **Template Brand Fallbacks**: Legacy templates in `app/themes/templates.py` defaulted to `"ANNADECO"` or `"AnnaDeco"` when `branding` wasn't explicitly supplied, causing potential brand leakage in standalone render passes.
+3. **Deployer Hardcoded Fallback URL**: `app/deployer/cloudflare.py` contained a hardcoded fallback probe URL `https://gardenhome.laurainsley01.workers.dev` instead of dynamically evaluating `self.config.get_live_url()` or the configured `custom_domain` (`styleire.com`).
+4. **Client-Side SPA Defaults**: `app/dashboard/static/app.js` contained fallback references to `'annadeco.github.io'` and `'gardenhome'`.
+
+### 40.2 Architectural Contracts & Fix Specifications
+1. **Dashboard Primary Project Architecture**:
+   - `DashboardManager._init_projects()` dynamically registers `styleire` as the primary project:
+     - `id`: `"styleire"`
+     - `name`: `"Styleire"`
+     - `manifest_path`: `pseo_manifest.json` (60 real posts)
+     - `output_dir`: `"dist"`
+     - `cf_project_name`: `"styleire"`
+   - Active project defaults to `config.active_project` or `"styleire"`.
+2. **Template Brand Normalization**:
+   - Replace all legacy `"ANNADECO"` / `"AnnaDeco"` fallbacks in `app/themes/templates.py` with `"Styleire"`.
+3. **Cloudflare Deployer Edge Verification**:
+   - In `app/deployer/cloudflare.py`, `target_url` defaults to `self.config.get_live_url()` or `https://{self.config.custom_domain}` without any legacy domain strings.
+4. **Dashboard Client-Side Normalization**:
+   - In `app/dashboard/static/app.js`, sanitize default repo/owner strings to match active configuration.
+
+### 40.3 Milestones Roadmap (B1-B4)
+| Milestone | Role | Target Modules | Verification Scope |
+| :---: | :--- | :--- | :--- |
+| **B1** | **Technical Architect** | `plans/architecture-spec.md`, `plans/master-task-board.md` | Author Section 40 blueprint, register milestones B1-B4 |
+| **B2** | **Backend & UI Worker** | `app/dashboard/server.py`, `app/themes/templates.py`, `app/deployer/cloudflare.py`, `app/dashboard/static/app.js`, `run_dashboard.py`, `pseo_config.json` | Implement brand harmonization and primary Styleire dashboard project registration |
+| **B3** | **QA Critic** | `python -m compileall`, automated DashboardManager probe, live pipeline verification | Verify clean compilation, Styleire active project, 0 legacy alien strings |
+| **B4** | **Master Orchestrator** | `plans/master-task-board.md`, completion log | Zero placeholder audit, taskboard sign-off |
+
+
+---
+
+## 41. Asynchronous Ingestion Engine, Real-Time Progress Streaming & Project Field Persistence Architecture
+
+### 41.1 Overview & Root Cause Analysis
+Forensic analysis of the dashboard ingestion pipeline (`POST /api/ingest`) and project management system revealed critical design flaws:
+1. **Synchronous HTTP Blocking**: Ingestion ran synchronously within the HTTP server thread (`DashboardRequestHandler.do_POST`), blocking for 2-3 minutes when processing 24-100 posts with HTML and images. The client received zero real-time progress, no spinner, and no disabled button states.
+2. **Missing Project Field Persistence**: When users modified Step 1 inputs (Sitemap URL, Max Posts, Cloudflare Worker Name, Custom Domain, GitHub Org/Repo), there was no endpoint (`/api/projects/update`) to persist these fields into the active project in `config.projects[pid]`. Re-rendering or refreshing reverted inputs to static defaults.
+3. **Unguarded Step 1 Navigation**: The Step 1 "Proceed to Step 2: Models & Design" button used an inline `onclick="switchTab('tab-themes')"` that switched tabs unconditionally, abandoning pending ingestion jobs and leaving Step 2 with an empty catalog.
+4. **Hardcoded HTML Value Attributes**: Static HTML in `index.html` contained hardcoded `value="gardenhome"` and `value="annadeco"` strings that bled into newly created projects.
+
+### 41.2 Architectural Contracts & Fix Specifications
+1. **`IngestJob` Dataclass (`app/models.py`)**:
+   - State model: `status` (`idle`, `running`, `success`, `error`), `started_at`, `completed_at`, `current_post`, `processed_count`, `total_count`, `message`, `counts`, `error`, `new_posts`, `updated_posts`, `synced_posts`.
+   - `to_dict()` and `from_dict()` serialization.
+2. **Project Field Update Endpoint (`POST /api/projects/update`)**:
+   - Accepts project configuration payload, updates `self.projects[pid]`, synchronizes active configuration, and persists to `pseo_config.json`.
+3. **Asynchronous Background Ingest Worker (`_run_ingest_worker`)**:
+   - Spawns background `threading.Thread(daemon=True)`.
+   - `POST /api/ingest` responds immediately with `{ success: true, status: "running" }`.
+   - Provides live polling endpoint `GET /api/ingest/status`.
+4. **Dynamic Frontend Binding & Step Guard (`app.js`, `index.html`)**:
+   - Step 1 inputs dynamically populated from active project.
+   - Auto-save on `change`/`blur` events via `/api/projects/update`.
+   - Polling loop updating terminal logs, button spinner, and progress bar.
+   - Guard on `#btnStep1Next` preventing tab switch during active ingestion.
+
+### 41.3 Milestones Roadmap (I1-I4)
+| Milestone | Role | Target Modules | Verification Scope |
+| :---: | :--- | :--- | :--- |
+| **I1** | **Technical Architect** | `plans/architecture-spec.md`, `plans/master-task-board.md` | Author Section 41 blueprint, register milestones I1-I4 |
+| **I2** | **Backend Worker** | `app/models.py`, `app/dashboard/server.py`, `app/ingestion/web_scraper.py` | Implement `IngestJob`, `/api/projects/update`, async ingest worker & `/api/ingest/status` |
+| **I3** | **UI & Theme Worker** | `app/dashboard/static/index.html`, `app/dashboard/static/app.js` | Dynamic field binding, auto-save listeners, progress streaming, Step 1 navigation guard |
+| **I4** | **QA Critic & Orchestrator** | `scratch/test_async_ingest_and_project_update.py`, full suite | End-to-end automated test, compilation, 0 dead links, taskboard sign-off |
+
+
+---
+
+## 42. Cloudflare Edge Deployment 404 Fix & Real-Time Progress Bar Engine
+
+### 42.1 Overview & Root Cause Analysis
+1. **Cloudflare Workers Static Assets 404 Interception**:
+   - In `my-worker/wrangler.jsonc`, `"main": "src/index.ts"` and `"assets": { "directory": "./public" }` were configured together.
+   - Incoming edge requests were intercepted by `my-worker/src/index.ts`, which executed a switch statement returning `new Response('Not Found', { status: 404 })` for any path other than `/message` or `/random`.
+   - The worker never forwarded requests to `env.ASSETS.fetch(request)`, completely suppressing static site delivery for the homepage `/`, posts, and media assets.
+2. **Missing Deployment Progress Bar & Synchronous Blocking**:
+   - `POST /api/cloudflare/deploy` executed synchronously in `server.py`, blocking the client HTTP connection for ~89 seconds without any real-time UI progress.
+   - The Step 4 deployment interface lacked visual progress bars and stage telemetry.
+
+### 42.2 Architectural Contracts & Fix Specifications
+1. **Cloudflare Worker Static Assets Delegate (`my-worker/src/index.ts`)**:
+   - Must export a `fetch` handler that delegates directly to `env.ASSETS.fetch(request)`:
+     ```typescript
+     interface Env {
+       ASSETS: {
+         fetch: (request: Request | string) => Promise<Response>;
+       };
+     }
+     export default {
+       async fetch(request: Request, env: Env): Promise<Response> {
+         return env.ASSETS.fetch(request);
+       },
+     };
+     ```
+2. **Cloudflare Deployer Integrity Enforcement (`app/deployer/cloudflare.py`)**:
+   - `ensure_worker_script()` automatically inspects and updates `my-worker/src/index.ts` to ensure it always contains the valid static assets fetcher before any deployment runs.
+   - `deploy()` accepts a `progress_callback(stage, percent, message)` to report stages (10% setup, 30% compile, 55% sync, 75% wrangler, 90% edge probe, 100% verified).
+3. **`DeployJob` Dataclass & Endpoints (`app/models.py`, `app/dashboard/server.py`)**:
+   - `DeployJob`: tracks `status` (`idle`, `running`, `success`, `error`), `stage`, `percent`, `message`, `live_url`, `error`, `started_at`, `completed_at`, `edge_verification`.
+   - `start_cloudflare_deploy_job(...)`: launches deployment in a daemon background thread (`threading.Thread`).
+   - `GET /api/deploy/status`: returns serialized `DeployJob` status for frontend polling.
+   - `POST /api/cloudflare/deploy`: launches asynchronously and returns immediately with `{ "status": "running", "job_id": ... }`.
+4. **UI Progress Bar & Streaming (`index.html`, `app.js`)**:
+   - `#deployProgressBarContainer`: displays animated gradient bar, percentage, spinner, and stage status under Deploy button.
+   - `#buildProgressBarContainer`: displays static site compilation progress under Build button.
+   - 800ms polling loop against `/api/deploy/status` until terminal status (`success` / `error`).
+
+### 42.3 Milestones Roadmap (DP1-DP4)
+| Milestone | Role | Target Modules | Verification Scope |
+| :---: | :--- | :--- | :--- |
+| **DP1** | **Technical Architect** | `plans/architecture-spec.md`, `plans/master-task-board.md` | Author Section 42 blueprint, register milestones DP1-DP4 |
+| **DP2** | **Backend Worker** | `my-worker/src/index.ts`, `app/deployer/cloudflare.py`, `app/models.py`, `app/dashboard/server.py` | Implement worker asset delegation, `ensure_worker_script`, `DeployJob`, async deploy thread & `/api/deploy/status` |
+| **DP3** | **UI & Theme Worker** | `app/dashboard/static/index.html`, `app/dashboard/static/app.js` | Add `#deployProgressBarContainer`, `#buildProgressBarContainer`, and wire 800ms polling loop |
+| **DP4** | **QA Critic & Orchestrator** | `scratch/test_deploy_and_progress.py`, full suite | Python & JS compile, async deploy test, live edge HTTP 200 probe, taskboard sign-off |
+
+
+---
+
+## 43. Ingested Category Dynamic Menu & User-Furnished Branding Architecture
+
+### 43.1 Overview & Defect Root Causes
+1. **Hardcoded Supplemental Categories in Navigation Menus**:
+   - In `render_nordic_studio_layout` and `render_nordic_studio_hub`, the primary `<nav>` bar contained static links (`Living Rooms`, `Bedrooms`, `Kitchens`, `Bathrooms`, `Garden & Outdoor`, `Small Spaces`, `Color Trends`).
+   - In `build_styleire_header` and `build_styleire_footer`, the navigation links were statically hardcoded to 6 fixed categories (`Living Room`, `Bedroom`, `Kitchen & Dining`, etc.).
+   - In `render_blogger_header`, the links pointed to static sections (`Sanctuary Edits`, `Sourcing Notes`).
+   - None of these respected the actual categories extracted during sitemap/XML ingestion (`scraped_data/<project>/manifest.json` / `manifest.categories`), resulting in broken expectations, nonexistent supplemental categories, and 404 links.
+2. **Ignored User-Furnished Brand & Logo Text Data**:
+   - The masthead title and kickers hardcoded `THE NORDROOM` / `Curated Interior Design...` / `SCANDINAVIAN INTERIORS...` instead of reading the user's project settings (`branding.brand_name`, `branding.tagline`, `branding.logo_path`, `branding.author_name`, `branding.author_bio`).
+3. **Floating Category Badge CSS Defect**:
+   - In `render_related_guides`, `<span class="pseo-badge">` uses `position: absolute; top: 0.75rem; left: 0.75rem;`.
+   - Its parent container `.pseo-hero-media` lacked `position: relative; overflow: hidden;` in Nordic Studio's inline CSS.
+   - The browser calculated the absolute position against `<body>`, projecting the badge to the top-left of the viewport over the utility strip.
+
+### 43.2 Architectural Contracts & Fix Specifications
+1. **Dynamic Category Navigation Contract**:
+   - A universal helper function `build_dynamic_nav_links(categories, all_posts, path_prefix, link_class, routing_mode)` generates menu items strictly from `categories` (or distinct categories across `all_posts` if `categories` is omitted).
+   - Zero hardcoded or supplemental categories are allowed in `<nav>`.
+   - Each category item links to its valid generated path (`{path_prefix}/category/{slug}/` or `{path_prefix}/{slug}/` based on routing).
+2. **User-Furnished Brand & Logo Integration**:
+   - If `branding.logo_path` is present, render `<img src="{custom_logo_url}" alt="{brand_name}" class="...">` alongside or in place of text.
+   - Masthead headline displays `branding.brand_name` (or project name).
+   - Masthead kicker and tagline display `branding.tagline`.
+   - Utility strip displays `branding.brand_name` and `branding.tagline`.
+3. **Hero Media CSS Containment**:
+   - Ensure `.pseo-hero-media { position: relative; overflow: hidden; border-radius: 0.5rem; }` and `.pseo-card { position: relative; }` are included in all theme stylesheets.
+4. **SiteBuilder & Post Rendering Integration**:
+   - In `SiteBuilder.render_post(...)`, forward `categories=categories` into `template_render_post(...)`.
+   - In `SiteBuilder.build(...)`, pass `categories=categories` to post rendering loops.
+
+### 43.3 Milestones Roadmap (DM1-DM4)
+| Milestone | Role | Target Modules | Verification Scope |
+| :---: | :--- | :--- | :--- |
+| **DM1** | **Technical Architect** | `plans/architecture-spec.md`, `plans/master-task-board.md` | Author Section 43 blueprint, register milestones DM1-DM4 |
+| **DM2** | **Backend Worker** | `app/generator/site_builder.py`, `app/dashboard/server.py` | Pass ingested `categories` and user `branding` across `SiteBuilder.render_post`, `build`, and dashboard endpoints |
+| **DM3** | **UI & Theme Worker** | `app/themes/templates.py` | Implement `build_dynamic_nav_links`, refactor Nordic Studio, Styleire, and Blogger headers/footers, fix `.pseo-hero-media` CSS |
+| **DM4** | **QA Critic & Orchestrator** | `scratch/test_dynamic_menu_and_branding.py`, `scratch/qa_link_checker.py`, full suite | Verify 0 fake categories, user brand in masthead, badge containment, 0 broken links, taskboard sign-off |
+
+
+---
+
+## 44. Strict 1:1 Ingest Parity, Dynamic Taxonomy Derivation, and Project Scoping Architecture
+
+### 44.1 Overview & Defect Root Cause Analysis
+Forensic investigation across the ingestion pipeline, manifest lifecycle, image optimization routines, static build engines, and theme rendering subsystems identified six interconnected defect vectors that caused data contamination, alien post leakage, runtime errors, and broken link divergence between custom projects (such as `test103`) and the default/legacy workspace state:
+
+1. **`optimize_all_images()` Active Manifest Reload Contamination**:
+   - In `app/dashboard/server.py` (lines 1198–1218), `DashboardManager.optimize_all_images()` hardcodes `images_dir=os.path.join("assets", "images")` and `manifest_path=self.manifest_path`.
+   - `self.manifest_path` is initialized to the workspace root `pseo_manifest.json` (which holds 60 default/legacy posts).
+   - Upon completion of WebP conversion, line 1209 unconditionally executes `self.manifest = Manifest.load(self.manifest_path)`.
+   - This single call clobbers the active project's in-memory manifest (e.g. 24 posts for `test103`) and inflates it to the 60 root posts.
+   - Any subsequent call to `self.save_manifest()` or `run_build()` persists these 60 foreign posts into `scraped_data/<pid>/manifest.json` and `dist/<pid>/pseo_manifest.json`.
+   - In addition, `image_downloader.batch_optimize_directory()` hardcodes relative asset output prefixes to `assets/images/{stem}.webp` (lines 488, 495), stripping project scoping when processing `assets/<pid>/images/`.
+
+2. **Ingestion Merge Leak & Lack of Active Project Scoping in `run_ingest()` and `_init_projects()`**:
+   - In `app/dashboard/server.py` (lines 1098–1119), `run_ingest()` processes `discovered_posts` via `self.manifest.upsert_post(new_p)`.
+   - Because `upsert_post()` only adds new slugs or updates existing ones, any legacy or foreign posts pre-existing in `self.manifest` are retained indefinitely.
+   - For example, if `self.manifest` was holding 60 legacy posts, ingesting a 24-post sitemap resulted in 84 posts or preserved alien posts alongside the new posts.
+   - In `_init_projects()` (lines 194–202), when switching to a custom project (`test103`), if `scraped_data/test103/manifest.json` does not exist or fails to load, `self.manifest` remained set to the root `pseo_manifest.json` (60 legacy posts) and `self.active_manifest_path` remained `pseo_manifest.json`.
+   - In `sync_all_post_images()` (lines 1144–1190), `proj_assets_dir` was hardcoded to root `assets/images`, omitting the active project identifier (`assets/<pid>/images`), causing images to sync into root and manifest records to point to root.
+   - At the HTTP layer (lines 2050–2058), the server intercepted only `/assets/images/`, ignoring project-scoped routes like `/assets/<pid>/images/...` and serving 404/index fallbacks.
+
+3. **Interim Scraper Serialization Schema Divergence (`web_scraper.py`)**:
+   - In `app/ingestion/web_scraper.py` (lines 764–776 in `scrape_sitemap` and lines 901–910 in `scrape_url_list`), the interim manifest was persisted as:
+     `"posts": [p.to_dict() for p in scraped_posts]`
+   - Serializing `posts` as a Python `list` violates the contract expected by `Manifest.from_dict()` and `Manifest.to_dict()`, which expect `posts` to be a slug-keyed dictionary: `{slug: post_dict}`.
+   - Furthermore, `manifest_data` completely omitted the `"categories"` key. When `Manifest.load_from_json()` parsed the interim file, `Manifest.from_dict()` defaulted `self.categories = []`.
+
+4. **Dual Build Engines Divergence (`run_build()` vs `SiteBuilder`)**:
+   - In `app/dashboard/server.py`, `run_build()` (lines 1265–1516) maintained 252 lines of inlined legacy build code, completely separate from the production `SiteBuilder` pipeline in `app/generator/site_builder.py` used by `/api/cloudflare/deploy`.
+   - The inlined `run_build()`:
+     - Never generated the authoritative E-E-A-T Author page (`author/sophia-bennett/index.html`).
+     - Never generated any of the 9 Trust & Compliance pages (`about`, `contact`, `editorial-policy`, `fact-checking-policy`, `privacy-policy`, `cookie-policy`, `terms`, `disclaimer`, `copyright`).
+     - Never generated the HTML sitemap (`sitemap/index.html`).
+     - Never generated category alias directories (`category/<slug>/index.html`), causing 404s when navigating nested silo routes.
+     - Never copied static site assets or `ads.txt`.
+     - Generated deficient `robots.txt` and `sitemap.xml` lacking Google `<image:image>` metadata.
+     - Accumulated stale files across runs due to lack of output cleaning.
+   - When `qa_link_checker.py` audited the build output of `run_build()`, header/footer links to `/about/`, `/contact/`, `/author/...`, and `/sitemap/` failed with broken link errors.
+   - In contrast, `run_cloudflare_deploy()` called `SiteBuilder`, creating massive behavioral divergence between local preview builds and Cloudflare edge deployments.
+
+5. **Theme Hub `NameError` Crash & Hardcoded Silo Category Cards**:
+   - In `app/themes/templates.py`, `render_styleire_hub()` (lines 2524 & 2531) passed `all_posts=posts_list` to `build_styleire_header()` and `build_styleire_footer()`. Because the parameter was named `posts`, this threw `NameError: name 'posts_list' is not defined`.
+   - In lines 2525 & 2532, `routing_mode=routing_mode` was passed, but `routing_mode` was undefined in the function scope (should be `kwargs.get("routing_mode", "single")`).
+   - In lines 2523 & 2530, `categories=kwargs.get("categories")` shadowed the explicit `categories` argument, resulting in `None` when called as `render_styleire_hub(..., categories=categories)`.
+   - In `SiteBuilder.render_root_hub()` (lines 1369–1387), an unadorned `except Exception: pass` silently swallowed this `NameError`, preventing failure visibility and silently reverting to `_build_standalone_hub_html` (the generic fallback layout).
+   - In `render_styleire_hub()` (lines 2601–2623), the category grid hardcoded 6 legacy Styleire cards (`Living Room`, `Bedroom`, `Kitchen & Dining`, `Outdoor Spaces`, `DIY & Craft`, `Seasonal & Trends`) with static Unsplash URLs and guide counts. On a custom project like `test103` (whose categories are `Bedroom Inspo`, `Fire Pits`, `Patio Design`, `Backyard Ideas`, `Gazebos Pergola`, `Landscaping Ideas`), these cards generated broken links to non-existent categories.
+   - Similar hardcoding existed in `render_stitch_editorial_hub()` (lines 3721–3730, `silo_cats`), `render_taxonomy_pills()` (lines 1130–1141, `default_topics`), and `render_category_index()` (line 3581, ignoring `routing_mode`).
+
+6. **Append-Only Taxonomy Drift & Stale Categories (`models.py`)**:
+   - In `app/models.py` (lines 185–189), `Manifest.upsert_post()` only appended categories if `post.category_slug` was not yet in `self.categories`.
+   - It lacked any mechanism to remove categories when posts were deleted, replaced, or scoped.
+   - `Manifest.delete_post()` did not touch `self.categories`.
+   - Consequently, categories grew monotonically across builds and imports, leaving phantom categories in the manifest and sitemap navigation long after associated posts were removed.
+
+---
+
+### 44.2 Architectural Contracts & Fix Specifications
+
+#### Contract 1: Strict Project Dataset Isolation Contract
+1. **Single Source of Truth**:
+   - For any active project `<pid>`, `scraped_data/<pid>/manifest.json` is the sole authoritative manifest on disk.
+   - When switching to or initializing a custom project in `DashboardManager._init_projects()`, if `scraped_data/<pid>/manifest.json` does not exist, `DashboardManager` creates an empty manifest via `Manifest.create_empty(self.active_project_id)` and persists it immediately to disk. Under no circumstances may `self.manifest` fall back to root `pseo_manifest.json` for custom projects.
+2. **Ingestion Scoping & Alien Post Purging (`run_ingest`)**:
+   - When ingesting an XML sitemap into project `<pid>`, `self.manifest.posts` is explicitly rebound to strictly the collection of posts discovered in that sitemap:
+     `self.manifest.posts = scoped_posts` where `scoped_posts = {p.slug: p for p in discovered_posts}` (preserving custom edits on matching slugs).
+   - All alien, legacy, or default posts not present in `discovered_posts` are purged from the project manifest.
+   - `self.manifest.recompute_categories()` is immediately invoked following the rebuild.
+   - For `post-sitemap6.xml` ingested into `test103`, the post count must equal exactly 24, and the category count must equal exactly 6, with 0 default/legacy posts.
+3. **Scoped Image Optimization (`optimize_all_images`)**:
+   - `optimize_all_images()` strictly targets `self.active_manifest_path`. If unset, it resolves to `os.path.abspath(os.path.join("scraped_data", self.active_project_id, "manifest.json"))`.
+   - It targets `assets/<active_project_id>/images/` (falling back to `assets/images/` only for legacy projects `styleire`, `stylesdays`, `default`).
+   - After running `batch_optimize_directory()`, it reloads from `self.active_manifest_path`, never from root `pseo_manifest.json`.
+4. **Scoped Asset Synchronization (`sync_all_post_images`)**:
+   - Syncs images strictly to `assets/<active_project_id>/images/`.
+   - For custom projects, sets `post.local_image_path = f"assets/{self.active_project_id}/images/{slug}{ext}"` and passes `domain=self.active_project_id` to `download_post_image()`.
+5. **Dynamic Asset Prefix in `image_downloader.py`**:
+   - In `batch_optimize_directory()`, relative output paths are dynamically computed:
+     `rel_prefix = os.path.relpath(abs_images_dir, os.path.abspath(".")).replace("\\", "/")`
+     `slug_to_webp[stem] = f"{rel_prefix}/{stem}.webp"`
+   - This eliminates the hardcoded `"assets/images/"` string and preserves project-scoped directory structures.
+6. **Project-Scoped HTTP Asset Serving**:
+   - In `app/dashboard/server.py` line 2050, replace `/assets/images/` prefix matching with `/assets/`, safely resolving relative paths within `assets/` so project images like `/assets/test103/images/...` are served with correct MIME types.
+
+#### Contract 2: Dynamic Taxonomy Derivation Contract
+1. **Dynamic Derivation on `Manifest` (`app/models.py`)**:
+   - `derive_categories(self) -> list[dict[str, str]]`: Traverses `self.posts.values()`, extracting distinct `{"name": p.category, "slug": p.category_slug}` pairs. Preserves insertion order while guaranteeing slug uniqueness.
+   - `recompute_categories(self) -> None`: Sets `self.categories = self.derive_categories()`, instantly purging any stale or phantom categories.
+   - `upsert_post(self, post: PostItem) -> None`: Assigns `self.posts[post.slug] = post`, updates timestamp, and calls `self.recompute_categories()`.
+   - `delete_post(self, slug: str) -> Optional[PostItem]`: Removes `slug`, updates timestamp, and calls `self.recompute_categories()`.
+   - `to_dict(self) -> dict[str, Any]`: Serializes `"posts"` as `{slug: post.to_dict()}` and `"categories"` as `self.derive_categories()`.
+   - `from_dict(cls, data: dict[str, Any]) -> Manifest`: Instantiates `Manifest` and executes `manifest.recompute_categories()`.
+2. **Scraper Serialization Parity (`app/ingestion/web_scraper.py`)**:
+   - In `scrape_sitemap()` (lines 764–776) and `scrape_url_list()` (lines 901–910), serialize `manifest_data` conforming to:
+     ```python
+     "version": "2.0",
+     "subdomain": subdomain,
+     "domain": subdomain,
+     "source_url": sitemap_url,
+     "updated_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+     "scraped_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+     "total_posts": len(scraped_posts),
+     "posts": {p.slug: p.to_dict() for p in scraped_posts},
+     "categories": derived_categories,
+     ```
+   - Eliminates list serialization of posts and guarantees category taxonomy is present in interim manifests.
+
+#### Contract 3: Unified Build Engine Contract
+1. **Elimination of Inlined Build Logic**:
+   - The 252-line inlined compilation block in `app/dashboard/server.py` (`DashboardManager.run_build()`) is eliminated.
+   - `run_build()` resolves effective project identity `effective_sub = (subdomain or project_name or self.active_project_id or "default").strip()`, resolves `output_dir` via `self.resolve_output_dir(...)`, canonicalizes `base_url`, and delegates directly to `SiteBuilder`.
+2. **Strict Manifest Passing**:
+   - `run_build()` invokes:
+     ```python
+     builder = SiteBuilder(
+         config=self.config,
+         output_dir=output_dir,
+         subdomain=effective_sub,
+         base_url=base_url,
+         theme=theme,
+         routing_mode=routing_mode,
+     )
+     summary = builder.build(manifest_or_posts=self.manifest, subdomain=effective_sub)
+     ```
+   - Explicitly passing `manifest_or_posts=self.manifest` guarantees `SiteBuilder` never executes its fallback to root `pseo_manifest.json`.
+3. **Identical Static Artifact Parity**:
+   - Because both `/api/build` and `/api/cloudflare/deploy` execute the same `SiteBuilder.build()` pipeline, all builds guarantee:
+     - Output directory cleaning (preserving `assets/`, `images/`, `_worker.js`, `.git`).
+     - Generation of all post directories (`<output_dir>/<file_path>/index.html`).
+     - Generation of category indexes and category aliases (`category/<slug>/index.html`).
+     - Generation of E-E-A-T Author page (`author/sophia-bennett/index.html`).
+     - Generation of all 9 Trust & Compliance pages (`about`, `contact`, `editorial-policy`, `fact-checking-policy`, `privacy-policy`, `cookie-policy`, `terms`, `disclaimer`, `copyright`).
+     - Generation of HTML sitemap directory (`sitemap/index.html`).
+     - Generation of `robots.txt` and `sitemap.xml` with Google image tags.
+     - Copying of static assets and `ads.txt`.
+     - Output of `dist/<pid>/pseo_manifest.json` with exact post and category counts.
+4. **Cloudflare Deploy Simplification**:
+   - `run_cloudflare_deploy()` calls `self.run_build(clean=False, base_url=cf_base_url, target_cloud="cloudflare", subdomain=effective_sub, project_name=effective_sub)` and uses the returned `output_dir` for asset sync and deployment, eliminating redundant compilation logic and circular fallbacks.
+5. **Client Response Compatibility**:
+   - `run_build()` adapts `BuildSummary` into a JSON dictionary returning `success`, `status`, `project_name`, `output_dir`, `files_generated`, `files_count`, `assets_copied`, `images_copied`, `total_posts`, `duration_seconds`, and `timestamp`, maintaining complete compatibility with `app.js` and automated tests.
+
+#### Contract 4: Theme Hub & Category Rendering Parity Contract
+1. **`render_styleire_hub()` Error Resolution**:
+   - Replace undefined `posts_list` with `all_posts=posts`.
+   - Replace undefined `routing_mode` with `routing_mode=kwargs.get("routing_mode", "single")`.
+   - Resolve shadowed `categories` with `categories=categories or kwargs.get("categories")`.
+2. **Dynamic Silo Category Grid**:
+   - In `render_styleire_hub()`, replace the hardcoded `silo_categories` tuple list with dynamic construction from `categories or kwargs.get("categories")`.
+   - For each active category, dynamically count matching posts in `posts`, derive the category URL matching `routing_mode`, and pick the hero image of the first post in that category (or a deterministic fallback).
+   - Render zero alien category cards for categories not present in `manifest.categories`.
+3. **Dynamic Filter & Navigation Pills**:
+   - In `render_stitch_editorial_hub()`, populate `silo_cats` dynamically from `categories or kwargs.get("categories")` and set `data-category` attributes using the category slug.
+   - In `render_taxonomy_pills()`, eliminate hardcoded `default_topics` (`ikea-hacks`, `closet-storage`, etc.), displaying only categories matching the active post collection.
+   - In `render_category_index()`, construct links respecting `routing_mode` (`/category/{slug}/` for `pseo_nested_silo`).
+4. **Theme Exception Visibility**:
+   - In `SiteBuilder.render_root_hub()`, log exceptions raised by `template_render_hub` with `logger.warning(...)` instead of silent suppression with `pass`.
+
+#### Contract 5: Automated Parity Verification Contract
+1. **Automated Integration Test Harness (`scratch/test_xml_ingest_parity.py`)**:
+   - Must execute in under 15 seconds without mocking.
+   - Steps and assertions:
+     1. Instantiate `DashboardManager` and switch to `test103`.
+     2. Ingest `https://asqstyle.com/post-sitemap6.xml` (or verify loaded `scraped_data/test103/manifest.json`).
+     3. Assert `len(mgr.manifest.posts) == 24` and `len(mgr.manifest.categories) == 6`.
+     4. Assert 0 alien posts exist (e.g. check `how-to-choose-bedding`, `best-ikea-pax-wardrobe-hacks`, `curated-living-room-ideas` are NOT present).
+     5. Execute `mgr.optimize_all_images()` and assert `len(mgr.manifest.posts) == 24` and `len(mgr.manifest.categories) == 6`.
+     6. Execute `mgr.run_build()` and assert:
+        - `res["success"] is True`
+        - `res["project_name"] == "test103"`
+        - `dist/test103` contains exactly 24 post directories with `index.html`.
+        - `dist/test103/author/sophia-bennett/index.html` exists.
+        - `dist/test103/about/index.html` and other trust pages exist.
+        - `dist/test103/sitemap/index.html` exists.
+        - `dist/test103/pseo_manifest.json` contains exactly 24 posts and 6 categories.
+2. **Link Integrity Audit**:
+   - `python scratch/qa_link_checker.py dist/test103` must report 0 broken links (100% pass).
+3. **JSON-LD Schema Audit**:
+   - `python scratch/qa_schema_checker.py dist/test103` must pass all 24 post pages with valid `Article`, `BreadcrumbList`, and `FAQPage` schemas.
+4. **Live API Status Validation**:
+   - Probing `/api/status` returns `manifest_posts == 24` and `active_project == "test103"`.
+5. **Zero Placeholder Audit**:
+   - Zero `TODO`, `FIXME`, or stub implementations in modified code.
+
+---
+
+### 44.3 Milestones Roadmap (IP1-IP5)
+
+| Milestone | Role | Target Modules | Verification Scope |
+| :---: | :--- | :--- | :--- |
+| **IP1** | **Technical Architect** | `plans/architecture-spec.md`, `plans/master-task-board.md` | Author Section 44 blueprint, register milestones IP1–IP5 on master task board |
+| **IP2** | **Ingestion / Backend Worker** | `app/models.py`, `app/ingestion/web_scraper.py`, `app/ingestion/image_downloader.py`, `app/dashboard/server.py` | Implement dynamic taxonomy derivation (`derive_categories`, `recompute_categories`), slug-dict serialization in `web_scraper.py`, active manifest & asset scoping in `run_ingest`, `optimize_all_images`, `sync_all_post_images`, `_init_projects`, and HTTP asset serving |
+| **IP3** | **Ingestion / Backend Worker** | `app/dashboard/server.py`, `app/generator/site_builder.py` | Refactor `run_build()` to delegate directly to `SiteBuilder.build(self.manifest)`, eliminate inlined compilation logic, simplify `run_cloudflare_deploy()` |
+| **IP4** | **UI & Theme Worker** | `app/themes/templates.py`, `app/generator/site_builder.py` | Fix `posts_list`, `routing_mode`, and `categories` in `render_styleire_hub()`; replace hardcoded silo cards, filter pills, and topic fallbacks with dynamic `manifest.categories`; log theme errors in `SiteBuilder` |
+| **IP5** | **QA Critic & Orchestrator** | `scratch/test_xml_ingest_parity.py`, `scratch/qa_link_checker.py`, `scratch/qa_schema_checker.py`, `plans/master-task-board.md` | Author and execute automated 24-post parity integration test, verify 0 broken links in `dist/test103`, 24/24 schema pass, 0 placeholders, live dashboard check, and final taskboard sign-off |
+
+
+---
+
+## 45. Dynamic Theme Switching & Deployed Edge Application Architecture
+
+### 45.1 Overview & Defect Root Causes
+1. **Frontend Theme Selection Lacked Auto-Save**:
+   - In `app/dashboard/static/app.js`, clicking `.theme-card` only changed local visual classes and set the hidden `<select id="cfgTheme">`.
+   - No API request (`/api/projects/update` or `/api/config`) was dispatched. If the user navigated directly to Step 3 or Step 4 (Deploy), the selection was never saved to the server.
+2. **Backend Project/Config Split-Brain & Override Precedence**:
+   - `update_config_from_dict()` updated `self.config.build.theme`, but did NOT update `self.projects[self.active_project_id].theme`.
+   - `update_project()` updated `item.theme`, but did NOT update `self.config.build.theme` or `self.theme_engine.default_theme`.
+   - `switch_project()` failed to synchronize `item.theme` into `self.config.build.theme`.
+   - In `run_build()`, `getattr(proj_item, "theme", None)` took priority over `self.config.build.theme`. Because `proj_item.theme` in `self.projects` had `nordic-studio`, `run_build()` always built `nordic-studio`, ignoring user changes.
+3. **Deploy & Build API Endpoints Ignored Theme Parameters**:
+   - Neither `/api/build` nor `/api/cloudflare/deploy` accepted an explicit `theme` argument from the client.
+4. **Cloudflare Worker Static Assets (`my-worker/public`) Not Cleaned & Size-Check Collision**:
+   - In `app/deployer/cloudflare.py` (`sync_worker_assets`), `my-worker/public` was never cleaned before syncing, allowing stale files from previous projects and themes to accumulate.
+   - It used `if not os.path.exists(dst_file) or os.path.getsize(src_file) != os.path.getsize(dst_file):`, which skipped updating files if a new theme's HTML page had the same byte size as the old file.
+
+### 45.2 Architectural Contracts & Fix Specifications
+
+#### Contract 1: Bidirectional Theme Synchronization Contract
+1. **`DashboardManager.update_config_from_dict`**:
+   - When `build.theme` is updated, sync to:
+     - `self.config.build.theme = theme`
+     - `self.theme_engine.default_theme = theme`
+     - `self.projects[self.active_project_id].theme = theme`
+     - `self.config.projects[self.active_project_id]["theme"] = theme` (if present)
+2. **`DashboardManager.update_project`**:
+   - When `theme` is in `updates`, set `item.theme = val`.
+   - If `pid == self.active_project_id`:
+     - `self.config.build.theme = val`
+     - `self.theme_engine.default_theme = val`
+3. **`DashboardManager.switch_project`**:
+   - When switching to `pid`:
+     - If `item.theme`: `self.config.build.theme = item.theme; self.theme_engine.default_theme = item.theme`
+     - If `item.routing_mode`: `self.config.build.routing_mode = item.routing_mode`
+4. **Explicit `theme` Parameter in Build & Deploy**:
+   - `run_build(theme: Optional[str] = None)`: If `theme` is passed, update `proj_item.theme = theme` and `self.config.build.theme = theme` so that compilation strictly honors the request.
+   - `/api/build` and `/api/cloudflare/deploy` request handlers extract `body.get("theme")` and pass to `run_build` and `start_cloudflare_deploy_job`.
+
+#### Contract 2: Cloudflare Clean Worker Assets Synchronization Contract
+1. **`CloudflareDeployer.sync_worker_assets`**:
+   - Before copying files into `my-worker/public`:
+     - Clean all generated HTML, XML, text files, and subdirectories in `dest_dir` (preserving `.gitkeep` and `_worker.js` if located there).
+     - Remove the unsafe `os.path.getsize` check. Always copy fresh files (`shutil.copy2(src_file, dst_file)`).
+     - Guarantees `my-worker/public` contains strictly the assets produced by the current project and active theme.
+
+#### Contract 3: Frontend Auto-Save & Deploy Screen Theme Control Contract
+1. **Auto-Save on Selection (`app/dashboard/static/app.js`)**:
+   - Clicking `.theme-card` immediately posts `{ project_id: state.activeProject, theme: themeKey }` to `/api/projects/update` and updates top navbar `#statTheme`.
+   - Clicking `.routing-card` immediately posts `{ project_id: state.activeProject, routing_mode: routingKey }` to `/api/projects/update`.
+2. **Deploy Cockpit Theme Switcher (`index.html`, `app.js`)**:
+   - Step 4 Deploy cockpit displays active theme with quick-select options (`editorial-warm`, `nordic-studio`, `pinterest-mag`).
+   - `run_build` and `run_cloudflare_deploy` pass the active theme in request payload.
+
+### 45.3 Milestones Roadmap (TS1-TS5)
+
+| Milestone | Role | Target Modules | Verification Scope |
+| :---: | :--- | :--- | :--- |
+| **TS1** | **Technical Architect** | `plans/architecture-spec.md`, `plans/master-task-board.md` | Author Section 45 blueprint, register milestones TS1-TS5 on master task board |
+| **TS2** | **Backend Worker** | `app/dashboard/server.py` | Implement bidirectional theme synchronization across `update_config_from_dict`, `update_project`, `switch_project`, and accept explicit `theme` in `run_build()`, `/api/build`, and `/api/cloudflare/deploy` |
+| **TS3** | **DevOps Worker** | `app/deployer/cloudflare.py` | Implement clean assets synchronization in `sync_worker_assets()`, remove unsafe size check, wipe stale files from `my-worker/public` |
+| **TS4** | **UI / Theme Worker** | `app/dashboard/static/app.js`, `app/dashboard/static/index.html` | Wire auto-save listeners on `.theme-card` and `.routing-card`, add Step 4 quick theme switcher, update `#statTheme` dynamically |
+| **TS5** | **QA Critic & Orchestrator** | `scratch/test_theme_switch_and_deploy.py`, `scratch/qa_link_checker.py`, `scratch/qa_schema_checker.py`, `plans/master-task-board.md` | Author and execute automated theme switching test (test103 switching from nordic-studio to editorial-warm and pinterest-mag, verifying HTML styling, clean public assets, 0 broken links, 0 placeholders, taskboard sign-off) |
+
+
+---
+
+## 46. Related Reading 3-Card Responsive Grid Architecture & Layout Harmonization
+
+### 46.1 Problem Statement & Architectural Defect
+In production deployments (e.g. `test105.laurainsley01.workers.dev`), inspecting an individual post page revealed that the **Related Reading** section was broken:
+1. **Grid Containment Failure (The "Squeezed Column" Bug)**: In `render_styleire_layout` (Model 3) and `render_nordic_studio_layout` (Model 2), the template authored an outer `<div class="grid gap-6 sm:grid-cols-2 md:grid-cols-3">` or `<div class="grid grid-cols-1 sm:grid-cols-3 gap-6">`, but passed the full output of `render_related_guides()` directly into that grid. Because `render_related_guides()` emitted a monolithic `<section>` containing its own divider, header, and inner container, the browser grid engine treated the *entire section* as a single grid child (cell 1). Consequently, the entire related section was squeezed into the leftmost 1/3 column, leaving the remaining 2/3 of the page completely blank.
+2. **Duplicate Headings**: The outer layout declared `<h2>Related reading</h2>` (or `<h2>More Curated Inspiration</h2>`), while the nested inner section emitted a second `<h2>Related Guides & Inspiration</h2>`, producing two redundant stacked headings.
+3. **Unstyled Inner Container**: The inner section placed cards inside `<div class="pseo-related-grid">`. Because Tailwind CSS was loaded via CDN in Model 3 and `fallback_css` was not injected into the `<head>` of Model 2 and Model 3, `.pseo-related-grid` had no `display: grid` rule and defaulted to `display: block`, causing the 3 cards to stack vertically inside that 1/3 column.
+
+### 46.2 Architectural Contracts & Layout Invariants
+1. **Direct Grid Child Contract**:
+   A CSS Grid container (`.grid`) must have the card elements (`<article class="pseo-card ...">`) as its **direct children**. No wrapper `<section>` or intermediate `<div>` may intervene between the grid container and the cards.
+2. **Card Extraction & Isolation Helper (`extract_related_cards_html`)**:
+   Templates must support both raw card markup and legacy wrapped markup. An extraction function `extract_related_cards_html(html)` will safely unpack `<article ...>` tags from any wrapped section, ensuring backwards and forwards compatibility.
+3. **`cards_only` Parameter in `render_related_guides`**:
+   `render_related_guides()` must accept `cards_only: bool = False`. When `cards_only=True`, it returns solely the list of `<article>` card elements. When `cards_only=False`, it wraps them in a self-contained responsive grid section with inline fallback styles (`display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem;`).
+4. **Hybrid Tailwind & Inline CSS Guarantee**:
+   Each `<article>` card must specify both Tailwind utility classes (`bg-white rounded-xl border border-stone-200 overflow-hidden shadow-sm hover:shadow-md transition flex flex-col justify-between`) and inline CSS styles (`style="background-color: var(--pseo-card-bg, #FFFFFF); border: 1px solid var(--pseo-card-border, #E7E5E4); border-radius: 0.75rem; overflow: hidden; display: flex; flex-direction: column; justify-content: space-between;"`), ensuring full visual rendering across modern CDN browsers and headless static environments.
+5. **Single Authoritative Heading**:
+   Each theme layout retains exactly one thematic heading matching its visual model:
+   - Model 1 (Editorial Warm): `Related Guides & Inspiration`
+   - Model 2 (Nordic Studio): `More Curated Inspiration` with `Curated Reading` kicker
+   - Model 3 (Styleire Magazine): `Related reading`
+   Duplicate nested headings are completely eliminated.
+
+---
+
+### Master Task Board: Milestones RG1 - RG5
+
+| Milestone | Role | Target Files | Scope & Deliverables |
+|---|---|---|---|
+| **RG1** | **Technical Architect** | `plans/architecture-spec.md`, `plans/master-task-board.md` | Define Section 46 architecture specification and register Milestones RG1-RG5. |
+| **RG2** | **UI & Theme Worker** | `app/themes/templates.py` | Implement `extract_related_cards_html()`, add `cards_only` parameter to `render_related_guides()`, upgrade card markup with hybrid Tailwind & inline styles. |
+| **RG3** | **UI & Theme Worker** | `app/themes/templates.py` | Update `render_styleire_layout`, `render_nordic_studio_layout`, and `render_editorial_warm_layout` to ensure cards are direct children of the 3-column grid container. |
+| **RG4** | **Ingestion & DevOps Worker** | `app/generator/site_builder.py`, `app/dashboard/server.py` | Verify `SiteBuilder` post compilation passes clean related cards; rebuild active project `test105` static dist. |
+| **RG5** | **QA Critic & Orchestrator** | `scratch/test_related_grid.py`, `dist/test105/`, `plans/master-task-board.md` | Author and execute automated verification suite: verify 3 direct child cards in grid, 0 duplicate headings, 3-column layout, 0 broken links, and update task board. |
+
+
+---
+
+## 47. All Categories Pure-Color Silo Architecture in Template 3 (`render_styleire_hub`)
+
+### 47.1 Problem Statement & Architectural Defect
+In Template 3 (`render_styleire_hub` / Model 3 Styleire Magazine), the homepage category silo section presented several user experience and rendering defects:
+1. **Unwanted Image Clutter & Image Duplication**: The section previously called "Curated Room Silos" displayed large 16:10 image banners for every category card. Due to a Python operator precedence defect in the post-matching filter (`(getattr(...) or (...) == s_slug)`), every category matched all posts, causing all 6 cards to render the exact same repeated bedroom photograph.
+2. **User Request for Pure Background Color & Zero Images**: The user explicitly requested:
+   - Change heading to **"All Categories"** (or "All Category").
+   - Eliminate images completely from the category cards ("no image need").
+   - Render categories with distinct background colors (`bg-stone-100` / warm editorial tinted backgrounds), making the entire card clickable.
+3. **Inaccurate Post Counts**: Because of the filter precedence bug, all cards rendered identical counts ("24 guides").
+
+### 47.2 Architectural Contracts & Layout Invariants
+1. **Heading Contract**:
+   The category section heading in `render_styleire_hub` is updated from `"Curated Room Silos"` to `"All Categories"`, with subtitle `"Explore all curated room guides and design projects."`.
+2. **Zero-Image Pure-Color Card Contract**:
+   Each category card is rendered as a clean, self-contained `<a>` element without any `<img>` tag:
+   - Card container: `group block rounded-2xl border border-stone-200/80 p-6 transition duration-200 shadow-sm hover:shadow-md hover:-translate-y-0.5` with dedicated background color tints (e.g. `bg-[#F8F7F4] hover:bg-[#F0EDE6]`).
+   - Title: `font-serif text-xl font-bold text-stone-900 group-hover:text-black leading-snug`.
+   - Meta: Dynamic, accurate guide count (`s_count`), e.g. `10 guides`, `4 guides`, `1 guide`.
+   - Interactive affordance: Floating circular arrow badge (`→`) that transitions to dark on hover.
+   - Clickable target: `href="{s_url}"` linking directly to the category hub.
+3. **Accurate Category Post Filtering Contract**:
+   Filter logic must use explicit equality checks with parenthesis:
+   `((getattr(p, "category_slug", None) or (p.get("category_slug") if isinstance(p, dict) else "")) == s_slug) or (slugify(getattr(p, "category", "") or (p.get("category", "") if isinstance(p, dict) else "")) == s_slug) ...`
+   guaranteeing each category displays its true count.
+
+---
+
+### Master Task Board: Milestones AC1 - AC5
+
+| Milestone | Role | Target Files | Scope & Deliverables |
+|---|---|---|---|
+| **AC1** | **Technical Architect** | `plans/architecture-spec.md`, `plans/master-task-board.md` | Define Section 47 architecture specification and register Milestones AC1-AC5. |
+| **AC2** | **UI & Theme Worker** | `app/themes/templates.py` | Refactor `render_styleire_hub`: update title to "All Categories", remove `<img>` tags from `silo_cards`, style cards with background color and hover states. |
+| **AC3** | **Ingestion & Backend Worker** | `app/themes/templates.py` | Fix category post count filter logic in `render_styleire_hub` to ensure exact, isolated guide counts per category. |
+| **AC4** | **DevOps & Compiler Worker** | `app/generator/site_builder.py`, `dist/test105/` | Rebuild static site for `test105`; verify root `index.html` renders "All Categories" with 0 images in category cards; sync to `my-worker/public`. |
+| **AC5** | **QA Critic & Orchestrator** | `scratch/test_all_categories_theme3.py`, `dist/test105/` | Author and execute automated verification suite: verify "All Categories" header, 0 `<img>` tags in silo cards, clickable links, accurate counts, 0 broken links, 0 placeholders. |
+
+
+---
+
+## 48. Template 3 Visual Polish: Generic Slogan, Pure-Color Vivid Cards, Article Terminology & Date Removal
+
+### 48.1 Problem Statement & Architectural Alignment
+Following the deployment of "All Categories" pure-color cards in Template 3 (`render_styleire_hub` / Model 3 Styleire Magazine), user feedback identified specific editorial and visual refinements required for a cleaner, more realistic publication feel:
+1. **Generic Slogan Requirement**: The category section subtitle previously read `"Explore architectural guides organized by room and design project."`. The user specified: `"make the slog very generique expore our category just like this not add keyword"`. The subtitle must be shortened to `"Explore our categories."` without synthetic keyword bloat.
+2. **Category Card Decluttering**:
+   - The user requested removing the `"Category Silo"` eyebrow tag.
+   - The user requested removing the guide count (e.g. `"14 guides"`, `"1 guide"`).
+3. **Terminology Shift ("guide" &rarr; "article")**:
+   - The user specified `"all guide remplce with article"`.
+   - All user-facing terminology across Template 3 must transition from `"guide"` / `"guides"` to `"article"` / `"articles"` (e.g. `"Explore articles →"`, `"Latest Published Articles"`, `"Read Article →"`).
+4. **Complete Date Removal**:
+   - The user specified `"also remove date from the page"`.
+   - Date stamps and `<time>` tags must be stripped from the hub hero post, latest article cards, single post bylines, and category index feeds.
+5. **Vivid Secondary Color Accents for Realistic Theme**:
+   - The user specified `"finaly make more vive color like add the second color in the button or ligne to have more realistic theme"`.
+   - Category cards will feature a vibrant secondary color accent line (`border-t-4`) and a matching vibrant circular arrow action button (`style="background-color: {palette['accent']}"`), creating realistic visual depth and editorial flair.
+
+### 48.2 Architectural Specifications
+
+#### 1. Category Section Slogan
+```html
+<h2 class="font-serif text-2xl font-bold tracking-tight text-stone-900 sm:text-3xl">All Categories</h2>
+<p class="mt-1 text-sm text-stone-500">Explore our categories.</p>
+```
+
+#### 2. Vivid Multi-Tone Category Card Contract
+Each category card is an `<a>` tag with:
+- Top accent line: `border-top: 4px solid {palette['accent']}`
+- Rich background tint: `{palette['bg']}` (e.g. `#FFF6F2`, `#F3FAF5`, `#F3F7FE`, `#FFF9EC`, `#FAF3F8`, `#F4F6F9`)
+- Border: `border: 1px solid {palette['border']}`
+- Category Title: `<h3 class="font-serif text-xl sm:text-2xl font-bold text-stone-900 group-hover:text-black leading-snug">{s_name}</h3>`
+- Zero "Category Silo" tag
+- Zero "14 guides" count
+- Bottom action bar:
+  `<span class="text-xs font-bold uppercase tracking-wider text-stone-700 group-hover:text-black">Explore articles</span>`
+  `<span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-white shadow-sm transition-all duration-300 group-hover:scale-110" style="background-color: {palette['btn_bg']};">→</span>`
+
+#### 3. Complete Date Removal Contract
+- **Hub Hero**: `<span>By Sophia Bennett</span><span>•</span><span>6 min read</span>` (date stripped)
+- **Hub Latest Articles**: `<span>Curated Article</span><span>5 min read</span>` (date stripped)
+- **Post Byline**: `<span>By {author_name}</span><span>•</span><span>5 min read</span>` (date stripped)
+- **Category Index Cards**: `<span>Editorial Article</span><span>5 min read</span>` (date stripped)
+
+---
+
+### Master Task Board: Milestones ST1 - ST5
+
+| Milestone | Role | Target Files | Scope & Deliverables |
+|---|---|---|---|
+| **ST1** | **Technical Architect** | `plans/architecture-spec.md`, `plans/master-task-board.md` | Define Section 48 architecture specification and register Milestones ST1-ST5. |
+| **ST2** | **UI & Theme Worker** | `app/themes/templates.py` | Update `render_styleire_hub`: generic subtitle ("Explore our categories."), remove "Category Silo", remove guide counts, add vivid secondary color top lines and button badges. |
+| **ST3** | **UI & Theme Worker** | `app/themes/templates.py` | Replace "guide" with "article" across Template 3 (hub headers, action links, read buttons, category index headers). |
+| **ST4** | **UI & Theme Worker** | `app/themes/templates.py` | Remove date stamps and `<time>` tags from Template 3 hub hero, latest articles list, post page bylines, and category index feeds. |
+| **ST5** | **DevOps & QA Critic** | `scratch/test_template3_visual_polish.py`, `dist/test105/`, `plans/master-task-board.md` | Recompile static site for `test105`, sync to `my-worker/public`, verify 0 dates, generic subtitle, vivid accents, article terminology, 0 broken links. |
+
+
+---
+
+## 49. Section 49: Unified Category Theme Styling & Asqstyle Domain Purging
+
+### 49.1 Context & Objectives
+1. **Asqstyle Elimination**: The user identified that 'Asqstyle' (the legacy scraped source domain) appeared across multiple cards and meta descriptions on the site. In `scraped_data/test105/manifest.json`, exactly 5 posts contained `excerpt: 'Asqstyle'`, causing card descriptions, `<meta name="description">`, and OpenGraph tags to display 'Asqstyle'. Furthermore, scraped Pinterest sharing tags in `content_html` contained raw links to `https://asqstyle.com/`. All occurrences must be eliminated and replaced with high-quality editorial excerpts and canonical domain links.
+2. **Unified Category Background Palette**: Rather than rotating through disparate multi-colored background tints (terracotta, emerald, cobalt, amber, plum, slate), all category cards must share a single, unified, cohesive background color (`#FAF9F6` warm alabaster linen) with a crisp border (`#E7E5E4`).
+3. **Theme Secondary Accent Integration**: Apply the theme's secondary accent color (`#C2410C` warm terracotta for Template 3 Styleire) consistently to the top accent line separator (`border-top: 4px solid #C2410C`), the circular action button (`background-color: #C2410C`), and the 'Explore articles ->' link text.
+
+### 49.2 Architectural Contracts
+
+#### Contract 1: Excerpt Sanitization & Fallback Synthesis
+In `app/generator/site_builder.py` and `app/themes/templates.py`:
+```python
+def sanitize_excerpt(excerpt: str, title: str) -> str:
+    cleaned = (excerpt or '').strip()
+    if not cleaned or cleaned.lower() in ('asqstyle', 'asqstyle.com', 'stylesdays', 'stylesdays.com') or len(cleaned) < 15:
+        return f'Discover inspiring {title.lower()} with practical styling tips, curated palettes, and modern decor ideas.'
+    return cleaned
+```
+
+#### Contract 2: Unified Category Card Design Specification
+Every category card in `render_styleire_hub`:
+```html
+<a href="{s_url}" class="group relative flex flex-col justify-between overflow-hidden rounded-2xl border border-stone-200 border-t-4 p-6 transition-all duration-300 shadow-sm hover:shadow-md hover:-translate-y-1 bg-[#FAF9F6] hover:bg-[#F5F3EF]" style="background-color: #FAF9F6; border-color: #E7E5E4; border-top-color: #C2410C; border-top-width: 4px; min-height: 130px;">
+  <div class="flex items-start justify-between gap-4">
+    <h3 class="font-serif text-xl sm:text-2xl font-bold text-stone-900 group-hover:text-black leading-snug">{html_lib.escape(s_name)}</h3>
+    <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white shadow-sm transition-all duration-300 group-hover:scale-110 group-hover:shadow" style="background-color: #C2410C; font-weight: 700;">
+      →
+    </span>
+  </div>
+  <div class="mt-6 flex items-center justify-between border-t border-stone-200/80 pt-3">
+    <span class="text-xs font-bold uppercase tracking-wider group-hover:underline" style="color: #C2410C;">Explore articles</span>
+    <span class="text-xs font-semibold group-hover:translate-x-0.5 transition" style="color: #C2410C;">&rarr;</span>
+  </div>
+</a>
+```
+
+#### Contract 3: Content HTML Source Domain Purging
+In `app/generator/site_builder.py`, `render_post_page()`:
+```python
+if content_html and ('asqstyle.com' in content_html or 'asqstyle' in content_html):
+    content_html = re.sub(r'https?://(?:www\.)?asqstyle\.com/[^"'\s&]*', canonical_url, content_html)
+```
+
+---
+
+### Master Task Board: Milestones US1 - US5
+
+| Milestone | Role | Target Files | Scope & Deliverables |
+|---|---|---|---|
+| **US1** | **Technical Architect** | `plans/architecture-spec.md`, `plans/master-task-board.md` | Author Section 49 blueprint and register Milestones US1-US5. |
+| **US2** | **Ingestion / Backend Worker** | `scraped_data/test105/manifest.json`, `app/generator/site_builder.py`, `app/themes/templates.py` | Clean 5 posts with `excerpt: 'Asqstyle'` in manifest; add automated excerpt sanitizer in `SiteBuilder` and `templates.py`. |
+| **US3** | **UI & Theme Worker** | `app/themes/templates.py` | Eliminate multi-colored category backgrounds; set unified `#FAF9F6` background on all category cards; apply secondary accent `#C2410C` to 4px top line separator, circular arrow button, and link label. |
+| **US4** | **SEO & DevOps Worker** | `app/generator/site_builder.py` | Purge raw `asqstyle.com` URLs in `content_html` Pinterest share links, binding them cleanly to `{canonical_url}`. |
+| **US5** | **DevOps & QA Critic** | `scratch/test_unified_categories_and_asqstyle_purge.py`, `dist/test105/`, `my-worker/public` | Recompile static site for `test105`, audit `dist/test105/` for 0 occurrences of 'Asqstyle', verify unified category cards with `#C2410C` accents, check 0 broken links & 0 schema errors, and sync to `my-worker/public`. |
+
+---
+
+## 50. Top Bar Integration (Social Media: FB, Pinterest, Contact) & Complete 'Curated Read' and '5 min read' Elimination
+
+### 50.1 Motivation & Architectural Objectives
+1. **User Requirement**:
+   - "relove the 5 min read and Curated Read": Completely eliminate all artificial reading times (`5 min read`, `6 min read`) and editorial labels (`Curated Read`) from article cards, bylines, and category kickers.
+   - "add top bar add social medie fb pinterest contct": Introduce a high-contrast, responsive top utility bar positioned above the primary sticky masthead across all pages, hosting prominent links for Facebook (`fb`), Pinterest (`pinterest`), and Contact (`contct` pointing to `/contact/`).
+2. **Design Cohesion**:
+   - The top bar seamlessly integrates into `build_styleire_header` used by Template 3 (`pinterest-mag`/`styleire`), providing consistent brand presence across the Hub, Post pages, Category indexes, Author profiles, Sitemap, and Legal/Trust pages.
+   - The top bar features refined SVG iconography for Facebook and Pinterest, alongside a mail icon for Contact, styled with Tailwind utility classes and responsive breakpoints so mobile users enjoy frictionless navigation.
+   - Nordic Studio and Blogger themes are also updated to guarantee cross-theme parity.
+
+### 50.2 Architectural Contracts
+
+#### Contract 1: Responsive Top Utility Bar Specification
+In `app/themes/templates.py`, `build_styleire_header()`:
+```html
+<header class="sticky top-0 z-40 border-b border-stone-200 bg-white/95 backdrop-blur">
+  <!-- TOP UTILITY / SOCIAL BAR -->
+  <div class="border-b border-stone-200/80 bg-stone-100/90 text-stone-600 text-xs py-1.5 px-4">
+    <div class="mx-auto flex max-w-6xl items-center justify-between">
+      <div class="hidden sm:flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-stone-500">
+        <span>Curated Home &amp; Living</span>
+      </div>
+      <div class="flex items-center justify-between sm:justify-end w-full sm:w-auto gap-5 text-xs font-medium">
+        <div class="flex items-center gap-4">
+          <a href="https://www.facebook.com" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 text-stone-600 hover:text-[#1877F2] transition" title="Facebook">
+            <svg class="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+            <span>Facebook</span>
+          </a>
+          <a href="https://www.pinterest.com" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 text-stone-600 hover:text-[#E60023] transition" title="Pinterest">
+            <svg class="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24"><path d="M12 0C5.373 0 0 5.372 0 12c0 5.084 3.163 9.426 7.627 11.174-.105-.949-.2-2.405.042-3.441.218-.937 1.407-5.965 1.407-5.965s-.359-.719-.359-1.782c0-1.668.967-2.914 2.171-2.914 1.023 0 1.518.769 1.518 1.69 0 1.029-.655 2.568-.994 3.995-.283 1.194.599 2.169 1.777 2.169 2.133 0 3.772-2.249 3.772-5.495 0-2.873-2.064-4.882-5.012-4.882-3.414 0-5.418 2.561-5.418 5.207 0 1.031.397 2.138.893 2.738a.36.36 0 0 1 .083.345l-.333 1.36c-.053.22-.174.267-.402.161-1.499-.698-2.436-2.889-2.436-4.649 0-3.785 2.75-7.262 7.929-7.262 4.163 0 7.398 2.967 7.398 6.931 0 4.136-2.607 7.464-6.227 7.464-1.216 0-2.359-.631-2.75-1.378l-.748 2.853c-.271 1.043-1.002 2.35-1.492 3.146C9.57 23.812 10.763 24 12 24c6.627 0 12-5.373 12-12 0-6.628-5.373-12-12-12z"/></svg>
+            <span>Pinterest</span>
+          </a>
+        </div>
+        <div class="h-3 w-px bg-stone-300"></div>
+        <a href="{contact_url}" class="inline-flex items-center gap-1.5 text-stone-600 hover:text-stone-900 transition font-semibold" title="Contact Us">
+          <svg class="w-3.5 h-3.5 fill-none stroke-current stroke-2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+          <span>Contact</span>
+        </a>
+      </div>
+    </div>
+  </div>
+```
+
+#### Contract 2: Complete Elimination of "Curated Read" and "5 min read" / "6 min read"
+1. In `render_styleire_hub`:
+   - Stripped `<div class="mt-4 flex items-center justify-between text-xs text-stone-500 font-medium"><span class="text-stone-400">Curated Read</span><span>5 min read</span></div>` from card template.
+   - Removed `<span>•</span> <span>6 min read</span>` from hero cover byline.
+2. In `render_styleire_category_index`:
+   - Stripped the `Curated Read` / `5 min read` meta container from all category guide cards.
+3. In `render_author_page`:
+   - Stripped the `Curated Read` / `5 min read` meta container from author article cards.
+4. In `render_styleire_layout`:
+   - Stripped `<span>•</span> <span>5 min read</span>` from the post byline.
+5. In `render_nordic_studio_layout`:
+   - Stripped ` • 5 MIN READ` from `{esc_category} • 5 MIN READ • UPDATED {year_val}`.
+6. In `render_stitch_editorial_hub` & `render_blogger_byline`:
+   - Stripped residual reading time tags (`read_time`, `6 min read`).
+
+---
+
+### Master Task Board: Milestones TB1 - TB5
+
+| Milestone | Role | Target Files | Scope & Deliverables |
+|---|---|---|---|
+| **TB1** | **Technical Architect** | `plans/architecture-spec.md`, `plans/master-task-board.md` | Author Section 50 blueprint and register Milestones TB1-TB5. |
+| **TB2** | **UI & Theme Worker** | `app/themes/templates.py` | Implement Top Bar with Facebook, Pinterest, and Contact in `build_styleire_header` (and update Nordic Studio / Blogger headers). |
+| **TB3** | **UI & Theme Worker** | `app/themes/templates.py` | Completely remove "Curated Read" and "5 min read" / "6 min read" across all cards, bylines, and kicker templates. |
+| **TB4** | **SEO & DevOps Worker** | `app/generator/site_builder.py`, `dist/test105/`, `my-worker/public` | Recompile `test105` static site with SiteBuilder; cleanly synchronize all assets and HTML to `my-worker/public`. |
+| **TB5** | **DevOps & QA Critic** | `scratch/test_top_bar_and_read_removal.py`, full suite | Create and execute automated verification suite verifying top bar, social links, contact link, zero "Curated Read", zero "min read", zero broken links, zero placeholders. |
+
+---
+
+## 51. Top Bar Polish: Elimination of 'Curated Home & Living' Text & End-Aligned Utility Elements
+
+### 51.1 Motivation & Architectural Objectives
+1. **User Requirement**:
+   - "Curated Home & Living relove this in the top": Remove the left kicker text "Curated Home & Living" from the top utility bar.
+2. **Visual Hierarchy & Layout Refinement**:
+   - Stripping the left-hand text allows the top bar to become cleaner and more minimalist.
+   - The remaining social media controls (Facebook, Pinterest) and Contact link are aligned cleanly to the right (`justify-end`) within the maximum width container (`max-w-6xl mx-auto`), matching standard luxury editorial header styling.
+
+### 51.2 Architectural Contracts
+
+#### Contract 1: End-Aligned Top Utility Bar Specification
+In `app/themes/templates.py`, `build_styleire_header()`:
+```html
+<header class="sticky top-0 z-40 border-b border-stone-200 bg-white/95 backdrop-blur">
+  <!-- TOP UTILITY / SOCIAL BAR -->
+  <div class="border-b border-stone-200/80 bg-stone-100/90 text-stone-600 text-xs py-1.5 px-4">
+    <div class="mx-auto flex max-w-6xl items-center justify-end">
+      <div class="flex items-center gap-4 sm:gap-5 text-xs font-medium">
+        <div class="flex items-center gap-4">
+          <a href="{fb_url}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 text-stone-600 hover:text-[#1877F2] transition" title="Facebook">
+            <svg class="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+            <span>Facebook</span>
+          </a>
+          <a href="{pin_url}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 text-stone-600 hover:text-[#E60023] transition" title="Pinterest">
+            <svg class="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24"><path d="M12 0C5.373 0 0 5.372 0 12c0 5.084 3.163 9.426 7.627 11.174-.105-.949-.2-2.405.042-3.441.218-.937 1.407-5.965 1.407-5.965s-.359-.719-.359-1.782c0-1.668.967-2.914 2.171-2.914 1.023 0 1.518.769 1.518 1.69 0 1.029-.655 2.568-.994 3.995-.283 1.194.599 2.169 1.777 2.169 2.133 0 3.772-2.249 3.772-5.495 0-2.873-2.064-4.882-5.012-4.882-3.414 0-5.418 2.561-5.418 5.207 0 1.031.397 2.138.893 2.738a.36.36 0 0 1 .083.345l-.333 1.36c-.053.22-.174.267-.402.161-1.499-.698-2.436-2.889-2.436-4.649 0-3.785 2.75-7.262 7.929-7.262 4.163 0 7.398 2.967 7.398 6.931 0 4.136-2.607 7.464-6.227 7.464-1.216 0-2.359-.631-2.75-1.378l-.748 2.853c-.271 1.043-1.002 2.35-1.492 3.146C9.57 23.812 10.763 24 12 24c6.627 0 12-5.373 12-12 0-6.628-5.373-12-12-12z"/></svg>
+            <span>Pinterest</span>
+          </a>
+        </div>
+        <div class="h-3 w-px bg-stone-300"></div>
+        <a href="{contact_url}" class="inline-flex items-center gap-1.5 text-stone-600 hover:text-stone-900 transition font-semibold" title="Contact Us">
+          <svg class="w-3.5 h-3.5 fill-none stroke-current stroke-2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+          <span>Contact</span>
+        </a>
+      </div>
+    </div>
+  </div>
+```
+
+---
+
+### Master Task Board: Milestones RT1 - RT4
+
+| Milestone | Role | Target Files | Scope & Deliverables |
+|---|---|---|---|
+| **RT1** | **Technical Architect** | `plans/architecture-spec.md`, `plans/master-task-board.md` | Author Section 51 blueprint and register Milestones RT1-RT4. |
+| **RT2** | **UI & Theme Worker** | `app/themes/templates.py` | Remove 'Curated Home & Living' text and end-align top utility items with `justify-end`. |
+| **RT3** | **SEO & DevOps Worker** | `app/generator/site_builder.py`, `dist/test105/`, `my-worker/public` | Recompile static site for `test105`, verify HTML, and sync to `my-worker/public`. |
+| **RT4** | **DevOps & QA Critic** | `scratch/test_top_bar_removal.py`, full suite | Create automated verification script verifying 0 occurrences of 'Curated Home & Living' in top bar, FB/Pinterest/Contact presence, link integrity, and 0 placeholders. |
+
+---
+
+## 52. Live Worker Edge Deployment & Daemon Process Synchronization
+
+### 52.1 Root Cause of Residual Top Bar Text
+1. **Cloudflare Edge Lag**:
+   - While `my-worker/public` was synchronized locally on disk, the live Cloudflare Worker (`test105.laurainsley01.workers.dev`) had not been redeployed via `npx wrangler deploy`. The user visiting the live edge URL received stale edge-cached HTML.
+2. **Dashboard Process Cache**:
+   - The local background daemon `python run_dashboard.py` (PID 25268) was launched prior to the template edits. When triggers occurred via the dashboard, Python executed the in-memory cached copy of `app.themes.templates`.
+
+### 52.2 Architectural Contracts
+
+#### Contract 1: Full Edge Pipeline Deployment
+1. Recompile `dist/test105` strictly via `SiteBuilder`.
+2. Sync all static assets into `my-worker/public`.
+3. Deploy directly to Cloudflare via `npx wrangler deploy` targeting worker `test105`.
+4. Validate live edge HTTP response from `https://test105.laurainsley01.workers.dev/` for 0 occurrences of `Curated Home & Living`.
+
+#### Contract 2: Daemon Process Hot-Restart
+1. Terminate stale process on port 8080.
+2. Restart `run_dashboard.py` as a fresh background daemon with modern bytecode.
+
+---
+
+### Master Task Board: Milestones ED1 - ED4
+
+| Milestone | Role | Target Files | Scope & Deliverables |
+|---|---|---|---|
+| **ED1** | **Technical Architect** | `plans/architecture-spec.md`, `plans/master-task-board.md` | Author Section 52 blueprint and register Milestones ED1-ED4. |
+| **ED2** | **Backend & DevOps Worker** | `app/generator/site_builder.py`, `dist/test105/`, `my-worker/public` | Recompile `dist/test105` and verify 0 occurrences of 'Curated Home & Living' across all local files. |
+| **ED3** | **DevOps Worker** | `my-worker/`, Cloudflare Edge | Execute `npx wrangler deploy` from `my-worker/` to push asset changes to `test105.laurainsley01.workers.dev`. |
+| **ED4** | **QA Critic & Orchestrator** | `run_dashboard.py`, Edge Prober | Restart dashboard daemon, verify live edge HTTP response, run link & schema checks, 0 placeholders. |
+
+---
+
+## 62. Pinterest Save Button Dynamic Live-Origin Image Resolution Specification
+
+### 62.1 Problem Statement
+When a site is compiled with a future custom domain (`homeandrecipe.com`) configured in `pseo_config.json`, the Pinterest Save buttons on images are generated with static `href` attributes containing:
+`media=https://homeandrecipe.com/assets/images/...webp`
+When previewing and testing the site on a Cloudflare Worker preview URL (`test105.laurainsley01.workers.dev`) prior to DNS cutover:
+1. `homeandrecipe.com` returns `HTTP 404: Not Found` or `HTTP 403: Forbidden`.
+2. Pinterest's image-fetching crawler attempts to download `media` from `homeandrecipe.com` and fails with 404.
+3. Consequently, the Pinterest Pin Creation dialog displays a broken image icon.
+
+### 62.2 Architectural Contracts
+1. **Dynamic Client-Side Image Resolution Contract**:
+   Every Pinterest Save button (`.pseo-pin-save-btn` and `a[title="Save to Pinterest"]`) must be dynamically bound to the live, working image URL from which the browser currently loaded the asset:
+   - Inline `onclick` handler executes synchronously before navigation:
+     `onclick="var c=this.closest('.pseo-photo-container, .group, .pseo-img-wrapper, figure, div');var i=c?c.querySelector('img'):null;if(i){var u=new URL(this.href,window.location.origin);var s=i.currentSrc||i.src;if(s){u.searchParams.set('media',s);this.href=u.toString();}}"`
+   - Global capture-phase event listener (`document.addEventListener('click', handler, true)`) ensures `btn.href` search param `media` is updated to `img.currentSrc || img.src` prior to tab open.
+   - Initial DOM synchronization (`DOMContentLoaded`) scans all Pinterest buttons on load and swaps `media` parameter if the image is loaded from the active origin (`window.location.origin`).
+2. **Post Templates Ingestion**:
+   - `clean_and_wrap_article_images` in `app/themes/templates.py`: Injects inline `onclick` and `.pseo-pin-save-btn` class into every in-article photo wrapper.
+   - `render_styleire_layout` in `app/themes/templates.py`: Hero image button has inline `onclick` and script injection before `</body>`.
+   - `render_editorial_warm_layout` and `render_nordic_studio_layout` in `app/themes/templates.py`: Uses unified sync script, preventing redundant duplicate wrappers.
+   - `_build_standalone_post_html` in `app/generator/site_builder.py`: Injects the client-side Pinterest image sync script.
+3. **Verification Protocol**:
+   - Automated script tests that:
+     1. Static HTML contains `onclick` attribute and unified sync script.
+     2. Simulating click on `test105.laurainsley01.workers.dev` updates `media` to `https://test105.laurainsley01.workers.dev/assets/images/...webp`.
+     3. Pinterest pin creator URL with live image URL returns HTTP 200 and loads successfully without broken image icon.
+
+
+
+---
+
+## 63. Complete Worker Name Purge from Pinterest Save URLs & Provided Custom Domain Enforcement
+
+### 63.1 Problem Statement
+When inspecting the view-source of published articles on the provided custom domain (`https://decohome.homeandrecipe.com/`), 19 occurrences of the worker project name (`test105`) were found inside the static HTML of Pinterest Save buttons:
+`href="https://www.pinterest.com/pin/create/button/?url=https%3A%2F%2Fhomeandrecipe.com%2F...&media=https%3A%2F%2Fhomeandrecipe.com%2Fassets%2Ftest105%2Fimages%2F...webp..."`
+This leak occurred because:
+1. The ingested content in `scraped_data/test105/manifest.json` stored image paths with the project prefix: `/assets/test105/images/...`.
+2. In `clean_and_wrap_article_images` (`app/themes/templates.py`), path normalization failed to strip intermediate project folders when the string already started with `/assets/`.
+3. Sanitization in `SiteBuilder.sanitize_directory` only searched for raw `assets/{worker}/images/` with literal slashes, failing to match URL-encoded `%2Fassets%2F{worker}%2Fimages%2F` inside `pin_href` attributes.
+4. The custom domain in `pseo_config.json` was set to `homeandrecipe.com` instead of the user's provided, live active custom domain `decohome.homeandrecipe.com`.
+
+### 63.2 Architectural Contracts
+1. **Asset Path Normalization Contract**:
+   In `clean_and_wrap_article_images`, every image `src` must be normalized to strip any worker or project prefix:
+   - Input: `/assets/test105/images/sample.webp` or `assets/test105/images/sample.webp`
+   - Output: `/assets/images/sample.webp`
+   - Absolute Media URL: `{clean_base}/assets/images/sample.webp`
+   - Guarantees 0 occurrences of worker names (`test105`) in `media` query parameters.
+2. **Provided Custom Domain Alignment Contract**:
+   - `pseo_config.json`: Set `cloudflare.custom_domain` and `projects.test105.cf_custom_domain` to `decohome.homeandrecipe.com`.
+   - `base_url` for compilation: `https://decohome.homeandrecipe.com`.
+   - In Pinterest Save buttons, `url` parameter must be `https://decohome.homeandrecipe.com/{slug}/`.
+3. **Universal Sanitization Contract**:
+   `SiteBuilder.sanitize_directory` must scrub:
+   - `assets/{worker}/images/` -> `assets/images/`
+   - `assets%2F{worker}%2Fimages%2F` -> `assets%2Fimages%2F`
+   - `assets%2F{worker}%2F` -> `assets%2F`
+   - `assets/{worker}/` -> `assets/`
+4. **Verification Protocol**:
+   - Automated audit must search for `test105` in all generated files in `dist/test105/` and `my-worker/public/`, ensuring 0 occurrences in `view-source`.
+   - Live edge probe on `https://decohome.homeandrecipe.com/` must return HTTP 200 with 0 worker name leaks.
+
+---
+
+## 64. Social Media Network Links Configuration Zone & Universal Theme Integration
+
+### 64.1 Problem Statement & User Requirement
+The user requested adding a dedicated configuration zone in the Theme Step (`#tab-themes`) where custom social network links (e.g. Pinterest, Facebook, Instagram, Twitter/X, TikTok, YouTube) can be entered, edited, and persisted.
+Prior to this feature:
+1. Social profile URLs in themes were hardcoded (e.g. `https://facebook.com`, `https://pinterest.com/`, `https://instagram.com/`) across header utility bars and footers in `app/themes/templates.py`.
+2. The dashboard Theme step only exposed basic branding (Brand Name, Tagline, Author, Bio, Logo, TOC/FAQ/EEAT checkboxes), with no UI zone or fields to configure brand social media handles.
+3. The configuration data model (`BrandingConfig` in `app/config.py` and `pseo_config.json`) lacked a structured `social_links` dictionary.
+
+### 64.2 Architectural Design & Data Contracts
+
+1. **Configuration Schema Extension (`app/config.py`)**:
+   Add a `social_links` mapping to `BrandingConfig`:
+   ```python
+   social_links: dict[str, str] = field(default_factory=lambda: {
+       "pinterest": "",
+       "facebook": "",
+       "instagram": "",
+       "twitter": "",
+       "tiktok": "",
+       "youtube": "",
+   })
+   ```
+   - In `to_dict()`: export `"social_links": self.social_links`.
+   - In `from_dict()`: deserialize `social_links` preserving all keys with empty string fallbacks.
+
+2. **Persistence & API Endpoints (`app/dashboard/server.py`)**:
+   - In `update_config_from_dict`:
+     Parse `social_links` from `branding` object or top-level payload and update `self.config.branding.social_links`.
+   - Ensure `pseo_config.json` stores default/active social profiles.
+   - When switching projects or updating project metadata, maintain project-level or global `social_links`.
+
+3. **Theme Studio Dashboard UI Zone (`#tab-themes` in `app/dashboard/static/index.html`)**:
+   Inside `<form id="buildOptionsForm">`, introduce a dedicated visual card:
+   - Section Header: `4. SOCIAL MEDIA CHANNELS & NETWORK PROFILES` with an icon badge (`🌐 CONNECTIVITY & COMMUNITY`).
+   - 6 Input Controls arranged in a responsive grid:
+     - `cfgSocialPinterest`: Pinterest Profile / Board URL (e.g., `https://www.pinterest.com/decohome/`)
+     - `cfgSocialFacebook`: Facebook Page URL (e.g., `https://www.facebook.com/decohome/`)
+     - `cfgSocialInstagram`: Instagram Profile URL (e.g., `https://www.instagram.com/decohome/`)
+     - `cfgSocialTwitter`: Twitter / X Profile URL (e.g., `https://x.com/decohome`)
+     - `cfgSocialTiktok`: TikTok Profile URL (e.g., `https://www.tiktok.com/@decohome`)
+     - `cfgSocialYoutube`: YouTube Channel URL (e.g., `https://www.youtube.com/@decohome`)
+   - Each input includes a dedicated social icon, descriptive placeholder, and external link capability.
+
+4. **Frontend Controller Integration (`app/dashboard/static/app.js`)**:
+   - Cache the 6 input elements in the `DOM` object.
+   - In `populateConfig(cfg, status)`: populate each input from `cfg.branding.social_links`.
+   - In `buildOptionsForm` submit handler: include `social_links` in the payload sent to `/api/config`.
+   - Update live preview: pass `social_links` so the preview iframe immediately displays configured links.
+
+5. **Universal Theme Template Rendering (`app/themes/templates.py`)**:
+   - **Model 3 (Styleire Magazine / `pinterest-mag`)**:
+     - `build_styleire_header`: Reads `social_links` from `branding`. Uses `pinterest`, `facebook`, `instagram`, `twitter` URLs for header utility icons.
+     - `build_styleire_footer`: Dynamically renders social chips in the footer for any configured social channel.
+     - `render_styleire_layout`: Passes `branding=branding` and social parameters into `build_styleire_header` and `build_styleire_footer`.
+   - **Model 1 (Kinfolk Editorial / `editorial-warm`)**:
+     - `render_blogger_header`: Reads `social_links` from `branding`. Uses configured `facebook` and `pinterest` URLs in top utility bar.
+     - `render_blogger_footer`: Reads `social_links` from `branding`. Generates dynamic social chips for Pinterest, Instagram, Facebook, X, etc.
+   - **Model 2 (The Nordroom / `nordic-studio`)**:
+     - `render_nordic_studio_layout`: Reads `social_links` from `branding`. Top utility strip displays configured Facebook, Pinterest, and Instagram links.
+     - Footer "Curate & Connect" block dynamically binds configured Pinterest and social links.
+
+6. **DevOps & Verification Protocol**:
+   - Verify `pseo_config.json` stores valid `social_links`.
+   - Recompile `dist/test105` and deploy to Cloudflare Edge.
+   - Verify live edge `https://decohome.homeandrecipe.com/` serves the custom configured social links in header and footer.
+   - Verify dashboard API saves updates when submitted from Theme Studio.
+
+---
+
+## 65. Trust & Contact Page Custom Domain Alignment & Universal SVG Footer Social Media Bar
+
+### 65.1 Problem Statement & Audit Findings
+Inspection of `https://decohome.homeandrecipe.com/contact/` revealed two discrepancies:
+1. **Contact Info Leak of Old Default Domain**:
+   - The subtitle of `/contact/` stated: `"Questions, corrections, or story ideas — we read every message. You can also email us directly at editorial@styleire.com."`
+   - In `app/themes/trust_content.py`, `get_trust_page_content` only performed `.replace("Styleire", brand_name)` on `subtitle`, neglecting to replace `styleire.com` with the active custom domain (`decohome.homeandrecipe.com` or `homeandrecipe.com`).
+   - In `app/themes/templates.py`, `render_trust_page` fell back to `styleire.com` when `clean_domain` was derived from legacy WordPress source domains.
+2. **Footer Social Links Missing Configuration & Inconsistent with Top Bar**:
+   - In `render_trust_page`, `branding` was defined as an explicit argument and omitted from `**safe_kwargs`. As a result, `build_styleire_header` and `build_styleire_footer` were called without `branding=branding`, defaulting to generic `https://www.facebook.com` and `https://www.pinterest.com`.
+   - In `build_styleire_footer`, social media links were rendered as plain text/emoji (`📌 Pinterest`, `Facebook`) rather than the high-contrast, professional SVG icons featured in the masthead utility bar.
+
+### 65.2 Architectural Specifications & Technical Contracts
+
+1. **Trust Content Domain Alignment Contract (`app/themes/trust_content.py`)**:
+   - `get_trust_page_content(slug, brand_name, domain)`:
+     - Derive effective brand domain (e.g. `domain.strip("/ ")`). If empty or `styleire.com`, resolve from custom domain.
+     - In `subtitle`, replace `styleire.com` with `domain`.
+     - In `content_html` and `subtitle`, replace `editorial@styleire.com` and `contact@styleire.com` with `editorial@{domain}` / `contact@{domain}`.
+     - Replace all occurrences of `Styleire` with `brand_name`.
+2. **Trust Page Renderer Contract (`app/themes/templates.py`)**:
+   - In `render_trust_page`:
+     - Resolve `effective_domain` by priority:
+       1. Hostname extracted from `base_url` (e.g. `re.sub(r"^https?://", "", base_url).strip("/ ")`).
+       2. `clean_domain` if not default/scraped.
+       3. Fallback `homeandrecipe.com`.
+     - Pass `branding=branding` explicitly to `build_styleire_header` and `build_styleire_footer`.
+     - Also ensure `render_author_page` and `render_html_sitemap` pass `branding=branding` to `build_styleire_header` and `build_styleire_footer`.
+3. **Universal SVG Footer Social Media Bar Contract (`build_styleire_footer` in `app/themes/templates.py`)**:
+   - Harmonize the footer social icons to use the exact official SVG vectors as the top bar:
+     - **Facebook**: SVG with `#1877F2` brand hover.
+     - **Pinterest**: SVG with `#E60023` brand hover.
+     - **Instagram**: SVG with `#E1306C` brand hover.
+     - **Twitter / X**: SVG with `#0F172A` brand hover.
+     - **TikTok**: SVG with `#25F4EE` brand hover.
+     - **YouTube**: SVG with `#FF0000` brand hover.
+   - Wrap each item in an inline-flex pill/link matching the masthead:
+     `<a href="{url}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 text-xs text-stone-600 hover:text-stone-900 transition font-medium">...</a>`.
+4. **Site Builder Integration Contract (`app/generator/site_builder.py`)**:
+   - In `SiteBuilder.build_site()`, ensure `render_trust_page` passes `base_url=self.base_url` and `branding=getattr(self, "branding", None)`.
+5. **DevOps & Verification Protocol**:
+   - Rebuild `dist/test105`.
+   - Deploy to Cloudflare Edge.
+   - Probe `https://decohome.homeandrecipe.com/contact/`:
+     - Subtitle must contain `@decohome.homeandrecipe.com` or `@homeandrecipe.com` (0 occurrences of `styleire.com`).
+     - Masthead and footer must both contain the configured social media links with full SVG icons.
+
+
+
+## 66. Universal Code De-Hardcoding & Project-Agnostic Clean Code Architecture
+
+### 66.1 Problem Statement & Audit Findings
+Inspection of the repository revealed legacy project-specific strings and test identifiers hardcoded into core application modules:
+1. **Schema & SEO Hardcoding (`app/seo/schema.py`)**:
+   - Conditional logic checking `brand_name.lower() in ("test105", "homestylesdeco")` and fallback to `Styleire` in lines 294, 512, and 588.
+2. **Template Hardcoding (`app/themes/templates.py`)**:
+   - Monogram and brand overrides checking `("ANNA", "HOMESTYLESDECO", "STYLEDAYS", "STYLESDAYS")` in lines 1010 and 1048.
+   - Brand sanitization checking `("test105", "homestylesdeco")` in lines 2524 and 3524.
+   - Hardcoded custom domain `clean_domain = "decohome.homeandrecipe.com"` in line 3521.
+3. **Trust Content Hardcoding (`app/themes/trust_content.py`)**:
+   - Fallback `clean_dom = "decohome.homeandrecipe.com"` in line 94.
+4. **Site Builder Hardcoding (`app/generator/site_builder.py`)**:
+   - In `derive_brand_from_domain`, filtering `("asqstyle", "stylesdays", "test", "homestylesdeco")` in line 134.
+   - In `compile_static_site`, checking `in (self.subdomain.lower(), "test105", "homestylesdeco")` in lines 1130 and 1747.
+5. **Dashboard Server Hardcoding (`app/dashboard/server.py`)**:
+   - In `update_project`, checking `in (pid.lower(), "test105", "homestylesdeco")` in line 415.
+6. **Config & Deployer Defaults (`app/config.py`, `app/deployer/cloudflare.py`)**:
+   - Default `project_name: str = "homestylesdeco"` in `CloudflareConfig`.
+   - Hardcoded fallbacks in `get_worker_url()` and `get_live_url()`.
+7. **Static Dashboard DOM Hardcoding (`app/dashboard/static/index.html`)**:
+   - Hardcoded values and hrefs for `gardenhome`, `annadeco`, and `annadeco.github.io` in default HTML elements.
+
+### 66.2 Architectural Specifications & Technical Contracts
+
+1. **Dynamic Brand Derivation (`app/generator/site_builder.py`)**:
+   - Replace hardcoded keyword lists with generic domain token extraction:
+     ```python
+     if worker_name and main_token.strip().lower() == worker_name.strip().lower():
+         return "Editorial"
+     brand = main_token.replace("-", " ").replace("_", " ").strip().title()
+     return brand or "Editorial"
+     ```
+   - In `compile_static_site`, brand sanitization against worker name checks strictly `self.subdomain.lower()` dynamically without hardcoded project names.
+
+2. **Generic Schema Structured Data (`app/seo/schema.py`)**:
+   - Replace hardcoded project checks with generic dynamic resolution:
+     ```python
+     if not brand_name or (base_url and brand_name.lower() in base_url.lower() and "workers.dev" in base_url.lower()):
+         clean_domain_derived = source_domain.split(".")[0].replace("-", " ").title() if source_domain else "Editorial"
+         brand_name = clean_domain_derived
+     ```
+
+3. **Dynamic Template Brand & Domain Resolution (`app/themes/templates.py`, `app/themes/trust_content.py`)**:
+   - Purge all static tuples of old test project names (`ANNA`, `HOMESTYLESDECO`, `STYLEDAYS`, `test105`, etc.).
+   - Derive `clean_domain` dynamically from `base_url` (if not a raw `workers.dev` endpoint), `branding.custom_domain`, or `source_domain`. If none provided, fall back to generic `example.com`.
+   - In `trust_content.py`, `clean_dom` defaults dynamically to the provided `domain` or `example.com` without hardcoded domains.
+
+4. **Clean Project Update in Server (`app/dashboard/server.py`)**:
+   - Sanitize brand check against the active project ID: `if not cur_brand or cur_brand.lower() == pid.lower():`.
+
+5. **Config & Deployer Normalization (`app/config.py`, `app/deployer/cloudflare.py`)**:
+   - Normalize default `project_name` to empty string `""` or generic `"my-project"`.
+
+6. **Frontend DOM Neutralization (`app/dashboard/static/index.html`)**:
+   - Replace hardcoded links and repos in static HTML with clean placeholders (`—` and generic guidance). The frontend dynamically populates all values via `populateConfig` on dashboard boot.
+
+7. **Config & Storage Hygiene (`pseo_config.json`)**:
+   - Clean up scratch test projects (`challenger_scratch_*`, dummy test iterations) from `projects`.
+
+
+---
+
+## 67. Clean Workspace & Stale Artifact Purge Architecture
+
+### 67.1 Context & Problem Statement
+All projects were removed by the user in `pseo_config.json` (`active_project: ""` and empty `projects: {}`). However, legacy build outputs (`dist/`), deployed worker assets (`my-worker/public/*`), one-off test scripts (`scratch/`), archived project scrapes (`.archive/`), stale project assets (`assets/<project>/`), bytecode caches (`__pycache__`, `.pytest_cache`), and obsolete/unrelated files (`PROJECT.md`, `static-site.zip`, `pseo_config.backup.json`) remain on disk, occupying over 730 MB of unneeded disk space and cluttering the codebase.
+
+### 67.2 Deletion & Retention Blueprint
+1. **Build Artifacts Purge**:
+   - Delete `dist/` directory completely. The site builder regenerates `dist/` dynamically when builds are requested.
+2. **Worker Deployment Clean**:
+   - Purge all generated files in `my-worker/public/`, keeping only `my-worker/public/.gitkeep`.
+   - Remove `my-worker/.wrangler/` cache.
+   - Update `my-worker/wrangler.jsonc` name to `"my-worker"`.
+3. **Scratch & Archive Removal**:
+   - Delete `scratch/` completely (over 150 one-off patch/test scripts).
+   - Delete `.archive/` completely (scraped HTML/images from deleted projects).
+4. **Asset Directory Normalization**:
+   - Remove all stale project folders in `assets/`: `asqstyle`, `challenger*`, `deco-home`, `mytest*`, `stylesdays`, `test*`.
+   - In `assets/images/`, preserve only the 6 essential branding/template fallback files: `author-sophia.jpg`, `author-sophia.webp`, `custom-logo.webp`, `logo.svg`, `logo-badge.svg`, `placeholder.svg`. Remove all post-specific images from deleted projects.
+5. **Caches & Obsolete Files Purge**:
+   - Remove `.pytest_cache/`.
+   - Remove all `__pycache__` directories in root and `app/`.
+   - Remove `static-site.zip` (15.14 MB unused archive; `static-site/` is already extracted).
+   - Remove `pseo_config.backup.json`.
+   - Remove `PROJECT.md` (unrelated legacy cloaker project document).
+6. **Manifest Clean Reset**:
+   - Reset root `pseo_manifest.json` to an empty catalog (`{"version": "2.0", "updated_at": "...", "posts": {}, "categories": []}`) matching the clean state of `pseo_config.json`.
+
+### 67.3 Verification Contracts
+- All core application modules in `app/` (`app.config`, `app.models`, `app.dashboard.server`, `app.generator.site_builder`, `app.deployer.cloudflare`, `app.seo.schema`, `app.themes.templates`) must load cleanly without missing import errors.
+- `DashboardManager` initializes cleanly with 0 posts and 0 categories.
+- Total workspace size significantly reduced while keeping all production code intact.

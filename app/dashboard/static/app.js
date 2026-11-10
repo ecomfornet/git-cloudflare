@@ -35,6 +35,10 @@
     projects: [],
 
     activeProject: 'stylesdays',
+    isIngesting: false,
+    isDeploying: false,
+    deployPollInterval: null,
+    ingestPollInterval: null,
 
   };
 
@@ -155,6 +159,7 @@
     optimizeWebpBtn: document.getElementById('optimizeWebpBtn'),
 
     syncAssetsSettingsBtn: document.getElementById('syncAssetsSettingsBtn'),
+    quickDeployThemeSelect: document.getElementById('quickDeployThemeSelect'),
 
 
 
@@ -212,6 +217,20 @@
 
     cfgAuthorBio: document.getElementById('cfgAuthorBio'),
 
+    cfgSocialPinterest: document.getElementById('cfgSocialPinterest'),
+
+    cfgSocialFacebook: document.getElementById('cfgSocialFacebook'),
+
+    cfgSocialInstagram: document.getElementById('cfgSocialInstagram'),
+
+    cfgSocialTwitter: document.getElementById('cfgSocialTwitter'),
+
+    cfgSocialTiktok: document.getElementById('cfgSocialTiktok'),
+
+    cfgSocialYoutube: document.getElementById('cfgSocialYoutube'),
+
+    btnSaveSocialLinks: document.getElementById('btnSaveSocialLinks'),
+
     logoStatusBadge: document.getElementById('logoStatusBadge'),
 
     logoPreviewBox: document.getElementById('logoPreviewBox'),
@@ -232,7 +251,11 @@
 
     quickLogoFileInput: document.getElementById('quickLogoFileInput'),
 
+    quickBtnCropLogo: document.getElementById('quickBtnCropLogo'),
+
     quickBtnResetLogo: document.getElementById('quickBtnResetLogo'),
+
+    logoCropperModal: document.getElementById('logoCropperModal'),
 
     previewLogoBox: document.getElementById('previewLogoBox'),
 
@@ -277,6 +300,11 @@
     scanSitemapBtn: document.getElementById('scanSitemapBtn'),
 
     startIngestBtn: document.getElementById('startIngestBtn'),
+    ingestProgressBarContainer: document.getElementById('ingestProgressBarContainer'),
+    ingestProgressLabel: document.getElementById('ingestProgressLabel'),
+    ingestProgressCount: document.getElementById('ingestProgressCount'),
+    ingestProgressBar: document.getElementById('ingestProgressBar'),
+    btnStep1Next: document.getElementById('btnStep1Next'),
 
     syncAssetsBtn: document.getElementById('syncAssetsBtn'),
 
@@ -391,6 +419,18 @@
     deployDryRun: document.getElementById('deployDryRun'),
 
     triggerCfDeployBtn: document.getElementById('triggerCfDeployBtn'),
+    deployProgressBarContainer: document.getElementById('deployProgressBarContainer'),
+    deployProgressLabel: document.getElementById('deployProgressLabel'),
+    deployProgressPercent: document.getElementById('deployProgressPercent'),
+    deployProgressBar: document.getElementById('deployProgressBar'),
+    buildProgressBarContainer: document.getElementById('buildProgressBarContainer'),
+    buildProgressLabel: document.getElementById('buildProgressLabel'),
+    buildProgressPercent: document.getElementById('buildProgressPercent'),
+    buildProgressBar: document.getElementById('buildProgressBar'),
+    ghDeployProgressBarContainer: document.getElementById('ghDeployProgressBarContainer'),
+    ghDeployProgressLabel: document.getElementById('ghDeployProgressLabel'),
+    ghDeployProgressPercent: document.getElementById('ghDeployProgressPercent'),
+    ghDeployProgressBar: document.getElementById('ghDeployProgressBar'),
 
     deployCfDryRun: document.getElementById('deployCfDryRun'),
 
@@ -731,7 +771,7 @@
       }
       if (DOM.statPlatformCard) DOM.statPlatformCard.style.borderLeftColor = 'var(--accent-cloudflare)';
     } else {
-      const ghUrl = (DOM.cockpitGhUrlLink && DOM.cockpitGhUrlLink.href) || 'https://annadeco.github.io';
+      const ghUrl = (DOM.cockpitGhUrlLink && DOM.cockpitGhUrlLink.href) || '';
       if (DOM.statTargetUrl) {
         DOM.statTargetUrl.textContent = ghUrl + ' ↗';
         DOM.statTargetUrl.href = ghUrl;
@@ -861,13 +901,93 @@
   // MULTI-PROJECT MANAGEMENT SYSTEM
   // =========================================================================
 
+
+  function populateActiveProjectFields(proj) {
+    if (!proj) return;
+    if (DOM.ingestSitemapUrl && proj.sitemap_url) {
+      DOM.ingestSitemapUrl.value = proj.sitemap_url;
+    }
+    if (DOM.ingestMaxPosts && proj.max_posts) {
+      DOM.ingestMaxPosts.value = proj.max_posts;
+    }
+    if (DOM.ingestDownloadImages && proj.download_images !== undefined) {
+      DOM.ingestDownloadImages.checked = !!proj.download_images;
+    }
+    if (DOM.cfgCfProjectName) {
+      DOM.cfgCfProjectName.value = proj.cf_project_name || proj.id || '';
+    }
+    if (DOM.cfgCfCustomDomain && proj.cf_custom_domain !== undefined) {
+      DOM.cfgCfCustomDomain.value = proj.cf_custom_domain;
+    }
+    if (DOM.cfgStep1GithubOwner && proj.github_owner !== undefined) {
+      DOM.cfgStep1GithubOwner.value = proj.github_owner;
+      if (DOM.cfgGithubOwner) DOM.cfgGithubOwner.value = proj.github_owner;
+    }
+    if (DOM.cfgStep1GithubRepo && proj.github_repo !== undefined) {
+      DOM.cfgStep1GithubRepo.value = proj.github_repo;
+      if (DOM.cfgGithubRepo) DOM.cfgGithubRepo.value = proj.github_repo;
+    }
+    updateCloudflareLiveUrlPreview();
+    updateRootDomainPreview();
+  }
+
+  async function autoSaveActiveProject() {
+    if (!state.activeProject) return;
+    const updates = {};
+    if (DOM.ingestSitemapUrl) updates.sitemap_url = DOM.ingestSitemapUrl.value.trim();
+    if (DOM.ingestMaxPosts) updates.max_posts = parseInt(DOM.ingestMaxPosts.value, 10) || 60;
+    if (DOM.ingestDownloadImages) updates.download_images = DOM.ingestDownloadImages.checked;
+    if (DOM.cfgCfProjectName) {
+      updates.cf_project_name = DOM.cfgCfProjectName.value.trim();
+      updates.worker_name = updates.cf_project_name;
+    }
+    if (DOM.cfgCfCustomDomain) {
+      updates.cf_custom_domain = DOM.cfgCfCustomDomain.value.trim();
+      updates.custom_domain = updates.cf_custom_domain;
+    }
+    if (DOM.cfgStep1GithubOwner) {
+      updates.github_owner = DOM.cfgStep1GithubOwner.value.trim();
+      updates.gh_owner = updates.github_owner;
+    }
+    if (DOM.cfgStep1GithubRepo) {
+      updates.github_repo = DOM.cfgStep1GithubRepo.value.trim();
+      updates.gh_repo = updates.github_repo;
+    }
+
+    try {
+      const payload = {
+        project_id: state.activeProject,
+        updates: updates,
+        ...updates,
+      };
+      const res = await api('/api/projects/update', 'POST', payload);
+      if (res && res.project && state.projects) {
+        const idx = state.projects.findIndex((p) => p.id === state.activeProject);
+        if (idx !== -1) {
+          state.projects[idx] = { ...state.projects[idx], ...res.project };
+        }
+      }
+      updateCloudflareLiveUrlPreview();
+      return res;
+    } catch (err) {
+      console.warn('Auto-save active project failed:', err);
+    }
+  }
+
   async function loadProjects() {
     try {
       const res = await api('/api/projects');
       if (res && res.projects) {
         state.projects = res.projects;
-        state.activeProject = res.active_project || 'stylesdays';
+        if (res.active_project) {
+          state.activeProject = res.active_project;
+        }
         renderProjectSelector();
+
+        const curProj = state.projects.find((p) => p.id === state.activeProject);
+        if (curProj && curProj.theme) {
+          syncThemeToUI(curProj.theme);
+        }
       }
     } catch (err) {
       console.warn('Could not load projects list:', err);
@@ -877,6 +997,13 @@
   function renderProjectSelector() {
     if (!DOM.selectActiveProject) return;
     DOM.selectActiveProject.innerHTML = '';
+    if (!state.projects || state.projects.length === 0) {
+      const opt = document.createElement('option');
+      opt.value = '';
+      opt.textContent = 'No Projects (Click + New Project)';
+      DOM.selectActiveProject.appendChild(opt);
+      return;
+    }
     state.projects.forEach((p) => {
       const opt = document.createElement('option');
       opt.value = p.id;
@@ -895,6 +1022,9 @@
       appendTerminalLog(`[PROJECT] Switching active project to '${projectId}'...`, 'info');
       const res = await api('/api/projects/switch', 'POST', { project_id: projectId });
       state.activeProject = res.active_project || projectId;
+      if (res.project) {
+        populateActiveProjectFields(res.project);
+      }
       showToast(res.message || `Switched to project ${projectId}`, 'success');
       appendTerminalLog(`[PROJECT] Active project is now '${state.activeProject}' (${res.total_posts} posts, ${res.categories_count} categories).`, 'success');
 
@@ -1001,6 +1131,24 @@
       DOM.newProjectForm.addEventListener('submit', handleCreateNewProject);
     }
 
+    // Auto-save Step 1 inputs on change or blur
+    const step1Inputs = [
+      DOM.ingestSitemapUrl,
+      DOM.ingestMaxPosts,
+      DOM.ingestDownloadImages,
+      DOM.cfgCfProjectName,
+      DOM.cfgCfCustomDomain,
+      DOM.cfgStep1GithubOwner,
+      DOM.cfgStep1GithubRepo,
+    ].filter(Boolean);
+
+    step1Inputs.forEach((el) => {
+      el.addEventListener('change', autoSaveActiveProject);
+      if (el.tagName === 'INPUT' && (el.type === 'text' || el.type === 'number')) {
+        el.addEventListener('blur', autoSaveActiveProject);
+      }
+    });
+
     // Two-way synchronization for Step 1 GitHub inputs
     if (DOM.cfgStep1GithubOwner) {
       DOM.cfgStep1GithubOwner.addEventListener('change', async () => {
@@ -1056,11 +1204,7 @@
 
 
   function computeCloudflareLiveUrl() {
-    const custom = (DOM.cfgCfCustomDomain && DOM.cfgCfCustomDomain.value || '').trim();
-    if (custom) {
-      return (custom.startsWith('http://') || custom.startsWith('https://')) ? custom : ('https://' + custom.replace(/^\/+/, ''));
-    }
-    const proj = (DOM.cfgCfProjectName && DOM.cfgCfProjectName.value.trim()) || 'gardenhome';
+    const proj = (DOM.cfgCfProjectName && DOM.cfgCfProjectName.value.trim()) || state.activeProject || 'stylesdays';
     const deployType = (DOM.cfgCfDeployType && DOM.cfgCfDeployType.value) || 'workers_assets';
     const subdomain = (DOM.cfgCfAccountSubdomain && DOM.cfgCfAccountSubdomain.value.trim()) || '';
     if (subdomain) {
@@ -1086,7 +1230,7 @@
       DOM.cockpitCfSubdomain.textContent = DOM.cfgCfAccountSubdomain.value.trim() || '—';
     }
     if (DOM.cockpitCfWorker && DOM.cfgCfProjectName) {
-      DOM.cockpitCfWorker.textContent = DOM.cfgCfProjectName.value.trim() || 'gardenhome';
+      DOM.cockpitCfWorker.textContent = DOM.cfgCfProjectName.value.trim() || state.activeProject || 'stylesdays';
     }
     if (DOM.splitCfWorkerName) {
       const host = url.replace(/^https?:\/\//, '');
@@ -1357,6 +1501,23 @@
 
   // Load Status and Config
 
+  // Universal Theme Synchronizer: binds theme to inputs, previews, pills and card gallery
+  function syncThemeToUI(themeKey) {
+    if (!themeKey) return;
+    if (DOM.cfgTheme) DOM.cfgTheme.value = themeKey;
+    if (DOM.previewThemeSelect) DOM.previewThemeSelect.value = themeKey;
+    if (DOM.quickDeployThemeSelect) DOM.quickDeployThemeSelect.value = themeKey;
+    if (DOM.statTheme) DOM.statTheme.textContent = themeKey;
+    if (DOM.cockpitTheme) DOM.cockpitTheme.textContent = themeKey;
+    document.querySelectorAll('.theme-card').forEach((card) => {
+      if (card.dataset.theme === themeKey) {
+        card.classList.add('active');
+      } else {
+        card.classList.remove('active');
+      }
+    });
+  }
+
   async function refreshSystem() {
 
     try {
@@ -1449,15 +1610,20 @@
 
       }
 
+      // Active project metadata lookup
+      const activeProj = (state.projects && state.projects.find((p) => p.id === state.activeProject)) ||
+                         (cfg.projects && cfg.projects[state.activeProject]) ||
+                         {};
+
       if (DOM.cfgCfAccountId) DOM.cfgCfAccountId.value = cf.account_id || '';
       if (DOM.cfgCfAccountSubdomain) DOM.cfgCfAccountSubdomain.value = cf.account_subdomain || '';
-      if (DOM.cfgCfProjectName) DOM.cfgCfProjectName.value = cf.project_name || 'gardenhome';
+      if (DOM.cfgCfProjectName) DOM.cfgCfProjectName.value = activeProj.cf_project_name || activeProj.id || cf.project_name || state.activeProject || 'stylesdays';
       if (DOM.cfgCfDeployType) DOM.cfgCfDeployType.value = cf.deployment_type || 'workers_assets';
-      if (DOM.cfgCfCustomDomain) DOM.cfgCfCustomDomain.value = cf.custom_domain || '';
+      if (DOM.cfgCfCustomDomain) DOM.cfgCfCustomDomain.value = activeProj.cf_custom_domain !== undefined ? activeProj.cf_custom_domain : (cf.custom_domain || '');
       if (DOM.cfgCfCompatibilityDate) DOM.cfgCfCompatibilityDate.value = cf.compatibility_date || '2024-11-01';
 
       const cfTargetUrl = updateCloudflareLiveUrlPreview();
-      if (DOM.cockpitCfWorker) DOM.cockpitCfWorker.textContent = cf.project_name || 'gardenhome';
+      if (DOM.cockpitCfWorker) DOM.cockpitCfWorker.textContent = activeProj.cf_project_name || activeProj.id || cf.project_name || state.activeProject || 'stylesdays';
       if (DOM.cockpitCfSubdomain) DOM.cockpitCfSubdomain.textContent = cf.account_subdomain || '—';
 
 
@@ -1465,7 +1631,7 @@
       // Cockpit Meta Updates
 
       const isCfProj = (typeof currentPlatformMode !== 'undefined' && currentPlatformMode === 'cloudflare') || (state.activePlatform === 'cloudflare') || (!document.getElementById('workspaceCloudflare')?.classList.contains('hidden') && document.getElementById('workspaceCloudflare')?.style.display !== 'none');
-      const activeProjToken = isCfProj ? (cfg.cloudflare?.project_name || 'gardenhome') : (cfg.github?.owner || 'annadeco');
+      const activeProjToken = isCfProj ? (cfg.cloudflare?.project_name || 'styleire') : (cfg.github?.owner || '');
       const baseOutDir = (cfg.build?.output_dir && cfg.build.output_dir !== 'distooso') ? cfg.build.output_dir : 'dist';
       if (DOM.cockpitOutputDir) DOM.cockpitOutputDir.textContent = `${baseOutDir}/${activeProjToken}`;
 
@@ -1473,8 +1639,13 @@
 
       if (DOM.cockpitGhRepo) DOM.cockpitGhRepo.textContent = cfg.github?.repo || 'homedeco.github.io';
       if (DOM.cockpitGhBranch) DOM.cockpitGhBranch.textContent = cfg.github?.branch || 'main';
-      if (DOM.splitCfWorkerName) DOM.splitCfWorkerName.textContent = (cfg.cloudflare && cfg.cloudflare.project_name) ? (cfg.cloudflare.project_name + '.workers.dev') : 'homestylesdeco.workers.dev';
-      if (DOM.splitGhRepoName) DOM.splitGhRepoName.textContent = (cfg.github && cfg.github.repo) ? cfg.github.repo : 'annadeco.github.io';
+      const effCfUrl = computeCloudflareLiveUrl();
+      if (DOM.splitCfWorkerName) DOM.splitCfWorkerName.textContent = effCfUrl.replace(/^https?:\/\//, '');
+      if (DOM.statTargetUrl && (isCfProj || currentPlatformMode === 'cloudflare')) {
+        DOM.statTargetUrl.textContent = effCfUrl + ' ↗';
+        DOM.statTargetUrl.href = effCfUrl;
+      }
+      if (DOM.splitGhRepoName) DOM.splitGhRepoName.textContent = (cfg.github && cfg.github.repo) ? cfg.github.repo : '';
 
       if (DOM.cockpitGhUrlLink) {
 
@@ -1498,8 +1669,8 @@
 
       DOM.cfgGithubRepo.value = gh.repo || '';
 
-      if (DOM.cfgStep1GithubOwner) DOM.cfgStep1GithubOwner.value = gh.owner || '';
-      if (DOM.cfgStep1GithubRepo) DOM.cfgStep1GithubRepo.value = gh.repo || '';
+      if (DOM.cfgStep1GithubOwner) DOM.cfgStep1GithubOwner.value = activeProj.github_owner !== undefined ? activeProj.github_owner : (gh.owner || '');
+      if (DOM.cfgStep1GithubRepo) DOM.cfgStep1GithubRepo.value = activeProj.github_repo !== undefined ? activeProj.github_repo : (gh.repo || '');
 
       DOM.cfgGithubBranch.value = gh.branch || 'main';
 
@@ -1519,49 +1690,20 @@
 
 
       const bld = cfg.build || {};
+      const authoritativeTheme = (status && status.theme) || (bld && bld.theme) || activeProj.theme || 'nordic-studio';
+      const authoritativeRouting = (status && status.routing_mode) || (bld && bld.routing_mode) || activeProj.routing_mode || 'single';
+      syncThemeToUI(authoritativeTheme);
+      DOM.cfgRoutingMode.value = authoritativeRouting;
+      DOM.previewRoutingSelect.value = authoritativeRouting;
+      if (activeProj) activeProj.theme = authoritativeTheme;
 
-      const activeTheme = bld.theme || 'nordic-studio';
-
-      const activeRouting = bld.routing_mode || 'single';
-
-      DOM.cfgTheme.value = activeTheme;
-
-      DOM.cfgRoutingMode.value = activeRouting;
-
-      DOM.previewThemeSelect.value = activeTheme;
-
-      DOM.previewRoutingSelect.value = activeRouting;
-
-
-
-      // Update active cards in Theme & Routing galleries
-
-      document.querySelectorAll('.theme-card').forEach((card) => {
-
-        if (card.dataset.theme === activeTheme) {
-
-          card.classList.add('active');
-
-        } else {
-
-          card.classList.remove('active');
-
-        }
-
-      });
-
+      // Update active cards in Routing gallery
       document.querySelectorAll('.routing-card').forEach((card) => {
-
-        if (card.dataset.routing === activeRouting) {
-
+        if (card.dataset.routing === authoritativeRouting) {
           card.classList.add('active');
-
         } else {
-
           card.classList.remove('active');
-
         }
-
       });
 
       DOM.cfgOutputDir.value = bld.output_dir || 'dist_github_pages';
@@ -1572,11 +1714,11 @@
 
       DOM.cfgWpApiUrl.value = ing.wp_api_url || 'stylesdays.com';
 
-      DOM.ingestSitemapUrl.value = ing.sitemap_url || 'https://stylesdays.com/sitemap_index.xml';
+      DOM.ingestSitemapUrl.value = activeProj.sitemap_url || ing.sitemap_url || 'https://stylesdays.com/sitemap_index.xml';
 
-      DOM.ingestMaxPosts.value = ing.max_posts || 100;
+      DOM.ingestMaxPosts.value = activeProj.max_posts || ing.max_posts || 60;
 
-      DOM.ingestDownloadImages.checked = !!ing.download_images;
+      DOM.ingestDownloadImages.checked = activeProj.download_images !== undefined ? !!activeProj.download_images : (ing.download_images !== false);
 
 
 
@@ -1597,6 +1739,14 @@
       if (DOM.cfgEnableFaq) DOM.cfgEnableFaq.checked = branding.enable_faq !== false;
 
       if (DOM.cfgEnableEeat) DOM.cfgEnableEeat.checked = branding.enable_eeat !== false;
+
+      const socialLinks = branding.social_links || {};
+      if (DOM.cfgSocialPinterest) DOM.cfgSocialPinterest.value = socialLinks.pinterest || '';
+      if (DOM.cfgSocialFacebook) DOM.cfgSocialFacebook.value = socialLinks.facebook || '';
+      if (DOM.cfgSocialInstagram) DOM.cfgSocialInstagram.value = socialLinks.instagram || '';
+      if (DOM.cfgSocialTwitter) DOM.cfgSocialTwitter.value = socialLinks.twitter || '';
+      if (DOM.cfgSocialTiktok) DOM.cfgSocialTiktok.value = socialLinks.tiktok || '';
+      if (DOM.cfgSocialYoutube) DOM.cfgSocialYoutube.value = socialLinks.youtube || '';
 
       updateLogoPreview(branding.logo_path, branding.brand_name);
 
@@ -2854,23 +3004,27 @@
     }
 
     // Auto-save Project Name and Custom Domain from Ingest Step
+    let domainDebounceTimer = null;
     const saveIngestProjectConfig = async () => {
-      try {
-        const proj = (DOM.cfgCfProjectName && DOM.cfgCfProjectName.value.trim()) || 'gardenhome';
-        const custom = (DOM.cfgCfCustomDomain && DOM.cfgCfCustomDomain.value.trim()) || '';
-        await api('/api/config', 'POST', {
-          cloudflare: {
-            project_name: proj,
-            custom_domain: custom,
-          },
-        });
-        updateCloudflareLiveUrlPreview();
-      } catch (err) {
-        console.warn('Auto-save of project name or custom domain failed:', err);
-      }
+      await autoSaveActiveProject();
+      updateCloudflareLiveUrlPreview();
     };
-    if (DOM.cfgCfProjectName) DOM.cfgCfProjectName.addEventListener('change', saveIngestProjectConfig);
-    if (DOM.cfgCfCustomDomain) DOM.cfgCfCustomDomain.addEventListener('change', saveIngestProjectConfig);
+    if (DOM.cfgCfProjectName) {
+      DOM.cfgCfProjectName.addEventListener('change', saveIngestProjectConfig);
+      DOM.cfgCfProjectName.addEventListener('blur', saveIngestProjectConfig);
+      DOM.cfgCfProjectName.addEventListener('input', () => {
+        clearTimeout(domainDebounceTimer);
+        domainDebounceTimer = setTimeout(saveIngestProjectConfig, 350);
+      });
+    }
+    if (DOM.cfgCfCustomDomain) {
+      DOM.cfgCfCustomDomain.addEventListener('change', saveIngestProjectConfig);
+      DOM.cfgCfCustomDomain.addEventListener('blur', saveIngestProjectConfig);
+      DOM.cfgCfCustomDomain.addEventListener('input', () => {
+        clearTimeout(domainDebounceTimer);
+        domainDebounceTimer = setTimeout(saveIngestProjectConfig, 350);
+      });
+    }
 
 
 
@@ -3481,6 +3635,15 @@
 
             enable_eeat: DOM.cfgEnableEeat ? DOM.cfgEnableEeat.checked : true,
 
+            social_links: {
+              pinterest: DOM.cfgSocialPinterest ? DOM.cfgSocialPinterest.value.trim() : '',
+              facebook: DOM.cfgSocialFacebook ? DOM.cfgSocialFacebook.value.trim() : '',
+              instagram: DOM.cfgSocialInstagram ? DOM.cfgSocialInstagram.value.trim() : '',
+              twitter: DOM.cfgSocialTwitter ? DOM.cfgSocialTwitter.value.trim() : '',
+              tiktok: DOM.cfgSocialTiktok ? DOM.cfgSocialTiktok.value.trim() : '',
+              youtube: DOM.cfgSocialYoutube ? DOM.cfgSocialYoutube.value.trim() : '',
+            },
+
           },
 
         });
@@ -3499,66 +3662,93 @@
 
 
 
-    // Reusable Logo Upload Handler
+    // Reusable Logo Persistence Handler
+    async function saveLogoPayload(base64Data) {
+      try {
+        showToast('Saving custom logo...', 'info');
+        const bName = DOM.cfgBrandName ? DOM.cfgBrandName.value.trim() : (DOM.quickBrandNameDisplay ? DOM.quickBrandNameDisplay.textContent.trim() : 'Anna Deco');
+        const tag = DOM.cfgBrandTagline ? DOM.cfgBrandTagline.value.trim() : (DOM.quickTaglineDisplay ? DOM.quickTaglineDisplay.textContent.trim() : '');
+        const res = await api('/api/upload-logo', 'POST', {
+          data: base64Data,
+          brand_name: bName,
+          tagline: tag,
+        });
 
+        if (res.success) {
+          showToast('Custom logo saved & active across all models!', 'success');
+          updateLogoPreview(res.logo_url, res.brand_name, res.tagline);
+          if (state.config && state.config.branding) {
+            state.config.branding.logo_path = res.logo_url;
+            state.config.branding.brand_name = res.brand_name;
+            state.config.branding.tagline = res.tagline;
+          }
+          triggerPreview();
+        } else {
+          showToast(`Logo Upload Failed: ${res.error || 'Unknown error'}`, 'error');
+        }
+      } catch (err) {
+        showToast(`Upload Error: ${err.message}`, 'error');
+      }
+    }
+
+    // Interactive Logo Cropper & Studio Launcher
+    function openCropStudio(source) {
+      if (!source) return;
+      if (!window.cropperStudioInstance && window.LogoCropperStudio) {
+        window.cropperStudioInstance = new window.LogoCropperStudio();
+      }
+      if (window.cropperStudioInstance) {
+        const bName = DOM.cfgBrandName ? DOM.cfgBrandName.value.trim() : (DOM.quickBrandNameDisplay ? DOM.quickBrandNameDisplay.textContent.trim() : 'Anna Deco');
+        const tag = DOM.cfgBrandTagline ? DOM.cfgBrandTagline.value.trim() : (DOM.quickTaglineDisplay ? DOM.quickTaglineDisplay.textContent.trim() : '');
+        window.cropperStudioInstance.open(source, {
+          brandName: bName,
+          tagline: tag,
+          aspectRatio: '4:1',
+          onApply: async (croppedDataUrl) => {
+            await saveLogoPayload(croppedDataUrl);
+          }
+        });
+      } else {
+        if (typeof source === 'string') {
+          saveLogoPayload(source);
+        } else if (source instanceof File || source instanceof Blob) {
+          const reader = new FileReader();
+          reader.onload = async () => saveLogoPayload(reader.result);
+          reader.readAsDataURL(source);
+        }
+      }
+    }
+
+    // Reusable Logo Upload Handler with Cropper Studio Interception
     async function uploadCustomLogo(file) {
-
       if (!file) return;
-
-      if (file.size > 5 * 1024 * 1024) {
-
-        showToast('Image file exceeds 5MB limit.', 'error');
-
+      if (file.size > 10 * 1024 * 1024) {
+        showToast('Image file exceeds 10MB limit.', 'error');
         return;
+      }
+      openCropStudio(file);
+    }
 
+    // Trigger Cropper Studio for currently active logo
+    function openCropStudioForCurrentLogo() {
+      let currentLogo = '';
+      if (DOM.quickLogoPreviewBox) {
+        const img = DOM.quickLogoPreviewBox.querySelector('img');
+        if (img && img.src && !img.src.includes('placeholder')) {
+          currentLogo = img.src;
+        }
+      }
+      if (!currentLogo && state.config && state.config.branding && state.config.branding.logo_path) {
+        currentLogo = state.config.branding.logo_path;
       }
 
-      const reader = new FileReader();
-
-      reader.onload = async () => {
-
-        const base64Data = reader.result;
-
-        try {
-
-          showToast('Uploading custom logo...', 'info');
-
-          const res = await api('/api/upload-logo', 'POST', {
-
-            data: base64Data,
-
-            brand_name: DOM.cfgBrandName ? DOM.cfgBrandName.value.trim() : 'Anna Deco',
-
-            tagline: DOM.cfgBrandTagline ? DOM.cfgBrandTagline.value.trim() : '',
-
-          });
-
-
-
-          if (res.success) {
-
-            showToast('Custom logo uploaded & active across all themes!', 'success');
-
-            updateLogoPreview(res.logo_url, res.brand_name, res.tagline);
-
-            triggerPreview();
-
-          } else {
-
-            showToast(`Logo Upload Failed: ${res.error || 'Unknown error'}`, 'error');
-
-          }
-
-        } catch (err) {
-
-          showToast(`Upload Error: ${err.message}`, 'error');
-
+      if (currentLogo) {
+        openCropStudio(currentLogo);
+      } else {
+        if (DOM.quickLogoFileInput) {
+          DOM.quickLogoFileInput.click();
         }
-
-      };
-
-      reader.readAsDataURL(file);
-
+      }
     }
 
 
@@ -3621,6 +3811,11 @@
 
 
 
+    // Wire crop & zoom buttons
+    if (DOM.quickBtnCropLogo) {
+      DOM.quickBtnCropLogo.addEventListener('click', openCropStudioForCurrentLogo);
+    }
+
     // Wire reset buttons across all locations
 
     if (DOM.btnResetLogo) {
@@ -3672,6 +3867,7 @@
     DOM.scanSitemapBtn.addEventListener('click', async () => {
 
       try {
+        await autoSaveActiveProject();
 
         appendTerminalLog('Scanning WordPress sitemap index...', 'info');
 
@@ -3698,73 +3894,151 @@
     // Run Ingestion
 
     DOM.ingestionForm.addEventListener('submit', async (e) => {
-
       e.preventDefault();
+      if (state.isIngesting) {
+        showToast('Ingestion is already running. Please wait...', 'warning');
+        return;
+      }
 
       const sourceType = DOM.ingestSourceType.value;
-
       const urlOrList = sourceType === 'url_list' ? DOM.ingestUrlList.value : DOM.ingestSitemapUrl.value;
 
-
+      // Auto-save active project fields so everything entered is persisted
+      await autoSaveActiveProject();
 
       try {
+        state.isIngesting = true;
+        if (DOM.startIngestBtn) {
+          DOM.startIngestBtn.disabled = true;
+          DOM.startIngestBtn.innerHTML = '<span>⏳ Ingesting...</span>';
+        }
+        if (DOM.ingestProgressBarContainer) {
+          DOM.ingestProgressBarContainer.classList.remove('hidden');
+          DOM.ingestProgressBarContainer.style.display = 'block';
+        }
+        if (DOM.ingestProgressBar) {
+          DOM.ingestProgressBar.style.width = '5%';
+        }
+        if (DOM.ingestProgressLabel) {
+          DOM.ingestProgressLabel.textContent = 'Starting background ingestion...';
+        }
+        if (DOM.ingestProgressCount) {
+          DOM.ingestProgressCount.textContent = '0 / ...';
+        }
 
         appendTerminalLog(`Running ingestion & manifest diffing (source=${sourceType})...`, 'info');
 
-        const res = await api('/api/ingest', 'POST', {
+        const customDomainVal = DOM.cfgCfCustomDomain ? DOM.cfgCfCustomDomain.value.trim() : '';
+        const workerNameVal = DOM.cfgCfProjectName ? DOM.cfgCfProjectName.value.trim() : '';
 
+        const startRes = await api('/api/ingest', 'POST', {
           source_type: sourceType,
-
           url_or_list: urlOrList,
-
           max_posts: parseInt(DOM.ingestMaxPosts.value, 10),
-
           download_images: DOM.ingestDownloadImages.checked,
-
           force_full_resync: DOM.ingestForceResync.checked,
-
+          cf_custom_domain: customDomainVal,
+          custom_domain: customDomainVal,
+          cf_project_name: workerNameVal,
+          worker_name: workerNameVal,
         });
 
+        if (state.ingestPollInterval) {
+          clearInterval(state.ingestPollInterval);
+        }
 
+        state.ingestPollInterval = setInterval(async () => {
+          try {
+            const jobStatus = await api('/api/ingest/status');
+            if (!jobStatus) return;
 
-        const sum = res.summary || {};
+            if (jobStatus.status === 'running') {
+              const processed = jobStatus.processed_count || 0;
+              const total = jobStatus.total_count || 0;
+              const pct = total > 0 ? Math.min(95, Math.round((processed / total) * 100)) : 15;
+              if (DOM.ingestProgressBar) {
+                DOM.ingestProgressBar.style.width = `${pct}%`;
+              }
+              if (DOM.ingestProgressCount) {
+                DOM.ingestProgressCount.textContent = total > 0 ? `${processed} / ${total}` : `${processed} processed`;
+              }
+              if (DOM.ingestProgressLabel) {
+                DOM.ingestProgressLabel.textContent = jobStatus.current_post 
+                  ? `Processing: ${jobStatus.current_post}` 
+                  : (jobStatus.message || 'Ingesting articles...');
+              }
+            } else if (jobStatus.status === 'success') {
+              clearInterval(state.ingestPollInterval);
+              state.ingestPollInterval = null;
+              state.isIngesting = false;
 
-        const counts = sum.counts || {};
+              if (DOM.startIngestBtn) {
+                DOM.startIngestBtn.disabled = false;
+                DOM.startIngestBtn.innerHTML = '<span>📥 Ingest &amp; Diff</span>';
+              }
+              if (DOM.ingestProgressBar) {
+                DOM.ingestProgressBar.style.width = '100%';
+              }
+              if (DOM.ingestProgressLabel) {
+                DOM.ingestProgressLabel.textContent = '✅ Ingestion Completed Successfully!';
+              }
+              if (DOM.ingestProgressCount) {
+                DOM.ingestProgressCount.textContent = `${jobStatus.processed_count || 0} / ${jobStatus.total_count || 0}`;
+              }
 
-        DOM.diffNewCount.textContent = counts.new || 0;
+              const counts = jobStatus.counts || {};
+              if (DOM.diffNewCount) DOM.diffNewCount.textContent = counts.new || 0;
+              if (DOM.diffUpdatedCount) DOM.diffUpdatedCount.textContent = counts.updated || 0;
+              if (DOM.diffSyncedCount) DOM.diffSyncedCount.textContent = counts.synced || 0;
+              if (DOM.diffResultsBox) DOM.diffResultsBox.style.display = 'block';
 
-        DOM.diffUpdatedCount.textContent = counts.updated || 0;
+              if (DOM.diffSummaryTableBody) {
+                DOM.diffSummaryTableBody.innerHTML = '';
+                (jobStatus.new_posts || []).forEach((p) => addDiffRow(p.slug, p.title, 'NEW', 'badge-new'));
+                (jobStatus.updated_posts || []).forEach((p) => addDiffRow(p.slug, p.title, 'UPDATED', 'badge-updated'));
+                (jobStatus.synced_posts || []).forEach((p) => addDiffRow(p.slug, p.title, 'SYNCED', 'badge-synced'));
+              }
 
-        DOM.diffSyncedCount.textContent = counts.synced || 0;
+              showToast(`Ingestion finished: ${counts.total || jobStatus.processed_count || 0} total posts processed.`, 'success');
+              appendTerminalLog(`Ingested: ${counts.new || 0} new, ${counts.updated || 0} updated, ${counts.synced || 0} synced.`, 'success');
 
-        DOM.diffResultsBox.style.display = 'block';
+              await refreshSystem();
+              await refreshPosts();
+              await loadProjects();
+            } else if (jobStatus.status === 'error') {
+              clearInterval(state.ingestPollInterval);
+              state.ingestPollInterval = null;
+              state.isIngesting = false;
 
+              if (DOM.startIngestBtn) {
+                DOM.startIngestBtn.disabled = false;
+                DOM.startIngestBtn.innerHTML = '<span>📥 Ingest &amp; Diff</span>';
+              }
+              if (DOM.ingestProgressLabel) {
+                DOM.ingestProgressLabel.textContent = `❌ Ingestion error: ${jobStatus.error || jobStatus.message || 'Unknown error'}`;
+              }
 
-
-        DOM.diffSummaryTableBody.innerHTML = '';
-
-        (sum.new_posts || []).forEach((p) => addDiffRow(p.slug, p.title, 'NEW', 'badge-new'));
-
-        (sum.updated_posts || []).forEach((p) => addDiffRow(p.slug, p.title, 'UPDATED', 'badge-updated'));
-
-        (sum.synced_posts || []).forEach((p) => addDiffRow(p.slug, p.title, 'SYNCED', 'badge-synced'));
-
-
-
-        showToast(`Ingestion finished: ${counts.total || 0} total posts processed.`, 'success');
-
-        appendTerminalLog(`Ingested: ${counts.new} new, ${counts.updated} updated, ${counts.synced} synced.`, 'success');
-
-        refreshSystem();
+              showToast(`Ingestion error: ${jobStatus.error || jobStatus.message}`, 'error');
+              appendTerminalLog(`[INGEST ERROR] ${jobStatus.error || jobStatus.message}`, 'error');
+            }
+          } catch (pollErr) {
+            console.warn('Error polling ingest status:', pollErr);
+          }
+        }, 800);
 
       } catch (err) {
-
+        state.isIngesting = false;
+        if (state.ingestPollInterval) {
+          clearInterval(state.ingestPollInterval);
+          state.ingestPollInterval = null;
+        }
+        if (DOM.startIngestBtn) {
+          DOM.startIngestBtn.disabled = false;
+          DOM.startIngestBtn.innerHTML = '<span>📥 Ingest &amp; Diff</span>';
+        }
         showToast(`Ingestion error: ${err.message}`, 'error');
-
         appendTerminalLog(`Ingestion failure: ${err.message}`, 'error');
-
       }
-
     });
 
 
@@ -3785,6 +4059,23 @@
 
       DOM.diffSummaryTableBody.appendChild(tr);
 
+    }
+
+    // Step 1 Progression Guard
+    if (DOM.btnStep1Next) {
+      DOM.btnStep1Next.addEventListener('click', (e) => {
+        e.preventDefault();
+        if (state.isIngesting) {
+          showToast('⚠️ Ingestion is currently in progress. Please wait for it to complete.', 'warning');
+          appendTerminalLog('[NAV GUARD] Cannot proceed to Step 2 while ingestion is actively running.', 'warning');
+          return;
+        }
+        if (!state.posts || state.posts.length === 0) {
+          const proceed = confirm('No posts are currently ingested in this project. Proceed to Step 2 anyway?');
+          if (!proceed) return;
+        }
+        switchTab('tab-themes');
+      });
     }
 
 
@@ -3885,55 +4176,93 @@
 
 
 
-    // Theme Card Selection Handler
-
+    // Theme Card Selection Handler (with immediate persistence)
     document.querySelectorAll('.theme-card').forEach((card) => {
-
-      card.addEventListener('click', (e) => {
-
+      card.addEventListener('click', async (e) => {
         if (e.target.closest('.btn-preview-theme')) return; // handled by preview modal trigger
-
         const themeKey = card.dataset.theme;
-
-        document.querySelectorAll('.theme-card').forEach((c) => c.classList.remove('active'));
-
-        card.classList.add('active');
-
-        if (DOM.cfgTheme) DOM.cfgTheme.value = themeKey;
-
-        if (DOM.previewThemeSelect) DOM.previewThemeSelect.value = themeKey;
-
+        syncThemeToUI(themeKey);
         triggerPreview();
 
-      });
+        // Update in-memory project and config state immediately
+        const curProj = state.projects && state.projects.find((p) => p.id === state.activeProject);
+        if (curProj) curProj.theme = themeKey;
+        if (state.config && state.config.build) state.config.build.theme = themeKey;
+        if (state.status) state.status.theme = themeKey;
 
+        try {
+          if (state.activeProject) {
+            await api('/api/projects/update', 'POST', {
+              project_id: state.activeProject,
+              theme: themeKey,
+            });
+          }
+          await api('/api/config', 'POST', {
+            build: { theme: themeKey }
+          });
+          showToast(`Theme set to '${themeKey}'`, 'info');
+        } catch (err) {
+          console.warn('Auto-save theme failed:', err);
+        }
+      });
     });
 
+    // Quick Deploy Theme Select Handler (Step 4 Cockpit)
+    if (DOM.quickDeployThemeSelect) {
+      DOM.quickDeployThemeSelect.addEventListener('change', async () => {
+        const themeKey = DOM.quickDeployThemeSelect.value;
+        syncThemeToUI(themeKey);
+        triggerPreview();
 
+        // Update in-memory project and config state immediately
+        const curProj = state.projects && state.projects.find((p) => p.id === state.activeProject);
+        if (curProj) curProj.theme = themeKey;
+        if (state.config && state.config.build) state.config.build.theme = themeKey;
+        if (state.status) state.status.theme = themeKey;
 
-    // Routing Card Selection Handler
+        try {
+          if (state.activeProject) {
+            await api('/api/projects/update', 'POST', {
+              project_id: state.activeProject,
+              theme: themeKey,
+            });
+          }
+          await api('/api/config', 'POST', {
+            build: { theme: themeKey }
+          });
+          showToast(`Deploy theme set to '${themeKey}'`, 'info');
+        } catch (err) {
+          console.warn('Auto-save deploy theme failed:', err);
+        }
+      });
+    }
 
+    // Routing Card Selection Handler (with immediate persistence)
     document.querySelectorAll('.routing-card').forEach((card) => {
-
-      card.addEventListener('click', () => {
-
+      card.addEventListener('click', async () => {
         const routeKey = card.dataset.routing;
-
         document.querySelectorAll('.routing-card').forEach((c) => c.classList.remove('active'));
-
         card.classList.add('active');
-
         if (DOM.cfgRoutingMode) DOM.cfgRoutingMode.value = routeKey;
-
         if (DOM.previewRoutingSelect) DOM.previewRoutingSelect.value = routeKey;
-
         triggerPreview();
 
+        try {
+          if (state.activeProject) {
+            await api('/api/projects/update', 'POST', {
+              project_id: state.activeProject,
+              routing_mode: routeKey,
+            });
+          }
+          await api('/api/config', 'POST', {
+            build: { routing_mode: routeKey }
+          });
+          showToast(`Routing mode set to '${routeKey}'`, 'info');
+        } catch (err) {
+          console.warn('Auto-save routing mode failed:', err);
+        }
       });
-
     });
-
-
 
     // Open Fullscreen Template Preview Modal
 
@@ -4161,19 +4490,17 @@
       DOM.applyTemplateThemeBtn.addEventListener('click', () => {
 
         const chosen = state.modalActiveTheme || 'nordic-studio';
-
-        if (DOM.cfgTheme) DOM.cfgTheme.value = chosen;
-
-        if (DOM.previewThemeSelect) DOM.previewThemeSelect.value = chosen;
-
-        document.querySelectorAll('.theme-card').forEach((c) => {
-
-          if (c.dataset.theme === chosen) c.classList.add('active');
-
-          else c.classList.remove('active');
-
-        });
-
+        syncThemeToUI(chosen);
+        const curProj = state.projects && state.projects.find((p) => p.id === state.activeProject);
+        if (curProj) curProj.theme = chosen;
+        if (state.config && state.config.build) state.config.build.theme = chosen;
+        if (state.status) state.status.theme = chosen;
+        try {
+          if (state.activeProject) {
+            api('/api/projects/update', 'POST', { project_id: state.activeProject, theme: chosen });
+          }
+          api('/api/config', 'POST', { build: { theme: chosen } });
+        } catch (e) {}
         if (DOM.templatePreviewModal) DOM.templatePreviewModal.classList.remove('active');
 
         showToast(`Theme applied: ${chosen}. Click 'Save Generation Settings' to persist.`, 'success');
@@ -4221,12 +4548,22 @@
     async function handleSyncAssets() {
 
       try {
+        await autoSaveActiveProject();
+
+        const customDomainVal = DOM.cfgCfCustomDomain ? DOM.cfgCfCustomDomain.value.trim() : '';
+        const workerNameVal = DOM.cfgCfProjectName ? DOM.cfgCfProjectName.value.trim() : '';
 
         showToast('Syncing all post image assets to project...', 'info');
 
         appendTerminalLog('[ASSETS] Scanning posts and downloading missing featured images to assets/images/...', 'info');
 
-        const res = await api('/api/assets/sync', 'POST', { force: false });
+        const res = await api('/api/assets/sync', 'POST', {
+          force: false,
+          cf_custom_domain: customDomainVal,
+          custom_domain: customDomainVal,
+          cf_project_name: workerNameVal,
+          worker_name: workerNameVal,
+        });
 
         if (res.success) {
 
@@ -4311,40 +4648,69 @@
     // Build Trigger
 
     async function executeBuild() {
+      if (DOM.triggerBuildBtn) {
+        DOM.triggerBuildBtn.disabled = true;
+        DOM.triggerBuildBtn.innerHTML = '<span>⏳ Compiling...</span>';
+      }
+      if (DOM.buildProgressBarContainer) {
+        DOM.buildProgressBarContainer.style.display = 'block';
+        if (DOM.buildProgressBar) DOM.buildProgressBar.style.width = '30%';
+        if (DOM.buildProgressPercent) DOM.buildProgressPercent.textContent = '30%';
+        if (DOM.buildProgressLabel) DOM.buildProgressLabel.textContent = 'Compiling HTML templates, XML sitemaps & schemas...';
+      }
 
       try {
-
         appendTerminalLog('[BUILD] Starting static compilation to disk...', 'info');
 
         const isCf = (typeof currentPlatformMode !== 'undefined' && currentPlatformMode === 'cloudflare') || (state.activePlatform === 'cloudflare') || (!document.getElementById('workspaceCloudflare')?.classList.contains('hidden') && document.getElementById('workspaceCloudflare')?.style.display !== 'none');
         const activePlatform = isCf ? 'cloudflare' : 'github';
         const workerInput = document.getElementById('cfgCfProjectName')?.value?.trim();
         const activeProject = isCf 
-          ? (workerInput || DOM.cockpitCfWorker?.textContent?.trim() || 'gardenhome')
-          : (DOM.cockpitGhOwner?.textContent?.trim() || 'annadeco');
+          ? (workerInput || DOM.cockpitCfWorker?.textContent?.trim() || state.activeProject || 'stylesdays')
+          : (DOM.cockpitGhOwner?.textContent?.trim() || '');
 
-        const res = await api('/api/build', 'POST', { 
+        if (DOM.buildProgressBar) DOM.buildProgressBar.style.width = '65%';
+        if (DOM.buildProgressPercent) DOM.buildProgressPercent.textContent = '65%';
+        if (DOM.buildProgressLabel) DOM.buildProgressLabel.textContent = 'Generating 4,300+ internal routes and JSON-LD schemas...';
+
+        const currentTheme = (DOM.quickDeployThemeSelect && DOM.quickDeployThemeSelect.value) || (DOM.cfgTheme && DOM.cfgTheme.value) || undefined;
+        const currentRouting = (DOM.cfgRoutingMode && DOM.cfgRoutingMode.value) || undefined;
+        const res = await api('/api/build', 'POST', {
           clean: true,
           target_cloud: activePlatform,
-          project_name: activeProject
+          project_name: activeProject,
+          theme: currentTheme,
+          routing_mode: currentRouting
         });
 
         const assetMsg = res.assets_copied ? ` (${res.assets_copied} image assets copied)` : '';
 
-        showToast(`Build complete: ${res.files_generated} files generated${assetMsg}.`, 'success');
+        if (DOM.buildProgressBar) DOM.buildProgressBar.style.width = '100%';
+        if (DOM.buildProgressPercent) DOM.buildProgressPercent.textContent = '100%';
+        if (DOM.buildProgressLabel) DOM.buildProgressLabel.textContent = `✅ Build complete: ${res.files_generated} files generated!`;
 
+        showToast(`Build complete: ${res.files_generated} files generated${assetMsg}.`, 'success');
         appendTerminalLog(`[BUILD SUCCESS] Generated ${res.files_generated} static files in ${res.output_dir}${assetMsg}`, 'success');
 
-        refreshSystem();
+        await refreshSystem();
+
+        setTimeout(() => {
+          if (DOM.buildProgressBarContainer) DOM.buildProgressBarContainer.style.display = 'none';
+          if (DOM.triggerBuildBtn) {
+            DOM.triggerBuildBtn.disabled = false;
+            DOM.triggerBuildBtn.innerHTML = '<span>🔨 Build Static Site</span>';
+          }
+        }, 3000);
 
       } catch (err) {
-
+        if (DOM.buildProgressLabel) DOM.buildProgressLabel.textContent = `❌ Build failed: ${err.message}`;
+        if (DOM.triggerBuildBtn) {
+          DOM.triggerBuildBtn.disabled = false;
+          DOM.triggerBuildBtn.innerHTML = '<span>🔨 Build Static Site</span>';
+        }
         showToast(`Build failed: ${err.message}`, 'error');
-
         appendTerminalLog(`[BUILD ERROR] ${err.message}`, 'error');
-
       }
-
     }
 
     if (DOM.triggerBuildBtn) DOM.triggerBuildBtn.addEventListener('click', executeBuild);
@@ -4494,12 +4860,21 @@
     // Deploy Trigger: GitHub Pages
 
     DOM.triggerDeployBtn.addEventListener('click', async () => {
-
       const dryRun = DOM.deployDryRun.checked;
+      const ghOwner = DOM.cockpitGhOwner?.textContent?.trim() || '';
 
-      const ghOwner = DOM.cockpitGhOwner?.textContent?.trim() || 'annadeco';
+      if (DOM.triggerDeployBtn) {
+        DOM.triggerDeployBtn.disabled = true;
+        DOM.triggerDeployBtn.innerHTML = '<span>⏳ Deploying to GitHub...</span>';
+      }
+      if (DOM.ghDeployProgressBarContainer) {
+        DOM.ghDeployProgressBarContainer.style.display = 'block';
+        if (DOM.ghDeployProgressBar) DOM.ghDeployProgressBar.style.width = '15%';
+        if (DOM.ghDeployProgressPercent) DOM.ghDeployProgressPercent.textContent = '15%';
+        if (DOM.ghDeployProgressLabel) DOM.ghDeployProgressLabel.textContent = 'Initiating GitHub Pages deployment...';
+      }
+
       try {
-
         appendTerminalLog(`[GITHUB] Initiating Pages deployment (owner=${ghOwner}, dry_run=${dryRun})...`, 'info');
 
         const res = await api('/api/deploy', 'POST', { 
@@ -4509,32 +4884,33 @@
 
         showToast(res.message, 'info');
 
-
-
         startLogPolling((success) => {
-
-          if (success) {
-
-            showToast('GitHub Pages deployment completed successfully!', 'success');
-
-          } else {
-
-            showToast('GitHub deployment encountered errors.', 'error');
-
+          if (DOM.ghDeployProgressBar) DOM.ghDeployProgressBar.style.width = '100%';
+          if (DOM.ghDeployProgressPercent) DOM.ghDeployProgressPercent.textContent = '100%';
+          if (DOM.ghDeployProgressLabel) {
+            DOM.ghDeployProgressLabel.textContent = success ? '✅ GitHub Pages deployment completed!' : '❌ GitHub Pages deployment encountered errors.';
+          }
+          if (DOM.triggerDeployBtn) {
+            DOM.triggerDeployBtn.disabled = false;
+            DOM.triggerDeployBtn.innerHTML = '<span>🚀 Deploy to GitHub Pages</span>';
           }
 
+          if (success) {
+            showToast('GitHub Pages deployment completed successfully!', 'success');
+          } else {
+            showToast('GitHub Pages deployment encountered errors.', 'error');
+          }
           refreshSystem();
-
         });
 
       } catch (err) {
-
+        if (DOM.triggerDeployBtn) {
+          DOM.triggerDeployBtn.disabled = false;
+          DOM.triggerDeployBtn.innerHTML = '<span>🚀 Deploy to GitHub Pages</span>';
+        }
         showToast(`Deploy error: ${err.message}`, 'error');
-
         appendTerminalLog(`[GITHUB ERROR] ${err.message}`, 'error');
-
       }
-
     });
 
 
@@ -4542,52 +4918,115 @@
     // Deploy Trigger: Cloudflare Workers
 
     if (DOM.triggerCfDeployBtn) {
-
       DOM.triggerCfDeployBtn.addEventListener('click', async () => {
-
-        const dryRun = DOM.deployCfDryRun ? DOM.deployCfDryRun.checked : false;
-
-        const workerName = document.getElementById('cfgCfProjectName')?.value?.trim() || DOM.cockpitCfWorker?.textContent?.trim() || 'gardenhome';
-        try {
-
-          appendTerminalLog(`[CLOUDFLARE] Initiating Workers deployment (Worker Name=${workerName}, dry_run=${dryRun})...`, 'info');
-
-          const res = await api('/api/cloudflare/deploy', 'POST', { 
-            dry_run: dryRun,
-            subdomain: workerName,
-            worker_name: workerName
-          });
-
-          showToast(res.message, 'info');
-
-
-
-          startLogPolling((success) => {
-
-            if (success) {
-
-              showToast('Cloudflare Workers deployment completed successfully!', 'success');
-
-            } else {
-
-              showToast('Cloudflare Workers deployment encountered errors.', 'error');
-
-            }
-
-            refreshSystem();
-
-          });
-
-        } catch (err) {
-
-          showToast(`Cloudflare Deploy error: ${err.message}`, 'error');
-
-          appendTerminalLog(`[CLOUDFLARE ERROR] ${err.message}`, 'error');
-
+        if (state.isDeploying) {
+          showToast('Deployment is already in progress...', 'warning');
+          return;
         }
 
-      });
+        const dryRun = DOM.deployCfDryRun ? DOM.deployCfDryRun.checked : false;
+        const workerName = document.getElementById('cfgCfProjectName')?.value?.trim() || DOM.cockpitCfWorker?.textContent?.trim() || state.activeProject || 'stylesdays';
 
+        state.isDeploying = true;
+        if (DOM.triggerCfDeployBtn) {
+          DOM.triggerCfDeployBtn.disabled = true;
+          DOM.triggerCfDeployBtn.innerHTML = '<span>⏳ Deploying to Edge...</span>';
+        }
+        if (DOM.deployProgressBarContainer) {
+          DOM.deployProgressBarContainer.style.display = 'block';
+          if (DOM.deployProgressBar) DOM.deployProgressBar.style.width = '10%';
+          if (DOM.deployProgressPercent) DOM.deployProgressPercent.textContent = '10%';
+          if (DOM.deployProgressLabel) DOM.deployProgressLabel.textContent = 'Initializing Cloudflare deployment...';
+        }
+
+        try {
+          appendTerminalLog(`[CLOUDFLARE] Initiating Workers deployment (Worker Name=${workerName}, dry_run=${dryRun})...`, 'info');
+
+          const currentTheme = (DOM.quickDeployThemeSelect && DOM.quickDeployThemeSelect.value) || (DOM.cfgTheme && DOM.cfgTheme.value) || undefined;
+          const startRes = await api('/api/cloudflare/deploy', 'POST', { 
+            dry_run: dryRun,
+            subdomain: workerName,
+            worker_name: workerName,
+            theme: currentTheme
+          });
+
+          if (startRes.message) {
+            showToast(startRes.message, 'info');
+          }
+
+          if (state.deployPollInterval) clearInterval(state.deployPollInterval);
+
+          state.deployPollInterval = setInterval(async () => {
+            try {
+              const statusRes = await api('/api/deploy/status');
+              if (!statusRes) return;
+
+              if (statusRes.logs && statusRes.logs.length) {
+                renderTerminalLogs(statusRes.logs);
+              }
+
+              const pct = statusRes.percent || (statusRes.job && statusRes.job.percent) || 15;
+              const msg = statusRes.message || (statusRes.job && statusRes.job.message) || 'Deploying...';
+
+              if (DOM.deployProgressBar) {
+                DOM.deployProgressBar.style.width = `${Math.min(98, Math.max(10, pct))}%`;
+              }
+              if (DOM.deployProgressPercent) {
+                DOM.deployProgressPercent.textContent = `${pct}%`;
+              }
+              if (DOM.deployProgressLabel) {
+                DOM.deployProgressLabel.textContent = msg;
+              }
+
+              if (statusRes.status === 'success') {
+                clearInterval(state.deployPollInterval);
+                state.deployPollInterval = null;
+                state.isDeploying = false;
+
+                if (DOM.deployProgressBar) DOM.deployProgressBar.style.width = '100%';
+                if (DOM.deployProgressPercent) DOM.deployProgressPercent.textContent = '100%';
+                if (DOM.deployProgressLabel) DOM.deployProgressLabel.textContent = '✅ Deployment & Live Edge Verified! (HTTP 200)';
+                if (DOM.triggerCfDeployBtn) {
+                  DOM.triggerCfDeployBtn.disabled = false;
+                  DOM.triggerCfDeployBtn.innerHTML = '<span>🚀 Deploy to Cloudflare Edge</span>';
+                }
+
+                showToast('Cloudflare Workers deployment completed and live edge verified!', 'success');
+                appendTerminalLog(`[CLOUDFLARE SUCCESS] Deployed to ${statusRes.live_url || 'edge'} in ${statusRes.duration || '0'}s`, 'success');
+                await refreshSystem();
+              } else if (statusRes.status === 'error' || statusRes.status === 'failed') {
+                clearInterval(state.deployPollInterval);
+                state.deployPollInterval = null;
+                state.isDeploying = false;
+
+                if (DOM.deployProgressLabel) DOM.deployProgressLabel.textContent = `❌ Deployment failed: ${statusRes.error || statusRes.message || 'Unknown error'}`;
+                if (DOM.triggerCfDeployBtn) {
+                  DOM.triggerCfDeployBtn.disabled = false;
+                  DOM.triggerCfDeployBtn.innerHTML = '<span>🚀 Deploy to Cloudflare Edge</span>';
+                }
+
+                showToast(`Cloudflare deployment failed: ${statusRes.error || statusRes.message}`, 'error');
+                appendTerminalLog(`[CLOUDFLARE ERROR] ${statusRes.error || statusRes.message}`, 'error');
+              }
+            } catch (pollErr) {
+              console.warn('Error polling deploy status:', pollErr);
+            }
+          }, 800);
+
+        } catch (err) {
+          state.isDeploying = false;
+          if (state.deployPollInterval) {
+            clearInterval(state.deployPollInterval);
+            state.deployPollInterval = null;
+          }
+          if (DOM.triggerCfDeployBtn) {
+            DOM.triggerCfDeployBtn.disabled = false;
+            DOM.triggerCfDeployBtn.innerHTML = '<span>🚀 Deploy to Cloudflare Edge</span>';
+          }
+          showToast(`Cloudflare Deploy error: ${err.message}`, 'error');
+          appendTerminalLog(`[CLOUDFLARE ERROR] ${err.message}`, 'error');
+        }
+      });
     }
 
 
@@ -4687,6 +5126,10 @@
     switchTab('tab-ingest');
 
     initListeners();
+
+    if (window.LogoCropperStudio && !window.cropperStudioInstance) {
+      window.cropperStudioInstance = new window.LogoCropperStudio();
+    }
 
     initModelSwitcher();
 

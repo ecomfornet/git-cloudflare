@@ -327,7 +327,7 @@ def get_intermediate_routes(
             IntermediateRoute(
                 web_path=blog_web_path,
                 file_path=blog_file_path,
-                title="All Published Guides",
+                title="All Published Articles",
                 slug="blog",
                 parent_slug="",
                 depth=1,
@@ -361,7 +361,7 @@ def get_intermediate_routes(
                 IntermediateRoute(
                     web_path=web_path,
                     file_path=file_path,
-                    title=f"{name} Guides",
+                    title=f"{name}",
                     slug=cat_slug,
                     parent_slug="",
                     depth=1,
@@ -392,7 +392,7 @@ def get_intermediate_routes(
                 IntermediateRoute(
                     web_path=web_path,
                     file_path=file_path,
-                    title=f"{name} Guides",
+                    title=f"{name}",
                     slug=p_slug,
                     parent_slug=p_slug,
                     depth=1,
@@ -407,13 +407,13 @@ def get_intermediate_routes(
         guides_file_path = "guides/index.html"
         guides_breadcrumbs = [
             {"name": "Home", "url": home_url},
-            {"name": "Guides", "url": guides_web_path},
+            {"name": "Articles", "url": guides_web_path},
         ]
         intermediate_routes.append(
             IntermediateRoute(
                 web_path=guides_web_path,
                 file_path=guides_file_path,
-                title="Curated Guides Hub",
+                title="Curated Articles Hub",
                 slug="guides",
                 parent_slug="",
                 depth=1,
@@ -438,14 +438,14 @@ def get_intermediate_routes(
             file_path = f"guides/{p_slug}/index.html"
             breadcrumbs = [
                 {"name": "Home", "url": home_url},
-                {"name": "Guides", "url": guides_web_path},
+                {"name": "Articles", "url": guides_web_path},
                 {"name": name, "url": web_path},
             ]
             intermediate_routes.append(
                 IntermediateRoute(
                     web_path=web_path,
                     file_path=file_path,
-                    title=f"{name} Guides",
+                    title=f"{name}",
                     slug=p_slug,
                     parent_slug=p_slug,
                     depth=2,

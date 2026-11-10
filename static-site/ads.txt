@@ -1,0 +1,17 @@
+# ads.txt for Styleire (styleire.com)
+# Authorized Digital Sellers — IAB Tech Lab spec 1.1
+#
+# HOW TO FINISH THIS FILE:
+# After your ad-management application (Journey by Mediavine, AdSense, etc.)
+# is approved, replace the placeholder lines below with the exact lines your
+# ad partner gives you. Every line must be copied verbatim — a wrong publisher
+# ID means the inventory is treated as unauthorized and will not monetize.
+
+# --- Google AdSense / Ad Manager (replace pub-0000000000000000 with your ID) ---
+google.com, pub-0000000000000000, DIRECT, f08c47fec0942fa0
+
+# --- Journey by Mediavine ---
+# Mediavine supplies a long block of lines (or asks you to redirect ads.txt
+# to their managed file). Paste it here, or replace this whole file with:
+# subdomain=amp.example.com
+# and the redirect line they provide.

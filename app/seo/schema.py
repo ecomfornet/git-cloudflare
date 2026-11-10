@@ -85,6 +85,9 @@ def resolve_image_url(post: Any, base_url: str) -> str:
         clean_local = str(local_path).lstrip("/")
         if clean_local.startswith("http://") or clean_local.startswith("https://"):
             return clean_local
+        if "/images/" in clean_local and not clean_local.startswith("assets/images/"):
+            fname = clean_local.split("/images/")[-1]
+            clean_local = f"assets/images/{fname}"
         return join_base_and_path(base_url, f"/{clean_local}")
 
     # Determine extension from remote image_url if available
@@ -126,6 +129,10 @@ def build_breadcrumb_list(
     Utilizes route.breadcrumbs if provided, or synthesizes based on web_path/taxonomy.
     """
     clean_base = base_url.rstrip("/")
+    parsed_base = urllib.parse.urlparse(clean_base)
+    if parsed_base.netloc and not parsed_base.netloc.endswith(".github.io"):
+        clean_base = f"{parsed_base.scheme}://{parsed_base.netloc}"
+        base_url = clean_base
     post_title = strip_html(_get_field(post, "title") or _get_field(post, "slug", "Article"))
     slug = _get_field(post, "slug", "")
     web_path = _get_field(route, "web_path") or f"/{slug}/"
@@ -173,27 +180,29 @@ def build_breadcrumb_list(
         category_slug = _get_field(post, "category_slug", "")
         parent_slug = _get_field(post, "parent_slug", "")
         cat_seg = category_slug or parent_slug
+        raw_cat_display = category or (cat_seg.replace("-", " ").title() if cat_seg else "")
+        cat_display = re.sub(r'\s+guides?$', '', raw_cat_display, flags=re.IGNORECASE).strip() or raw_cat_display
 
         # Detect 3-level (silo_nested)
         if "/guides/" in web_path or _get_field(route, "depth", 1) == 3:
             items.append({
                 "@type": "ListItem",
                 "position": 2,
-                "name": "Guides",
+                "name": "Articles",
                 "item": join_base_and_path(base_url, "/guides/"),
             })
             if cat_seg:
                 items.append({
                     "@type": "ListItem",
                     "position": 3,
-                    "name": category or cat_seg.replace("-", " ").title(),
+                    "name": cat_display,
                     "item": join_base_and_path(base_url, f"/guides/{cat_seg}/"),
                 })
         elif cat_seg:
             items.append({
                 "@type": "ListItem",
                 "position": 2,
-                "name": category or cat_seg.replace("-", " ").title(),
+                "name": cat_display,
                 "item": join_base_and_path(base_url, f"/{cat_seg}/"),
             })
 
@@ -211,14 +220,25 @@ def build_breadcrumb_list(
 
 
 def build_faq_schema(post: Any) -> Optional[dict[str, Any]]:
-    """Constructs Schema.org FAQPage schema from post FAQ data."""
+    """Constructs Schema.org FAQPage schema from post FAQ data with contextual fallback."""
     faqs = _get_field(post, "faq", []) or _get_field(post, "faqs", [])
     if not faqs:
         raw_meta = _get_field(post, "raw_meta", {})
         if isinstance(raw_meta, dict):
             faqs = raw_meta.get("faq") or raw_meta.get("faqs") or []
     if not faqs:
-        return None
+        title = strip_html(_get_field(post, "title") or _get_field(post, "slug", "Home Decor"))
+        cat = strip_html(_get_field(post, "category") or "Interior Design")
+        faqs = [
+            {
+                "question": f"What are key considerations for {title}?",
+                "answer": f"Focus on optimal spatial layout, cohesive color harmonies, and curated textures that elevate {cat.lower()} aesthetics while maximizing functionality."
+            },
+            {
+                "question": f"How do I recreate this curated {cat.lower()} design affordably?",
+                "answer": f"Prioritize timeless foundational furniture, incorporate layered ambient lighting, and add distinct personality through organic textiles and artisanal accents."
+            }
+        ]
 
     items = []
     for item in faqs:
@@ -267,9 +287,19 @@ def build_article_schema(
 ) -> dict[str, Any]:
     """Constructs Schema.org Article block with E-E-A-T Person author and Organization publisher."""
     clean_base = base_url.rstrip("/")
+    parsed_base = urllib.parse.urlparse(clean_base)
+    if parsed_base.netloc and not parsed_base.netloc.endswith(".github.io"):
+        clean_base = f"{parsed_base.scheme}://{parsed_base.netloc}"
+        base_url = clean_base
+    if not brand_name or (base_url and brand_name.lower() in base_url.lower() and "workers.dev" in base_url.lower()):
+        clean_domain_derived = source_domain.split(".")[0].replace("-", " ").title() if source_domain else "Editorial"
+        brand_name = clean_domain_derived
     slug = _get_field(post, "slug", "")
-    title = strip_html(_get_field(post, "title") or slug)
-    excerpt = strip_html(_get_field(post, "excerpt") or _get_field(post, "description", ""))
+    title = strip_html(_get_field(post, "title") or slug.replace("-", " ").title())
+    raw_excerpt = strip_html(_get_field(post, "excerpt") or _get_field(post, "description", "")).strip()
+    if not raw_excerpt or ("." in raw_excerpt and " " not in raw_excerpt) or len(raw_excerpt) < 15:
+        raw_excerpt = f"Discover inspiring {title.lower()} with practical styling tips, curated palettes, and modern decor ideas."
+    excerpt = raw_excerpt
 
     web_path = _get_field(route, "web_path") or f"/{slug}/"
     full_page_url = join_base_and_path(base_url, web_path)
@@ -375,6 +405,10 @@ def generate_multi_tier_json_ld_scripts(
     3. BreadcrumbList schema
     """
     scripts: list[str] = []
+    clean_base = base_url.rstrip("/")
+    parsed_base = urllib.parse.urlparse(clean_base)
+    if parsed_base.netloc and not parsed_base.netloc.endswith(".github.io"):
+        base_url = f"{parsed_base.scheme}://{parsed_base.netloc}"
 
     # 1. Article schema
     article = build_article_schema(
@@ -475,14 +509,21 @@ def generate_opengraph_tags(
 ) -> list[str]:
     """Generates standard OpenGraph metadata tags referencing native GitHub-hosted assets."""
     clean_base = base_url.rstrip("/")
+    if not brand_name or (base_url and brand_name.lower() in base_url.lower() and "workers.dev" in base_url.lower()):
+        clean_domain_derived = source_domain.split(".")[0].replace("-", " ").title() if source_domain else "Editorial"
+        brand_name = clean_domain_derived
     slug = _get_field(post, "slug", "")
-    title = strip_html(_get_field(post, "title") or slug)
-    excerpt = strip_html(_get_field(post, "excerpt") or _get_field(post, "description", ""))
+    title = strip_html(_get_field(post, "title") or slug.replace("-", " ").title())
+    raw_excerpt = strip_html(_get_field(post, "excerpt") or _get_field(post, "description", "")).strip()
+    if not raw_excerpt or ("." in raw_excerpt and " " not in raw_excerpt) or len(raw_excerpt) < 15:
+        raw_excerpt = f"Discover inspiring {title.lower()} with practical styling tips, curated palettes, and modern decor ideas."
+    excerpt = raw_excerpt
 
     web_path = _get_field(route, "web_path") or f"/{slug}/"
     full_page_url = join_base_and_path(base_url, web_path)
     image_url = resolve_image_url(post, base_url)
-    site_name = f"{source_domain} Editorial Hub"
+    clean_site_domain = "Styleire" if "asqstyle" in source_domain.lower() else source_domain
+    site_name = f"{clean_site_domain} Editorial Hub"
 
     return [
         '<meta property="og:type" content="article">',
@@ -503,7 +544,8 @@ def generate_pinterest_tags(
     raw_modified = _get_field(post, "modified") or _get_field(post, "lastmod", raw_date)
     date_published = _format_iso_date(raw_date or raw_modified)
     date_modified = _format_iso_date(raw_modified or raw_date)
-    author_name = f"{source_domain} Editorial Team"
+    clean_pin_domain = "Styleire" if "asqstyle" in source_domain.lower() else source_domain
+    author_name = f"{clean_pin_domain} Editorial Team"
 
     return [
         '<meta name="pinterest-rich-pin" content="true">',
@@ -543,18 +585,25 @@ def generate_seo_head(
     and JSON-LD structured data.
     """
     clean_base = base_url.rstrip("/")
+    if not brand_name or (base_url and brand_name.lower() in base_url.lower() and "workers.dev" in base_url.lower()):
+        clean_domain_derived = source_domain.split(".")[0].replace("-", " ").title() if source_domain else "Editorial"
+        brand_name = clean_domain_derived
     slug = _get_field(post, "slug", "")
-    excerpt = strip_html(_get_field(post, "excerpt") or _get_field(post, "description", ""))
+    title = strip_html(_get_field(post, "title") or slug.replace("-", " ").title())
+    raw_excerpt = strip_html(_get_field(post, "excerpt") or _get_field(post, "description", "")).strip()
+    if not raw_excerpt or ("." in raw_excerpt and " " not in raw_excerpt) or len(raw_excerpt) < 15:
+        raw_excerpt = f"Discover inspiring {title.lower()} with practical styling tips, curated palettes, and modern decor ideas."
+    excerpt = raw_excerpt
 
     web_path = _get_field(route, "web_path") or f"/{slug}/"
     full_page_url = join_base_and_path(base_url, web_path)
 
     raw_meta = _get_field(post, "raw_meta", {})
-    canonical_source = (
-        _get_field(post, "link", "")
-        or (raw_meta.get("link") if isinstance(raw_meta, dict) else "")
-        or full_page_url
-    )
+    post_link = _get_field(post, "link", "") or (raw_meta.get("link") if isinstance(raw_meta, dict) else "")
+    if not post_link or any(d in post_link.lower() for d in ("asqstyle.com", "asqstyle", "stylesdays.com", "stylesdays")):
+        canonical_source = full_page_url
+    else:
+        canonical_source = post_link or full_page_url
 
     tags: list[str] = [
         f'<meta name="description" content="{html.escape(excerpt, quote=True)}">',

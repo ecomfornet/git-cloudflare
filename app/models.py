@@ -170,6 +170,27 @@ class Manifest:
     def __post_init__(self) -> None:
         if not self.updated_at:
             self.updated_at = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        if self.posts and not self.categories:
+            self.categories = self.derive_categories()
+
+    def derive_categories(self) -> list[dict[str, str]]:
+        """Derives unique category name/slug pairs dynamically from the current posts.
+
+        Preserves insertion order while guaranteeing slug uniqueness.
+        """
+        seen_slugs: set[str] = set()
+        derived: list[dict[str, str]] = []
+        for post in self.posts.values():
+            name = (post.category or "").strip()
+            slug = (post.category_slug or "").strip()
+            if name and slug and slug not in seen_slugs:
+                seen_slugs.add(slug)
+                derived.append({"name": name, "slug": slug})
+        return derived
+
+    def recompute_categories(self) -> None:
+        """Sets self.categories = self.derive_categories(), instantly purging stale or phantom categories."""
+        self.categories = self.derive_categories()
 
     def get_post(self, slug: str) -> Optional[PostItem]:
         """Retrieves a post by slug or None if not found."""
@@ -181,27 +202,24 @@ class Manifest:
             raise ValueError("Cannot upsert PostItem with empty slug")
         self.posts[post.slug] = post
         self.updated_at = datetime.datetime.now(datetime.timezone.utc).isoformat()
-
-        # Update category taxonomy if category is present and not yet registered
-        if post.category and post.category_slug:
-            existing = any(c.get("slug") == post.category_slug for c in self.categories)
-            if not existing:
-                self.categories.append({"name": post.category, "slug": post.category_slug})
+        self.recompute_categories()
 
     def delete_post(self, slug: str) -> Optional[PostItem]:
-        """Deletes a post by slug from the manifest."""
+        """Deletes a post by slug from the manifest and recomputes taxonomy."""
         post = self.posts.pop(slug, None)
         if post:
             self.updated_at = datetime.datetime.now(datetime.timezone.utc).isoformat()
+            self.recompute_categories()
         return post
 
     def to_dict(self) -> dict[str, Any]:
         """Serializes Manifest to dictionary conforming to Interface Contract 1."""
+        cats = self.derive_categories() if self.posts else [dict(c) for c in self.categories]
         return {
             "version": self.version,
             "updated_at": self.updated_at,
             "posts": {slug: post.to_dict() for slug, post in self.posts.items()},
-            "categories": [dict(c) for c in self.categories],
+            "categories": cats,
         }
 
     def to_json(self, indent: int = 2) -> str:
@@ -245,12 +263,15 @@ class Manifest:
         raw_categories = data.get("categories") or []
         categories = [dict(c) for c in raw_categories if isinstance(c, dict)]
 
-        return cls(
+        manifest = cls(
             version=str(data.get("version") or "2.0"),
             updated_at=str(data.get("updated_at") or datetime.datetime.now(datetime.timezone.utc).isoformat()),
             posts=posts,
             categories=categories,
         )
+        if posts:
+            manifest.recompute_categories()
+        return manifest
 
     @classmethod
     def load_from_json(cls, path: str) -> Manifest:
@@ -366,34 +387,131 @@ class RouteResult:
         )
 
 
-@dataclass
-class DeployJob:
-    """State tracking for a GitHub Pages deployment job."""
 
-    status: str = "pending"  # "pending" | "in_progress" | "success" | "failed"
+@dataclass
+class IngestJob:
+    """State tracking for asynchronous sitemap/API ingestion job."""
+
+    status: str = "idle"  # "idle" | "running" | "success" | "error"
     started_at: str = ""
     completed_at: str = ""
+    current_post: str = ""
+    processed_count: int = 0
+    total_count: int = 0
+    message: str = ""
+    counts: dict[str, int] = field(default_factory=lambda: {"new": 0, "updated": 0, "synced": 0, "total": 0})
+    error: str = ""
+    new_posts: list[dict[str, Any]] = field(default_factory=list)
+    updated_posts: list[dict[str, Any]] = field(default_factory=list)
+    synced_posts: list[dict[str, Any]] = field(default_factory=list)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "status": self.status,
+            "started_at": self.started_at,
+            "completed_at": self.completed_at,
+            "current_post": self.current_post,
+            "processed_count": self.processed_count,
+            "total_count": self.total_count,
+            "message": self.message,
+            "counts": self.counts,
+            "error": self.error,
+            "new_posts": self.new_posts,
+            "updated_posts": self.updated_posts,
+            "synced_posts": self.synced_posts,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Optional[dict[str, Any]] = None) -> IngestJob:
+        if not data:
+            return cls()
+        return cls(
+            status=str(data.get("status") or "idle"),
+            started_at=str(data.get("started_at") or ""),
+            completed_at=str(data.get("completed_at") or ""),
+            current_post=str(data.get("current_post") or ""),
+            processed_count=int(data.get("processed_count") or 0),
+            total_count=int(data.get("total_count") or 0),
+            message=str(data.get("message") or ""),
+            counts=data.get("counts") or {"new": 0, "updated": 0, "synced": 0, "total": 0},
+            error=str(data.get("error") or ""),
+            new_posts=data.get("new_posts") or [],
+            updated_posts=data.get("updated_posts") or [],
+            synced_posts=data.get("synced_posts") or [],
+        )
+
+@dataclass
+class DeployJob:
+    """State tracking for Cloudflare Workers & GitHub Pages deployment jobs."""
+
+    status: str = "idle"  # "idle" | "running" | "success" | "error" | "failed"
+    stage: str = ""  # "setup" | "compiling" | "syncing" | "uploading" | "probing" | "done"
+    percent: int = 0  # 0 to 100
+    message: str = ""
+    target: str = "Cloudflare Workers"
+    subdomain: str = ""
+    live_url: str = ""
+    duration: float = 0.0
+    files_count: int = 0
     total_files: int = 0
     deployed_files: int = 0
     commit_sha: str = ""
+    error: str = ""
     errors: list[str] = field(default_factory=list)
+    started_at: str = ""
+    completed_at: str = ""
+    edge_verification: dict[str, Any] = field(default_factory=dict)
+    output: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         """Serializes DeployJob to dictionary."""
         return {
             "status": self.status,
+            "stage": self.stage,
+            "percent": self.percent,
+            "message": self.message,
+            "target": self.target,
+            "subdomain": self.subdomain,
+            "live_url": self.live_url,
+            "duration": self.duration,
+            "files_count": self.files_count,
+            "total_files": self.total_files or self.files_count,
+            "deployed_files": self.deployed_files or self.files_count,
+            "commit_sha": self.commit_sha,
+            "error": self.error,
+            "errors": [str(e) for e in self.errors] if self.errors else ([self.error] if self.error else []),
             "started_at": self.started_at,
             "completed_at": self.completed_at,
-            "total_files": self.total_files,
-            "deployed_files": self.deployed_files,
-            "commit_sha": self.commit_sha,
-            "errors": [str(e) for e in self.errors],
+            "edge_verification": self.edge_verification,
+            "output": self.output,
         }
 
     @classmethod
-    def from_dict(cls, data: Optional[dict[str, Any]] = None) -> DeployJob:
+    def from_dict(cls, data: Optional[dict[str, Any]] = None) -> "DeployJob":
         if not data:
             return cls()
+        raw_errors = data.get("errors") or []
+        errors = [str(e) for e in raw_errors]
+        return cls(
+            status=str(data.get("status") or "idle"),
+            stage=str(data.get("stage") or ""),
+            percent=int(data.get("percent") or 0),
+            message=str(data.get("message") or ""),
+            target=str(data.get("target") or "Cloudflare Workers"),
+            subdomain=str(data.get("subdomain") or ""),
+            live_url=str(data.get("live_url") or ""),
+            duration=float(data.get("duration") or 0.0),
+            files_count=int(data.get("files_count") or data.get("total_files") or 0),
+            total_files=int(data.get("total_files") or data.get("files_count") or 0),
+            deployed_files=int(data.get("deployed_files") or data.get("files_count") or 0),
+            commit_sha=str(data.get("commit_sha") or ""),
+            error=str(data.get("error") or (errors[0] if errors else "")),
+            errors=errors,
+            started_at=str(data.get("started_at") or ""),
+            completed_at=str(data.get("completed_at") or ""),
+            edge_verification=data.get("edge_verification") or {},
+            output=str(data.get("output") or ""),
+        )
         raw_errors = data.get("errors") or []
         errors = [str(e) for e in raw_errors]
         return cls(
@@ -427,6 +545,8 @@ class ProjectItem:
     routing_mode: str = "single"
     manifest_path: str = ""
     output_dir: str = ""
+    max_posts: int = 60
+    download_images: bool = True
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -446,6 +566,8 @@ class ProjectItem:
             "routing_mode": self.routing_mode,
             "manifest_path": self.manifest_path,
             "output_dir": self.output_dir,
+            "max_posts": getattr(self, "max_posts", 60),
+            "download_images": getattr(self, "download_images", True),
         }
 
     @classmethod
@@ -469,5 +591,7 @@ class ProjectItem:
             routing_mode=str(data.get("routing_mode") or "single"),
             manifest_path=str(data.get("manifest_path") or ""),
             output_dir=str(data.get("output_dir") or ""),
+            max_posts=int(data.get("max_posts", 60)),
+            download_images=bool(data.get("download_images", True)),
         )
 

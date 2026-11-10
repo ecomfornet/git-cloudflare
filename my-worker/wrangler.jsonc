@@ -1,12 +1,11 @@
 {
-  "name": "gardenhomejdhd",
+  "name": "my-worker",
   "main": "src/index.ts",
   "compatibility_date": "2024-11-01",
   "compatibility_flags": [
     "global_fetch_strictly_public"
   ],
   "assets": {
-    // The path to the directory containing the `index.html` file to be served at `/`
     "directory": "./public"
   },
   "observability": {

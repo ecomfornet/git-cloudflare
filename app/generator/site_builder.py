@@ -113,6 +113,31 @@ def _clean_source_domain(domain: str) -> str:
     return clean.rstrip("/")
 
 
+def derive_brand_from_domain(domain: str, worker_name: str = "") -> str:
+    """Intelligently derives a clean, human-readable Brand Name from a custom domain.
+    Never returns worker names, infrastructure tokens, or raw URLs.
+    """
+    clean = re.sub(r"^https?://", "", str(domain or ""), flags=re.IGNORECASE).strip("/ ")
+    if not clean or any(w in clean.lower() for w in ("workers.dev", "pages.dev", "github.io", "localhost", "127.0.0.1")):
+        return "Styleire"
+    host = clean.split("/")[0].split(":")[0]
+    parts = host.split(".")
+    if len(parts) >= 3 and parts[0].lower() in ("www", "decor", "blog", "shop", "store", "news", "hub", "mag", "magazine", "studio", "app", "web", "cdn"):
+        main_token = parts[1]
+    elif len(parts) >= 2:
+        main_token = parts[0]
+    else:
+        main_token = host
+
+    if worker_name and main_token.strip().lower() == worker_name.strip().lower():
+        return "Styleire"
+    if main_token.lower() in ("test", "demo"):
+        return "Styleire"
+    brand = main_token.replace("-", " ").replace("_", " ").strip().title()
+    return brand or "Styleire"
+
+
+
 THEME_PALETTES = {
     "editorial-warm": {
         "bg_body": "#FAF8F5",
@@ -233,7 +258,10 @@ def _build_standalone_seo_head(post: PostItem, route: RouteResult, base_url: str
     image_url = join_base_and_path(clean_base, image_rel_clean)
 
     title_escaped = html_lib.escape(post.title or "Editorial Guide")
-    excerpt_escaped = html_lib.escape(post.excerpt or "")
+    clean_excerpt = (post.excerpt or "").strip()
+    if not clean_excerpt or clean_excerpt.lower() in ("asqstyle", "asqstyle.com", "stylesdays", "stylesdays.com") or len(clean_excerpt) < 15:
+        clean_excerpt = f"Discover inspiring {(post.title or 'home styling').lower()} with practical styling tips, curated palettes, and modern decor ideas."
+    excerpt_escaped = html_lib.escape(clean_excerpt)
 
     # Breadcrumb list schema
     bc_items = []
@@ -250,18 +278,18 @@ def _build_standalone_seo_head(post: PostItem, route: RouteResult, base_url: str
     article_schema = {
         "@type": "Article",
         "headline": post.title or "Editorial Guide",
-        "description": post.excerpt or "",
+        "description": clean_excerpt,
         "image": image_url,
         "datePublished": post.date or "2026-01-01",
         "dateModified": post.modified or post.date or "2026-01-01",
         "author": {
-            "@type": "Organization",
-            "name": "StylesDays Editorial",
-            "url": "https://stylesdays.com",
+            "@type": "Person",
+            "name": "Sophia Bennett",
+            "url": f"{clean_base}/author/sophia-bennett/",
         },
         "publisher": {
             "@type": "Organization",
-            "name": "StylesDays",
+            "name": "Styleire",
             "logo": {
                 "@type": "ImageObject",
                 "url": f"{clean_base}/assets/images/logo.png",
@@ -278,15 +306,39 @@ def _build_standalone_seo_head(post: PostItem, route: RouteResult, base_url: str
         "itemListElement": bc_items,
     }
 
+    # Extract FAQs if present in raw_meta or fallback
+    raw_faqs = (post.raw_meta or {}).get("faq") if hasattr(post, "raw_meta") else None
+    if not raw_faqs:
+        raw_faqs = [
+            {"q": f"What is the best way to get started with {post.title}?", "a": f"Begin with the core principles detailed in this guide: assess room dimensions, choose a cohesive palette, and prioritize functional layout."},
+            {"q": "How long does a home styling project typically take?", "a": "Most focused room styling projects can be completed over a single weekend with proper planning and sourcing."}
+        ]
+
+    faq_schema = {
+        "@type": "FAQPage",
+        "mainEntity": [
+            {
+                "@type": "Question",
+                "name": f.get("q", ""),
+                "acceptedAnswer": {"@type": "Answer", "text": f.get("a", "")}
+            }
+            for f in raw_faqs if f.get("q") and f.get("a")
+        ]
+    }
+
+    graph_items = [article_schema, breadcrumb_schema]
+    if faq_schema["mainEntity"]:
+        graph_items.append(faq_schema)
+
     json_ld_graph = {
         "@context": "https://schema.org",
-        "@graph": [article_schema, breadcrumb_schema],
+        "@graph": graph_items,
     }
     json_ld_str = json.dumps(json_ld_graph, indent=2)
 
     return f"""  <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{title_escaped} | Home Organization & Living Ideas</title>
+  <title>{title_escaped} | Styleire</title>
   <meta name="description" content="{excerpt_escaped}">
   <link rel="canonical" href="{page_url}">
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
@@ -297,7 +349,8 @@ def _build_standalone_seo_head(post: PostItem, route: RouteResult, base_url: str
   <meta property="og:description" content="{excerpt_escaped}">
   <meta property="og:url" content="{page_url}">
   <meta property="og:image" content="{image_url}">
-  <meta property="og:site_name" content="Home Organization & Living Ideas">
+  <meta property="og:site_name" content="Styleire">
+  <meta name="twitter:site" content="@styleire">
   
   <!-- Pinterest Rich Pin Metadata -->
   <meta name="pinterest-rich-pin" content="true">
@@ -319,12 +372,34 @@ def _build_standalone_post_html(
     base_url: str,
     seo_head: str,
     source_domain: str = "stylesdays.com",
+    branding: Optional[Any] = None,
+    categories: Optional[list[Any]] = None,
+    routing_mode: str = "single",
 ) -> str:
     """Builds a complete post page containing all R4 interactive components and typography."""
     palette = THEME_PALETTES.get(theme_key, THEME_PALETTES["editorial-warm"])
     clean_base = base_url.rstrip("/") if base_url else ""
     path_prefix = _extract_path_prefix(base_url)
     clean_domain = _clean_source_domain(source_domain)
+    brand_name = getattr(branding, "brand_name", "") or (branding.get("brand_name") if isinstance(branding, dict) else "") or (clean_domain.split(".")[0].title() if clean_domain else "StylesDays")
+    logo_path = getattr(branding, "logo_path", "") or (branding.get("logo_path") if isinstance(branding, dict) else "") or ""
+    home_link = f"{path_prefix}/" if path_prefix else "/"
+
+    if logo_path:
+        clean_logo = logo_path.lstrip("/")
+        logo_url = f"{path_prefix}/{clean_logo}" if path_prefix else f"/{clean_logo}"
+        brand_html = f'<a href="{home_link}" class="inline-block hover:opacity-90 transition"><img src="{logo_url}" alt="{html_lib.escape(brand_name)}" class="h-8 max-w-[180px] object-contain pseo-custom-logo"></a>'
+    else:
+        brand_html = f'<a href="{home_link}" class="flex items-center gap-2"><span class="w-8 h-8 rounded-lg flex items-center justify-center text-white font-bold text-sm" style="background-color: {palette["accent"]}">{brand_name[:1].upper()}</span><span class="font-serif-editorial text-xl font-bold tracking-tight text-stone-900">{html_lib.escape(brand_name)}</span></a>'
+
+    nav_links_html = ""
+    if categories:
+        for c in categories[:6]:
+            c_name = c.get("name") if isinstance(c, dict) else (getattr(c, "name", "") or str(c))
+            c_slug = c.get("slug") if isinstance(c, dict) else (getattr(c, "slug", "") or slugify(c_name))
+            if c_slug:
+                c_url = f"{path_prefix}/{c_slug}/" if path_prefix else f"/{c_slug}/"
+                nav_links_html += f'<a href="{c_url}" class="text-xs font-semibold text-stone-600 hover:text-stone-900 px-2 py-1 rounded transition">{html_lib.escape(c_name)}</a>'
 
     # Breadcrumb HTML
     crumbs_html = []
@@ -377,7 +452,7 @@ def _build_standalone_post_html(
             rp_img = f"{path_prefix}/{clean_img}" if path_prefix else f"/{clean_img}"
         rp_fallback_svg = f"{path_prefix}/assets/images/placeholder.svg" if path_prefix else "/assets/images/placeholder.svg"
         rp_title = html_lib.escape(rp.title or rp.slug)
-        rp_cat = html_lib.escape(rp.category or "Guides")
+        rp_cat = html_lib.escape(rp.category or "Articles")
         related_cards_html += f"""
         <article class="bg-white rounded-2xl border border-stone-200 overflow-hidden shadow-xs hover:shadow-md transition flex flex-col justify-between group">
           <a href="{rp_route.web_path}" class="block">
@@ -401,6 +476,20 @@ def _build_standalone_post_html(
 
     home_link = f"{path_prefix}/" if path_prefix else "/"
 
+    # Post Body HTML
+    raw_body = post.content_html or ""
+    if raw_body:
+        from app.themes.templates import clean_and_wrap_article_images
+        body_html_rendered = clean_and_wrap_article_images(
+            raw_body,
+            canonical_url=join_base_and_path(clean_base, route.web_path),
+            canonical_base=clean_base,
+            page_title=post.title or "",
+            path_prefix=path_prefix,
+        )
+    else:
+        body_html_rendered = f'<p>{html_lib.escape(post.excerpt)}</p><p>Explore comprehensive DIY storage systems, modular shelving options, and minimalist organization tips crafted to elevate everyday spaces.</p>'
+
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -423,14 +512,13 @@ def _build_standalone_post_html(
 <body class="min-h-screen flex flex-col antialiased">
   <!-- Top Navigation Header -->
   <header class="bg-white border-b border-stone-200/80 sticky top-0 z-40 backdrop-blur-md bg-white/95">
-    <div class="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between">
-      <a href="{home_link}" class="flex items-center gap-2">
-        <span class="w-8 h-8 rounded-lg flex items-center justify-center text-white font-bold text-sm" style="background-color: {palette['accent']}">S</span>
-        <span class="font-serif-editorial text-xl font-bold tracking-tight text-stone-900">StylesDays</span>
-      </a>
-      <div class="flex items-center gap-3">
+    <div class="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between gap-4">
+      {brand_html}
+      <nav class="hidden sm:flex items-center gap-3">
+        {nav_links_html}
+      </nav>
+      <div class="flex items-center gap-2">
         <a href="{home_link}" class="text-xs font-semibold text-stone-600 hover:text-stone-900 px-3 py-1.5 rounded-lg hover:bg-stone-100 transition">Hub</a>
-        <a href="https://{clean_domain}/" target="_blank" rel="noopener" class="text-xs font-bold text-white px-4 py-2 rounded-xl shadow-xs hover:opacity-90 transition" style="background-color: {palette['accent']}">Original Post ↗</a>
       </div>
     </div>
   </header>
@@ -444,12 +532,11 @@ def _build_standalone_post_html(
 
   <!-- Main Article Content -->
   <main class="max-w-4xl w-full mx-auto px-4 py-10 flex-grow">
-    <!-- Category & Date Header -->
+    <!-- Category Header -->
     <div class="flex items-center gap-3 mb-4">
       <span class="px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider text-white" style="background-color: {palette['accent']}">
         {html_lib.escape(post.category or 'Home Organization')}
       </span>
-      <span class="text-xs text-stone-400 font-medium">Updated: {post.modified or post.date or '2026-10-29'}</span>
     </div>
 
     <!-- Article Headline -->
@@ -478,7 +565,7 @@ def _build_standalone_post_html(
 
     <!-- Post Body HTML -->
     <article class="prose prose-stone max-w-none text-stone-700 leading-relaxed mb-12 space-y-4">
-      {post.content_html or f'<p>{html_lib.escape(post.excerpt)}</p><p>Explore comprehensive DIY storage systems, modular shelving options, and minimalist organization tips crafted to elevate everyday spaces.</p>'}
+      {body_html_rendered}
     </article>
 
     <!-- Interactive Room & DIY Checklist Component -->
@@ -496,9 +583,9 @@ def _build_standalone_post_html(
       <p class="text-xs text-stone-400">Progress is automatically saved to your browser local storage.</p>
     </section>
 
-    <!-- Related Guides Cards Section -->
+    <!-- Related Articles Cards Section -->
     <section class="border-t border-stone-200/80 pt-10">
-      <h2 class="font-serif-editorial text-2xl font-bold text-stone-900 mb-6">Related Guides & Styling Ideas</h2>
+      <h2 class="font-serif-editorial text-2xl font-bold text-stone-900 mb-6">Related Articles &amp; Styling Ideas</h2>
       <div class="grid grid-cols-1 sm:grid-cols-3 gap-6">
         {related_cards_html}
       </div>
@@ -552,6 +639,55 @@ def _build_standalone_post_html(
       updateProgress();
     }})();
   </script>
+  <script>
+    (function() {{
+      function syncPinterestButtons() {{
+        document.querySelectorAll('a[title="Save to Pinterest"], a.pseo-pin-save-btn, a[href*="pinterest.com/pin/create/button"]').forEach(function(btn) {{
+          var container = btn.closest('.pseo-photo-container, .group, .pseo-img-wrapper, figure, div');
+          var img = container ? container.querySelector('img') : null;
+          if (!img) img = document.querySelector('article img, main img');
+          if (img) {{
+            var liveSrc = img.currentSrc || img.src || img.getAttribute('src') || '';
+            if (liveSrc && liveSrc.startsWith('/')) {{
+              liveSrc = window.location.origin + liveSrc;
+            }}
+            if (liveSrc) {{
+              try {{
+                var u = new URL(btn.href, window.location.origin);
+                u.searchParams.set('media', liveSrc);
+                btn.href = u.toString();
+              }} catch(e) {{}}
+            }}
+          }}
+        }});
+      }}
+      if (document.readyState === 'loading') {{
+        document.addEventListener('DOMContentLoaded', syncPinterestButtons);
+      }} else {{
+        syncPinterestButtons();
+      }}
+      document.addEventListener('click', function(e) {{
+        var btn = e.target.closest('a[title="Save to Pinterest"], a.pseo-pin-save-btn, a[href*="pinterest.com/pin/create/button"]');
+        if (!btn) return;
+        var container = btn.closest('.pseo-photo-container, .group, .pseo-img-wrapper, figure, div');
+        var img = container ? container.querySelector('img') : null;
+        if (!img) img = document.querySelector('article img, main img');
+        if (img) {{
+          var liveSrc = img.currentSrc || img.src || img.getAttribute('src') || '';
+          if (liveSrc && liveSrc.startsWith('/')) {{
+            liveSrc = window.location.origin + liveSrc;
+          }}
+          if (liveSrc) {{
+            try {{
+              var u = new URL(btn.href, window.location.origin);
+              u.searchParams.set('media', liveSrc);
+              btn.href = u.toString();
+            }} catch (err) {{}}
+          }}
+        }}
+      }}, true);
+    }})();
+  </script>
 </body>
 </html>"""
 
@@ -597,7 +733,7 @@ def _build_standalone_hub_html(
 
     # Category Pills
     cat_pills_html = [
-        '<button class="filter-pill active px-4 py-2 rounded-xl text-xs font-bold transition bg-stone-900 text-white" data-cat="all" onclick="filterByCat(\'all\', this)">All Guides</button>'
+        '<button class="filter-pill active px-4 py-2 rounded-xl text-xs font-bold transition bg-stone-900 text-white" data-cat="all" onclick="filterByCat(\'all\', this)">All Articles</button>'
     ]
     seen_cats = set()
     for c in categories:
@@ -617,7 +753,7 @@ def _build_standalone_hub_html(
         <a href="{ir.web_path}" class="p-4 bg-white rounded-2xl border border-stone-200 hover:border-stone-400 hover:shadow-xs transition block group">
           <div class="text-[11px] font-mono text-stone-400 mb-1">{ir.web_path}</div>
           <h3 class="font-serif-editorial text-lg font-bold text-stone-900 group-hover:text-rose-600 transition">{html_lib.escape(ir.title)}</h3>
-          <p class="text-xs text-stone-500 mt-1">{len(ir.posts)} curated guides available</p>
+          <p class="text-xs text-stone-500 mt-1">{len(ir.posts)} curated articles available</p>
         </a>"""
 
     # Post Cards HTML
@@ -632,7 +768,10 @@ def _build_standalone_hub_html(
             img_src = f"{path_prefix}/{clean_img}" if path_prefix else f"/{clean_img}"
         card_fallback = f"{path_prefix}/assets/images/placeholder.svg" if path_prefix else "/assets/images/placeholder.svg"
         p_title = html_lib.escape(p.title or p.slug)
-        p_excerpt = html_lib.escape(p.excerpt or "")
+        clean_rp = (p.excerpt or "").strip()
+        if not clean_rp or clean_rp.lower() in ("asqstyle", "asqstyle.com", "stylesdays", "stylesdays.com") or len(clean_rp) < 15:
+            clean_rp = f"Discover inspiring {(p.title or 'decor').lower()} with practical styling tips."
+        p_excerpt = html_lib.escape(clean_rp)
         p_cat = html_lib.escape(p.category or "Home Organization")
         p_cat_slug = p.category_slug or slugify(p.category)
 
@@ -708,7 +847,7 @@ def _build_standalone_hub_html(
       <!-- Search & Filter Controls -->
       <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
         <div class="relative flex-grow max-w-md">
-          <input type="text" id="hub-search" placeholder="Search guides, IKEA hacks, storage ideas..." oninput="handleSearch()" class="w-full pl-10 pr-4 py-2.5 rounded-2xl bg-white border border-stone-200 text-sm focus:outline-none focus:ring-2 focus:ring-rose-500 shadow-xs">
+          <input type="text" id="hub-search" placeholder="Search articles, decor ideas, room inspiration..." oninput="handleSearch()" class="w-full pl-10 pr-4 py-2.5 rounded-2xl bg-white border border-stone-200 text-sm focus:outline-none focus:ring-2 focus:ring-rose-500 shadow-xs">
           <span class="absolute left-3.5 top-3 text-stone-400 text-sm">🔍</span>
         </div>
         <div class="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0">
@@ -730,14 +869,14 @@ def _build_standalone_hub_html(
   <!-- Main Posts Catalog Grid -->
   <main class="max-w-6xl w-full mx-auto px-4 py-12 flex-grow">
     <div class="flex items-center justify-between mb-8">
-      <h2 class="font-serif-editorial text-2xl font-bold text-stone-900">All Published Guides</h2>
-      <span id="posts-count-badge" class="text-xs font-bold text-stone-500 bg-stone-100 px-3 py-1 rounded-full">{len(posts)} Guides</span>
+      <h2 class="font-serif-editorial text-2xl font-bold text-stone-900">All Published Articles</h2>
+      <span id="posts-count-badge" class="text-xs font-bold text-stone-500 bg-stone-100 px-3 py-1 rounded-full">{len(posts)} Articles</span>
     </div>
     <div id="posts-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
       {cards_html}
     </div>
     <div id="empty-state" class="hidden text-center py-16">
-      <p class="text-stone-400 text-sm">No guides match your search or filter.</p>
+      <p class="text-stone-400 text-sm">No articles match your search or filter.</p>
     </div>
   </main>
 
@@ -786,7 +925,7 @@ def _build_standalone_hub_html(
       if (empty) empty.style.display = (visibleCount === 0) ? 'block' : 'none';
 
       const badge = document.getElementById('posts-count-badge');
-      if (badge) badge.textContent = visibleCount + ' Guides';
+      if (badge) badge.textContent = visibleCount + ' Articles';
     }}
   </script>
 </body>
@@ -833,7 +972,7 @@ def _build_standalone_category_index_html(
         cat_fallback = f"{path_prefix}/assets/images/placeholder.svg" if path_prefix else "/assets/images/placeholder.svg"
         p_title = html_lib.escape(getattr(p, "title", "") or slug)
         p_excerpt = html_lib.escape(getattr(p, "excerpt", "") or "")
-        p_cat = html_lib.escape(getattr(p, "category", "") or "Guides")
+        p_cat = html_lib.escape(getattr(p, "category", "") or "Articles")
 
         cards_html += f"""
         <article class="bg-white rounded-3xl border border-stone-200/90 overflow-hidden shadow-xs hover:shadow-md transition flex flex-col justify-between group">
@@ -885,7 +1024,7 @@ def _build_standalone_category_index_html(
         <span class="w-8 h-8 rounded-lg flex items-center justify-center text-white font-bold text-sm" style="background-color: {palette['accent']}">S</span>
         <span class="font-serif-editorial text-xl font-bold text-stone-900">StylesDays Hub</span>
       </a>
-      <a href="{home_link}" class="text-xs font-semibold text-stone-600 hover:text-stone-900 px-3 py-1.5 rounded-lg hover:bg-stone-100 transition">← All Guides</a>
+      <a href="{home_link}" class="text-xs font-semibold text-stone-600 hover:text-stone-900 px-3 py-1.5 rounded-lg hover:bg-stone-100 transition">← All Articles</a>
     </div>
   </header>
 
@@ -899,7 +1038,7 @@ def _build_standalone_category_index_html(
     <div class="max-w-6xl mx-auto">
       <span class="text-xs font-bold uppercase tracking-widest text-stone-400 block mb-1">Topic Hub</span>
       <h1 class="font-serif-editorial text-3xl sm:text-4xl font-bold text-stone-900">{html_lib.escape(route.title)}</h1>
-      <p class="text-sm text-stone-600 mt-2">Curated collection of {len(route.posts)} guides under this category.</p>
+      <p class="text-sm text-stone-600 mt-2">Curated collection of {len(route.posts)} articles under this category.</p>
     </div>
   </section>
 
@@ -953,15 +1092,55 @@ class SiteBuilder:
         self.base_url = (base_url or "").rstrip("/")
         self.base_path = base_path or self.config.github.base_path or ""
         self.branding = getattr(self.config, "branding", None)
-        raw_domain = source_domain or self.config.ingestion.wp_api_url or "asqstyle.com"
-        self.source_domain = raw_domain.replace("https://", "").replace("http://", "").strip("/")
-        if self.subdomain and (self.source_domain in ("stylesdays.com", "asqstyle.com") or not self.source_domain):
-            self.source_domain = f"{self.subdomain}.com"
+        if self.subdomain and hasattr(self.config, "projects"):
+            proj_data = self.config.projects.get(self.subdomain)
+            if proj_data and isinstance(proj_data, dict) and proj_data.get("branding"):
+                try:
+                    from app.config import BrandingConfig
+                    self.branding = BrandingConfig.from_dict(proj_data["branding"])
+                except Exception:
+                    pass
+
+        # Check for configured Custom Domain (from active project or cloudflare config)
+        effective_custom_domain = ""
+        if self.subdomain and hasattr(self.config, "projects"):
+            proj_data = self.config.projects.get(self.subdomain)
+            if isinstance(proj_data, dict):
+                effective_custom_domain = (proj_data.get("cf_custom_domain") or proj_data.get("custom_domain") or "").strip()
+            elif hasattr(proj_data, "cf_custom_domain"):
+                effective_custom_domain = (getattr(proj_data, "cf_custom_domain", "") or getattr(proj_data, "custom_domain", "") or "").strip()
+        if not effective_custom_domain and hasattr(self.config, "cloudflare") and self.config.cloudflare.custom_domain:
+            effective_custom_domain = self.config.cloudflare.custom_domain.strip()
+
+        if effective_custom_domain:
+            clean_dom = re.sub(r"^https?://", "", effective_custom_domain, flags=re.IGNORECASE).strip("/ ")
+            derived_brand = derive_brand_from_domain(clean_dom, worker_name=self.subdomain)
+            if not self.branding:
+                from app.config import BrandingConfig
+                self.branding = BrandingConfig(brand_name=derived_brand)
+            else:
+                self.branding.brand_name = derived_brand
+            if not self.base_url or "workers.dev" in self.base_url.lower():
+                self.base_url = f"https://{clean_dom}"
+            self.source_domain = clean_dom or "styleire.com"
+        else:
+            if not self.branding:
+                from app.config import BrandingConfig
+                self.branding = BrandingConfig(brand_name="Styleire")
+            elif not getattr(self.branding, "brand_name", "") or (self.subdomain and self.branding.brand_name.strip().lower() == self.subdomain.lower()):
+                self.branding.brand_name = "Editorial"
+            raw_domain = source_domain or self.config.ingestion.wp_api_url or "styleire.com"
+            self.source_domain = raw_domain.replace("https://", "").replace("http://", "").strip("/")
+            if self.subdomain and (self.source_domain in ("stylesdays.com", "asqstyle.com") or not self.source_domain):
+                self.source_domain = "styleire.com"
 
         # If base_url was not provided, derive canonical from Cloudflare or GitHub config if available
         if not self.base_url:
             active_plat = getattr(getattr(self.config, "build", None), "active_platform", None) or getattr(self.config, "active_platform", None) or "cloudflare"
-            if self.subdomain:
+            if effective_custom_domain:
+                clean_dom = re.sub(r"^https?://", "", effective_custom_domain, flags=re.IGNORECASE).strip("/ ")
+                self.base_url = f"https://{clean_dom}"
+            elif self.subdomain:
                 if self.config.cloudflare.account_subdomain:
                     self.base_url = f"https://{self.subdomain}.{self.config.cloudflare.account_subdomain}.workers.dev"
                 elif self.config.cloudflare.project_name == self.subdomain:
@@ -1204,8 +1383,14 @@ class SiteBuilder:
         post: PostItem,
         all_posts: list[PostItem],
         route: RouteResult,
+        categories: Optional[list[dict[str, Any]]] = None,
     ) -> str:
         """Renders post HTML using Theme Engine if available, with robust fallback."""
+        clean_base = self.base_url.rstrip("/") if (self.base_url and "://" in self.base_url) else "https://styleire.com"
+        clean_post_url = f"{clean_base}/{post.slug}/"
+        if getattr(post, "content_html", None) and ("asqstyle.com" in post.content_html or "asqstyle" in post.content_html):
+            post.content_html = re.sub(r"https?://(?:www\.)?asqstyle\.com/[^\s\"'&<>]*", clean_post_url, post.content_html)
+            post.content_html = re.sub(r"https?://(?:www\.)?asqstyle\.com", clean_base, post.content_html)
         # Generate SEO Head
         seo_head = ""
         if generate_seo_head is not None:
@@ -1247,6 +1432,16 @@ class SiteBuilder:
                         kwargs[name] = self.source_domain
                     elif name == "branding":
                         kwargs[name] = getattr(self, "branding", None)
+                    elif name == "categories":
+                        kwargs[name] = categories
+                    elif name == "routing_mode":
+                        kwargs[name] = self.routing_mode
+                if any(p.kind == inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values()):
+                    kwargs.setdefault("branding", getattr(self, "branding", None))
+                    kwargs.setdefault("categories", categories)
+                    kwargs.setdefault("routing_mode", self.routing_mode)
+                    kwargs.setdefault("route", route)
+                    kwargs.setdefault("seo_head", seo_head)
                 return theme_render_post(**kwargs)
             except Exception:
                 pass
@@ -1261,6 +1456,8 @@ class SiteBuilder:
                     seo_head=seo_head,
                     route=route,
                     branding=getattr(self, "branding", None),
+                    categories=categories,
+                    routing_mode=self.routing_mode,
                 )
             except Exception:
                 pass
@@ -1273,14 +1470,37 @@ class SiteBuilder:
             base_url=self.base_url,
             seo_head=seo_head,
             source_domain=self.source_domain,
+            branding=getattr(self, "branding", None),
+            categories=categories,
+            routing_mode=self.routing_mode,
         )
 
     def render_category_page(
         self,
         route: IntermediateRoute,
         post_routes: dict[str, RouteResult],
+        all_categories: Optional[list[dict[str, Any]]] = None,
     ) -> str:
         """Renders category/silo index page containing links to child posts."""
+        if template_render_category_index is not None:
+            try:
+                cat_slug = getattr(route, "slug", "") or (route.web_path.strip("/").split("/")[-1] if hasattr(route, "web_path") else "")
+                raw_cat_title = getattr(route, "title", "") or ""
+                clean_cat_title = re.sub(r'\s+guides?$', '', raw_cat_title, flags=re.IGNORECASE).strip() or raw_cat_title
+                return template_render_category_index(
+                    category_name=clean_cat_title,
+                    category_slug=cat_slug,
+                    posts=route.posts,
+                    base_url=self.base_url,
+                    theme=self.theme,
+                    source_domain=self.source_domain,
+                    branding=getattr(self, "branding", None),
+                    post_routes=post_routes,
+                    routing_mode=self.routing_mode,
+                    all_categories=all_categories,
+                )
+            except Exception:
+                pass
         return _build_standalone_category_index_html(
             route=route,
             theme_key=self.theme,
@@ -1297,6 +1517,27 @@ class SiteBuilder:
         intermediate_routes: list[IntermediateRoute],
     ) -> str:
         """Renders the root organization hub index.html with search/filter section and category directory."""
+        if template_render_hub is not None and self.theme in ("styleire", "pinterest-mag", "nordic-studio"):
+            try:
+                brand = getattr(getattr(self, "branding", None), "brand_name", None) or getattr(getattr(self.config, "branding", None), "brand_name", None) or "Styleire"
+                title = f"{brand} - Home decor ideas, articles, and inspiration"
+                subtitle = f"{brand} is an independent home decor publication with practical articles, expert styling advice, and inspiration for every room of your home."
+                return template_render_hub(
+                    posts=posts,
+                    categories=categories,
+                    title=title,
+                    subtitle=subtitle,
+                    base_url=self.base_url,
+                    theme=self.theme,
+                    source_domain=self.source_domain,
+                    branding=getattr(self, "branding", None),
+                    post_routes=post_routes,
+                    intermediate_routes=intermediate_routes,
+                    routing_mode=self.routing_mode,
+                )
+            except Exception as e:
+                import logging
+                logging.getLogger(__name__).warning("Failed to render hub via template_render_hub: %s", e, exc_info=True)
         if self.base_url and ("workers.dev" in self.base_url or "pages.dev" in self.base_url):
             brand = self.config.cloudflare.project_name or self.source_domain or "StylesDays"
         elif self.config.cloudflare.project_name and not self.config.github.owner:
@@ -1314,7 +1555,7 @@ class SiteBuilder:
             .title()
         )
         title = f"{brand_clean} Editorial Hub"
-        subtitle = "Curated Home Organization, IKEA Hacks, and Room Styling Guides."
+        subtitle = "Curated Home Organization, Room Styling Inspiration, and Modern Living Articles."
 
         return _build_standalone_hub_html(
             title=title,
@@ -1326,7 +1567,7 @@ class SiteBuilder:
             post_routes=post_routes,
             intermediate_routes=intermediate_routes,
             source_domain=self.source_domain,
-            branding=getattr(self.config, "branding", None),
+            branding=getattr(self, "branding", None),
         )
 
     def generate_robots_and_sitemap(
@@ -1480,11 +1721,32 @@ Sitemap: {sitemap_url}
 
         if sub:
             self.subdomain = sub
-            norm_out = os.path.normpath(self.output_dir)
-            if os.path.basename(norm_out) != self.subdomain:
-                self.output_dir = os.path.join(self.output_dir, self.subdomain)
+            if not getattr(self, "_explicit_output_dir", False):
+                norm_out = os.path.normpath(self.output_dir)
+                if os.path.basename(norm_out) != self.subdomain:
+                    self.output_dir = os.path.join(self.output_dir, self.subdomain)
             if not getattr(self, "_explicit_base_url", False):
-                if self.config.cloudflare.account_subdomain:
+                eff_cd = ""
+                if self.subdomain and hasattr(self.config, "projects"):
+                    proj_d = self.config.projects.get(self.subdomain)
+                    if isinstance(proj_d, dict):
+                        eff_cd = (proj_d.get("cf_custom_domain") or proj_d.get("custom_domain") or "").strip()
+                    elif hasattr(proj_d, "cf_custom_domain"):
+                        eff_cd = (getattr(proj_d, "cf_custom_domain", "") or getattr(proj_d, "custom_domain", "") or "").strip()
+                if not eff_cd and hasattr(self.config, "cloudflare") and self.config.cloudflare.custom_domain:
+                    eff_cd = self.config.cloudflare.custom_domain.strip()
+
+                if eff_cd:
+                    clean_dom = re.sub(r"^https?://", "", eff_cd, flags=re.IGNORECASE).strip("/ ")
+                    self.base_url = f"https://{clean_dom}"
+                    self.source_domain = clean_dom
+                    derived_brand = derive_brand_from_domain(clean_dom, worker_name=self.subdomain)
+                    if not self.branding:
+                        from app.config import BrandingConfig
+                        self.branding = BrandingConfig(brand_name=derived_brand)
+                    elif not getattr(self.branding, "brand_name", "") or (self.subdomain and self.branding.brand_name.strip().lower() == self.subdomain.lower()):
+                        self.branding.brand_name = derived_brand
+                elif self.config.cloudflare.account_subdomain:
                     self.base_url = f"https://{self.subdomain}.{self.config.cloudflare.account_subdomain}.workers.dev"
                 elif self.config.cloudflare.project_name == self.subdomain:
                     self.base_url = self.config.cloudflare.get_live_url()
@@ -1493,6 +1755,19 @@ Sitemap: {sitemap_url}
 
         abs_output_dir = os.path.abspath(self.output_dir)
         os.makedirs(abs_output_dir, exist_ok=True)
+
+        # Clean stale generated HTML files and route directories (preserve assets/, images/, _worker.js, .git)
+        for entry in os.listdir(abs_output_dir):
+            if entry in ("assets", "images", "_worker.js", ".git"):
+                continue
+            entry_path = os.path.join(abs_output_dir, entry)
+            if os.path.isdir(entry_path):
+                shutil.rmtree(entry_path, ignore_errors=True)
+            elif entry.endswith((".html", ".xml", ".txt")):
+                try:
+                    os.remove(entry_path)
+                except OSError:
+                    pass
 
         files_created: list[str] = []
         errors: list[str] = []
@@ -1510,6 +1785,15 @@ Sitemap: {sitemap_url}
         target_assets_dir = os.path.join(abs_output_dir, "assets", "images")
         images_copied = self.copy_image_assets(posts, target_assets_dir)
 
+        # Normalize post local_image_path to eliminate any /assets/<worker>/images/ leakage in HTML
+        for post in posts:
+            lip = getattr(post, "local_image_path", "") or ""
+            if lip and not lip.startswith("http"):
+                clean_lip = lip.replace("\\", "/").lstrip("/")
+                if "/images/" in clean_lip:
+                    img_filename = clean_lip.split("/images/")[-1]
+                    post.local_image_path = f"assets/images/{img_filename}"
+
         # 4. Render Post Pages
         post_pages_count = 0
         for post in posts:
@@ -1521,7 +1805,7 @@ Sitemap: {sitemap_url}
             os.makedirs(os.path.dirname(target_file), exist_ok=True)
 
             try:
-                html_content = self.render_post_page(post, posts, route)
+                html_content = self.render_post_page(post, posts, route, categories=categories)
                 with open(target_file, "w", encoding="utf-8") as f:
                     f.write(html_content)
                 files_created.append(route.file_path)
@@ -1536,11 +1820,20 @@ Sitemap: {sitemap_url}
             os.makedirs(os.path.dirname(target_file), exist_ok=True)
 
             try:
-                html_content = self.render_category_page(ir, post_routes)
+                html_content = self.render_category_page(ir, post_routes, all_categories=categories)
                 with open(target_file, "w", encoding="utf-8") as f:
                     f.write(html_content)
                 files_created.append(ir.file_path)
                 intermediate_count += 1
+
+                # Dual alias support: ensure both /{slug}/ and /category/{slug}/ exist on disk
+                if ir.file_path.startswith("category/"):
+                    alias_file = os.path.join(abs_output_dir, ir.file_path[len("category/"):].replace("/", os.sep))
+                else:
+                    alias_file = os.path.join(abs_output_dir, "category", ir.file_path.replace("/", os.sep))
+                os.makedirs(os.path.dirname(alias_file), exist_ok=True)
+                with open(alias_file, "w", encoding="utf-8") as af:
+                    af.write(html_content)
             except Exception as e:
                 errors.append(f"Error rendering intermediate route {ir.web_path}: {e}")
 
@@ -1566,7 +1859,10 @@ Sitemap: {sitemap_url}
                 theme=self.theme,
                 base_url=self.base_url,
                 source_domain=self.source_domain,
-                branding=getattr(self.config, "branding", None),
+                branding=getattr(self, "branding", None),
+                post_routes=post_routes,
+                routing_mode=self.routing_mode,
+                categories=categories,
             )
             with open(author_file, "w", encoding="utf-8") as f:
                 f.write(author_html)
@@ -1589,7 +1885,10 @@ Sitemap: {sitemap_url}
                     theme=self.theme,
                     base_url=self.base_url,
                     source_domain=self.source_domain,
-                    branding=getattr(self.config, "branding", None),
+                    branding=getattr(self, "branding", None),
+                    categories=categories,
+                    all_posts=posts,
+                    routing_mode=self.routing_mode,
                 )
                 with open(t_file, "w", encoding="utf-8") as f:
                     f.write(t_html)
@@ -1608,7 +1907,8 @@ Sitemap: {sitemap_url}
                 theme=self.theme,
                 base_url=self.base_url,
                 source_domain=self.source_domain,
-                branding=getattr(self.config, "branding", None),
+                branding=getattr(self, "branding", None),
+                routing_mode=self.routing_mode,
             )
             with open(sitemap_html_file, "w", encoding="utf-8") as f:
                 f.write(sitemap_html)
@@ -1647,6 +1947,20 @@ Sitemap: {sitemap_url}
             f.write(sitemap_content)
         files_created.append("sitemap.xml")
 
+        # Copy static pages & assets from static-site/ to ensure 100% compliance
+        try:
+            from app.generator.static_pages import copy_static_pages
+            source_site = "static-site"
+            if os.path.exists(source_site):
+                path_prefix = _extract_path_prefix(self.base_url)
+                copy_static_pages(
+                    source_site_dir=source_site,
+                    output_dir=abs_output_dir,
+                    path_prefix=path_prefix,
+                )
+        except Exception as e:
+            errors.append(f"Error copying static pages: {e}")
+
         # 8. Dump Manifest to output directory for portability
         manifest_dest = os.path.join(abs_output_dir, "pseo_manifest.json")
         try:
@@ -1658,6 +1972,9 @@ Sitemap: {sitemap_url}
             files_created.append("pseo_manifest.json")
         except Exception as e:
             errors.append(f"Error saving manifest to output: {e}")
+
+        # 9. Universal post-compilation guard rail: sanitize any leaked worker names
+        self._sanitize_output_files(abs_output_dir)
 
         duration = round(time.time() - start_time, 4)
         total_pages = 1 + intermediate_count + post_pages_count + 1 + len(trust_slugs) + 1
@@ -1677,6 +1994,273 @@ Sitemap: {sitemap_url}
             duration_seconds=duration,
             files_created=files_created,
             errors=errors,
+        )
+
+    @classmethod
+    def sanitize_directory(
+        cls,
+        output_dir: str,
+        worker_names: Optional[list[str]] = None,
+        base_url: Optional[str] = None,
+        brand_name: Optional[str] = None,
+        config: Optional[AppConfig] = None,
+    ) -> None:
+        """Universal audit and sanitization pass: purges any leaked worker names in static files."""
+        if not output_dir or not os.path.exists(output_dir):
+            return
+
+        worker_patterns = list(worker_names or [])
+        if config and hasattr(config, "cloudflare") and config.cloudflare.project_name:
+            worker_patterns.append(config.cloudflare.project_name.strip())
+
+        unique_workers = [w.strip() for w in set(worker_patterns) if w and len(w.strip()) >= 3]
+        if not unique_workers:
+            return
+
+        # Check config for configured custom domain
+        effective_cd = ""
+        if config and hasattr(config, "cloudflare") and config.cloudflare.custom_domain:
+            effective_cd = config.cloudflare.custom_domain.strip()
+        if not effective_cd and base_url and "workers.dev" not in base_url.lower():
+            effective_cd = base_url
+
+        replacement_domain = ""
+        if effective_cd:
+            replacement_domain = re.sub(r"^https?://", "", effective_cd, flags=re.IGNORECASE).strip("/ ")
+        elif base_url:
+            replacement_domain = re.sub(r"^https?://", "", base_url, flags=re.IGNORECASE).strip("/ ")
+
+        target_brand = (brand_name or (getattr(config.branding, "brand_name", "") if config and getattr(config, "branding", None) else "") or "").strip()
+        if not target_brand or target_brand.lower() in [w.lower() for w in unique_workers]:
+            if replacement_domain and "workers.dev" not in replacement_domain.lower():
+                target_brand = derive_brand_from_domain(replacement_domain, worker_name=unique_workers[0])
+            elif base_url:
+                target_brand = derive_brand_from_domain(base_url, worker_name=unique_workers[0])
+            else:
+                target_brand = "Styleire"
+
+        for root, _, files in os.walk(output_dir):
+            for fname in files:
+                if fname.endswith((".html", ".xml", ".txt", ".json")):
+                    fpath = os.path.join(root, fname)
+                    try:
+                        with open(fpath, "r", encoding="utf-8") as f:
+                            content = f.read()
+
+                        modified = content
+
+                        # 1. Clean worker domain URLs only when replacing with an external domain
+                        if replacement_domain and "workers.dev" not in replacement_domain.lower():
+                            for w in unique_workers:
+                                w_lower = w.lower()
+                                modified = re.sub(
+                                    rf"https?://{re.escape(w_lower)}\.[a-zA-Z0-9_\-\.]*workers\.dev",
+                                    f"https://{replacement_domain}",
+                                    modified,
+                                    flags=re.IGNORECASE,
+                                )
+                                modified = re.sub(
+                                    rf"https?://{re.escape(w_lower)}\.workers\.dev",
+                                    f"https://{replacement_domain}",
+                                    modified,
+                                    flags=re.IGNORECASE,
+                                )
+                            # Universal worker URL catch-all for any leftover *.workers.dev
+                            modified = re.sub(
+                                r"https?://[a-zA-Z0-9_\-\.]*workers\.dev",
+                                f"https://{replacement_domain}",
+                                modified,
+                                flags=re.IGNORECASE,
+                            )
+                            # If custom domain is a subdomain (e.g. decohome.homeandrecipe.com), align apex domain references
+                            if replacement_domain.count(".") >= 2:
+                                apex = ".".join(replacement_domain.split(".")[-2:])
+                                modified = re.sub(
+                                    rf"https?://(?:www\.)?{re.escape(apex)}(?=[/'\"])",
+                                    f"https://{replacement_domain}",
+                                    modified,
+                                    flags=re.IGNORECASE,
+                                )
+                                modified = re.sub(
+                                    rf"https?%3A%2F%2F(?:www\.)?{re.escape(apex)}(?=%2F|&|\"|'|%22)",
+                                    f"https%3A%2F%2F{replacement_domain}",
+                                    modified,
+                                    flags=re.IGNORECASE,
+                                )
+
+                        for w in unique_workers:
+                            w_title = w.title()
+                            w_lower = w.lower()
+
+                            # 2. Clean asset paths (raw and URL-encoded): /assets/<worker>/images/ -> /assets/images/
+                            modified = re.sub(
+                                rf"assets/{re.escape(w_lower)}/images/",
+                                "assets/images/",
+                                modified,
+                                flags=re.IGNORECASE,
+                            )
+                            modified = re.sub(
+                                rf"assets/{re.escape(w_lower)}/",
+                                "assets/",
+                                modified,
+                                flags=re.IGNORECASE,
+                            )
+                            modified = re.sub(
+                                rf"assets%2F{re.escape(w_lower)}%2Fimages%2F",
+                                "assets%2Fimages%2F",
+                                modified,
+                                flags=re.IGNORECASE,
+                            )
+                            modified = re.sub(
+                                rf"assets%2F{re.escape(w_lower)}%2F",
+                                "assets%2F",
+                                modified,
+                                flags=re.IGNORECASE,
+                            )
+
+                            # 3. Clean titles and meta og:title / twitter:title: " | <WorkerTitle>" -> " | <TargetBrand>"
+                            modified = re.sub(
+                                rf"\|\s*{re.escape(w_title)}(?=[<\s\"])",
+                                f"| {target_brand}",
+                                modified,
+                            )
+                            modified = re.sub(
+                                rf"\|\s*{re.escape(w)}(?=[<\s\"])",
+                                f"| {target_brand}",
+                                modified,
+                            )
+
+                            # 4. Clean og:site_name and schema publisher name
+                            modified = re.sub(
+                                rf'(property="og:site_name"\s+content="){re.escape(w_title)}(")',
+                                rf"\g<1>{target_brand}\2",
+                                modified,
+                            )
+                            modified = re.sub(
+                                rf'(property="og:site_name"\s+content="){re.escape(w)}(")',
+                                rf"\g<1>{target_brand}\2",
+                                modified,
+                            )
+                            modified = re.sub(
+                                rf'("publisher":\s*\{{[^}}]*"name":\s*"){re.escape(w_title)}(")',
+                                rf"\g<1>{target_brand}\2",
+                                modified,
+                            )
+                            modified = re.sub(
+                                rf'("publisher":\s*\{{[^}}]*"name":\s*"){re.escape(w)}(")',
+                                rf"\g<1>{target_brand}\2",
+                                modified,
+                            )
+
+                            # 5. Clean trust pages (About <Worker>, <Worker> is an independent)
+                            modified = re.sub(
+                                rf"About\s+{re.escape(w_title)}",
+                                f"About {target_brand}",
+                                modified,
+                            )
+                            modified = re.sub(
+                                rf"About\s+{re.escape(w)}",
+                                f"About {target_brand}",
+                                modified,
+                            )
+                            modified = re.sub(
+                                rf"{re.escape(w_title)}\s+is\s+an\s+independent",
+                                f"{target_brand} is an independent",
+                                modified,
+                            )
+                            modified = re.sub(
+                                rf"{re.escape(w)}\s+is\s+an\s+independent",
+                                f"{target_brand} is an independent",
+                                modified,
+                            )
+                            modified = re.sub(
+                                rf"&copy;\s*2026\s+{re.escape(w_title)}\.",
+                                f"&copy; 2026 {target_brand}.",
+                                modified,
+                            )
+                            modified = re.sub(
+                                rf"&copy;\s*2026\s+{re.escape(w)}\.",
+                                f"&copy; 2026 {target_brand}.",
+                                modified,
+                            )
+
+                        # 6. Universal purge of "Last updated" and "Updated [date]" text nodes
+                        modified = re.sub(
+                            r'<p\s+class="mt-4 text-lg text-stone-600 leading-relaxed">\s*Last updated:?[^<]*</p>',
+                            '',
+                            modified,
+                            flags=re.IGNORECASE,
+                        )
+                        modified = re.sub(
+                            r'<meta\s+name="description"\s+content="Last updated:?[^"]*">',
+                            f'<meta name="description" content="Official editorial policies and guidance for {target_brand}.">',
+                            modified,
+                            flags=re.IGNORECASE,
+                        )
+                        modified = re.sub(
+                            r'<span\s+class="text-xs text-stone-400 font-medium">\s*Updated:?\s*[^<]*</span>',
+                            '',
+                            modified,
+                            flags=re.IGNORECASE,
+                        )
+                        modified = re.sub(
+                            r'<span\s+class="text-xs text-stone-500 font-medium">\s*Updated Regularly\s*</span>',
+                            '',
+                            modified,
+                            flags=re.IGNORECASE,
+                        )
+                        modified = re.sub(
+                            r'<span>Updated\s+[^<]+</span>\s*<span>&middot;</span>',
+                            '',
+                            modified,
+                            flags=re.IGNORECASE,
+                        )
+                        modified = re.sub(
+                            r'&nbsp;&middot;&nbsp;\s*Updated\s*\d{4}-\d{2}-\d{2}',
+                            '',
+                            modified,
+                            flags=re.IGNORECASE,
+                        )
+                        modified = re.sub(
+                            r'•\s*UPDATED\s*\d{4}',
+                            '',
+                            modified,
+                            flags=re.IGNORECASE,
+                        )
+                        modified = re.sub(
+                            r'Updated\s+(?:\d{4}-\d{2}-\d{2}|Recently)\s*•\s*',
+                            '',
+                            modified,
+                            flags=re.IGNORECASE,
+                        )
+
+                        # 7. Universal purge of foreign scraped Pinterest Save buttons & wrappers
+                        modified = re.sub(r'<a\s+[^>]*class="[^"]*(?:pinsave|pin-it-button|ss-pin-button)[^"]*"[^>]*>.*?</a>', '', modified, flags=re.DOTALL | re.IGNORECASE)
+                        modified = re.sub(r'<div\s+[^>]*class="[^"]*ss-on-media-wrapper[^"]*"[^>]*>.*?</div>', '', modified, flags=re.DOTALL | re.IGNORECASE)
+                        modified = re.sub(r'</?(?:div|span)\s+[^>]*class="[^"]*(?:ss-on-media-container|ss-on-media-image-wrap|pin-it-container)[^"]*"[^>]*>', '', modified, flags=re.IGNORECASE)
+
+                        if modified != content:
+                            with open(fpath, "w", encoding="utf-8") as f:
+                                f.write(modified)
+                    except Exception:
+                        pass
+
+    def _sanitize_output_files(self, output_dir: str) -> None:
+        """Universal post-compilation guard rail: audits and removes any leaked worker names in generated static files."""
+        sub = (self.subdomain or "").strip()
+        worker_patterns = []
+        if sub:
+            worker_patterns.append(sub)
+        if hasattr(self.config, "cloudflare") and self.config.cloudflare.project_name:
+            worker_patterns.append(self.config.cloudflare.project_name.strip())
+
+        target_brand = (getattr(self.branding, "brand_name", "") if self.branding else "") or ""
+        self.sanitize_directory(
+            output_dir=output_dir,
+            worker_names=worker_patterns,
+            base_url=self.base_url,
+            brand_name=target_brand,
+            config=self.config,
         )
 
     # Convenience method alias

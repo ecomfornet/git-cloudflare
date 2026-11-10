@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-CLI launcher for the stylesdays pSEO Static Site Generator & Interactive Management Dashboard.
+CLI launcher for the Styleire pSEO Static Site Generator & Interactive Management Dashboard.
 Runs standard library ThreadingHTTPServer serving REST API and SPA frontend.
 """
 
@@ -26,7 +26,7 @@ from app.dashboard.server import run_server
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Launch stylesdays pSEO Management Dashboard & Preview Server",
+        description="Launch Styleire pSEO Management Dashboard & Preview Server",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     parser.add_argument("--host", default="127.0.0.1", help="Network host interface to bind")
@@ -36,7 +36,7 @@ def main() -> None:
     args = parser.parse_args()
 
     print("=" * 72)
-    print("stylesdays pSEO Static Site Generator & Management Dashboard v2.0")
+    print("Styleire pSEO Static Site Generator & Management Dashboard v2.0")
     print(f"Server URL: http://{args.host}:{args.port}")
     print(f"Config:     {os.path.abspath(args.config)}")
     print(f"Manifest:   {os.path.abspath(args.manifest)}")

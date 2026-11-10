@@ -21,12 +21,12 @@ def join_base_and_path(base_url: str, web_path: str) -> str:
     """Combines base_url and web_path without duplicating repository subpaths.
 
     Handles:
-    - Base URL with repo: 'https://ecomfornet.github.io/homestylesdeco' + '/homestylesdeco/slug/'
-      -> 'https://ecomfornet.github.io/homestylesdeco/slug/'
-    - Base URL with repo: 'https://ecomfornet.github.io/homestylesdeco' + '/slug/'
-      -> 'https://ecomfornet.github.io/homestylesdeco/slug/'
-    - Root domain: 'https://home-organization.github.io' + '/slug/'
-      -> 'https://home-organization.github.io/slug/'
+    - Base URL with repo: 'https://user.github.io/my-repo' + '/my-repo/slug/'
+      -> 'https://user.github.io/my-repo/slug/'
+    - Base URL with repo: 'https://user.github.io/my-repo' + '/slug/'
+      -> 'https://user.github.io/my-repo/slug/'
+    - Root domain: 'https://user.github.io' + '/slug/'
+      -> 'https://user.github.io/slug/'
     """
     clean_base = (base_url or "").rstrip("/")
     if not clean_base:
@@ -34,7 +34,7 @@ def join_base_and_path(base_url: str, web_path: str) -> str:
 
     parsed = urllib.parse.urlparse(clean_base)
     origin = f"{parsed.scheme}://{parsed.netloc}" if parsed.netloc else ""
-    repo_subpath = parsed.path.rstrip("/")  # e.g. "/homestylesdeco" or ""
+    repo_subpath = parsed.path.rstrip("/")  # e.g. "/my-repo" or ""
 
     clean_path = str(web_path) if (web_path and str(web_path).startswith("/")) else f"/{web_path or ''}"
 

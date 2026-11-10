@@ -60,6 +60,7 @@ THEMES: dict[str, dict[str, str]] = {
         "text_body": "#1C1917",
         "accent": "#E60023",
         "accent_hover": "#C4001D",
+        "secondary_accent": "#C2410C",
         "card_bg": "#FFFFFF",
         "card_border": "#E7E2DA",
         "CheckBoxBg": "#F1EDE6",
@@ -77,6 +78,7 @@ THEMES: dict[str, dict[str, str]] = {
         "text_body": "#1C1C1C",
         "accent": "#8C6D53",
         "accent_hover": "#6E523B",
+        "secondary_accent": "#8C6D53",
         "card_bg": "#FFFFFF",
         "card_border": "#EBEBEA",
         "CheckBoxBg": "#F4F3F0",
@@ -94,6 +96,7 @@ THEMES: dict[str, dict[str, str]] = {
         "text_body": "#09090B",
         "accent": "#09090B",
         "accent_hover": "#27272A",
+        "secondary_accent": "#C2410C",
         "card_bg": "#FFFFFF",
         "card_border": "#E4E4E7",
         "CheckBoxBg": "#F4F4F5",
@@ -111,6 +114,7 @@ THEMES: dict[str, dict[str, str]] = {
         "text_body": "#09090B",
         "accent": "#09090B",
         "accent_hover": "#27272A",
+        "secondary_accent": "#C2410C",
         "card_bg": "#FFFFFF",
         "card_border": "#E4E4E7",
         "CheckBoxBg": "#F4F4F5",
@@ -784,8 +788,66 @@ def _detect_custom_logo(path_prefix: str = "") -> tuple[str, bool]:
     return "", False
 
 
+
+def _get_branding_field(branding: Any, field: str, default: Any = "") -> Any:
+    """Safely extracts a field from a branding dataclass, dict, or object."""
+    if branding is None:
+        return default
+    if isinstance(branding, dict):
+        val = branding.get(field)
+        return val if val is not None and val != "" else default
+    val = getattr(branding, field, None)
+    return val if val is not None and val != "" else default
+
+
+def build_dynamic_nav_links(
+    categories: Optional[list[Any]],
+    all_posts: Optional[list[Any]] = None,
+    path_prefix: str = "",
+    routing_mode: str = "single",
+    max_items: int = 8,
+) -> list[tuple[str, str]]:
+    """
+    Builds navigation links strictly from ingested categories.
+    Zero supplemental or hardcoded fake categories are allowed.
+    Returns list of (category_name, category_url).
+    """
+    prefix = path_prefix.rstrip("/") if path_prefix else ""
+    cat_list: list[tuple[str, str]] = []
+    seen_slugs = set()
+
+    if categories:
+        for c in categories:
+            if isinstance(c, dict):
+                name = c.get("name") or c.get("title") or ""
+                slug = c.get("slug") or (slugify(name) if name else "")
+            elif isinstance(c, str):
+                name = c.replace("-", " ").title()
+                slug = slugify(c)
+            else:
+                name = getattr(c, "name", "") or getattr(c, "title", "")
+                slug = getattr(c, "slug", "") or (slugify(name) if name else "")
+            if slug and slug not in seen_slugs and slug.lower() not in ("all", "uncategorized"):
+                seen_slugs.add(slug)
+                url = f"{prefix}/category/{slug}/" if routing_mode == "pseo_nested_silo" else f"{prefix}/{slug}/"
+                clean_name = name or slug.replace("-", " ").title()
+                cat_list.append((clean_name, url))
+
+    if not cat_list and all_posts:
+        for p in all_posts:
+            cat_name = getattr(p, "category", "") or (p.get("category") if isinstance(p, dict) else "")
+            cat_slug = getattr(p, "category_slug", "") or (p.get("category_slug") if isinstance(p, dict) else "")
+            if cat_name and not cat_slug:
+                cat_slug = slugify(cat_name)
+            if cat_slug and cat_slug not in seen_slugs and cat_slug.lower() not in ("all", "uncategorized"):
+                seen_slugs.add(cat_slug)
+                url = f"{prefix}/category/{cat_slug}/" if routing_mode == "pseo_nested_silo" else f"{prefix}/{cat_slug}/"
+                cat_list.append((cat_name, url))
+
+    return cat_list[:max_items]
+
 def render_blogger_logo(
-    brand_name: str = "ANNADECO",
+    brand_name: str = "Styleire",
     theme_tokens: Optional[dict[str, str]] = None,
     compact: bool = False,
     path_prefix: str = "",
@@ -798,7 +860,7 @@ def render_blogger_logo(
     text_color = theme.get("text_body", "#1C1917")
     home_url = f"{path_prefix}/" if path_prefix else "/"
     initials = html_lib.escape(brand_name[:2].upper() if brand_name else "AD")
-    clean_brand = brand_name.strip() if brand_name else "ANNADECO"
+    clean_brand = brand_name.strip() if brand_name else "Styleire"
     clean_tagline = tagline.strip() if tagline else ("Interiors Journal" if compact else "Home · Interiors · Living")
 
     if not custom_logo_url:
@@ -878,11 +940,13 @@ def render_blogger_header(
     path_prefix: str = "",
     canonical_url: str = "",
     branding: Optional[Any] = None,
+    categories: Optional[list[Any]] = None,
+    all_posts: Optional[list[Any]] = None,
+    routing_mode: str = "single",
 ) -> str:
     """Renders a modern, responsive Blogger & Magazine header with sticky blur and logo."""
-    brand_name = getattr(branding, "brand_name", None) or (clean_domain.split(".")[0].upper() if clean_domain else "ANNADECO")
-    if brand_name in ("ANNA", "ANNADECO", "HOMESTYLESDECO", "STYLEDAYS", "STYLESDAYS"):
-        brand_name = getattr(branding, "brand_name", None) or "ANNADECO"
+    brand_name = getattr(branding, "brand_name", None) or (clean_domain.split(".")[0].title() if clean_domain else "Styleire")
+
     tagline = getattr(branding, "tagline", "") or ""
     logo_path = getattr(branding, "logo_path", "") or ""
     if logo_path and path_prefix and not logo_path.startswith(path_prefix) and not logo_path.startswith("http"):
@@ -892,6 +956,12 @@ def render_blogger_header(
     accent = theme_tokens.get("accent", "#E60023")
     logo_html = render_blogger_logo(brand_name, theme_tokens, compact=False, path_prefix=path_prefix, custom_logo_url=custom_logo_url, tagline=tagline)
     home_link = f"{path_prefix}/" if path_prefix else "/"
+
+    social_links = getattr(branding, "social_links", {}) if branding else {}
+    if not isinstance(social_links, dict):
+        social_links = {}
+    fb_url = social_links.get("facebook") or "https://www.facebook.com"
+    pin_url = social_links.get("pinterest") or "https://pinterest.com/"
 
     return f"""
   <header class="pseo-header pseo-blogger-header">
@@ -908,15 +978,15 @@ def render_blogger_header(
       <div class="pseo-brand-row">
         {logo_html}
         <nav class="pseo-nav-links hidden md:flex" style="display:flex;align-items:center;gap:1.5rem;font-size:0.8rem;font-weight:600;letter-spacing:0.02em;">
-          <a href="{home_link}" style="color:#1C1917;text-decoration:none;" class="hover:opacity-75">All Guides</a>
-          <a href="{home_link}#overview" style="color:#57534E;text-decoration:none;" class="hover:opacity-75">Sanctuary Edits</a>
-          
-          <a href="{home_link}#sourcing" style="color:#57534E;text-decoration:none;" class="hover:opacity-75">Sourcing Notes</a>
+          <a href="{home_link}" style="color:#1C1917;text-decoration:none;" class="hover:opacity-75">All Articles</a>
+          {"".join([f'<a href="{u}" style="color:#57534E;text-decoration:none;" class="hover:opacity-75">{html_lib.escape(n)}</a>' for n, u in build_dynamic_nav_links(categories, all_posts=all_posts, path_prefix=path_prefix, routing_mode=routing_mode)[:5]])}
         </nav>
-        <div style="display:flex;align-items:center;gap:0.6rem;">
-          <a href="https://pinterest.com/" target="_blank" rel="noopener" class="pseo-header-action-btn" style="border:1px solid #E7E2DA;background:#FAF8F5;color:#1C1917;padding:0.4rem 0.95rem;border-radius:9999px;font-size:0.72rem;font-weight:700;display:inline-flex;align-items:center;gap:0.35rem;text-decoration:none;">
+        <div style="display:flex;align-items:center;gap:0.75rem;">
+          <a href="{fb_url}" target="_blank" rel="noopener noreferrer" style="color:#57534E;font-size:0.72rem;font-weight:600;text-decoration:none;" class="hover:opacity-75">Facebook</a>
+          <a href="{pin_url}" target="_blank" rel="noopener" class="pseo-header-action-btn" style="border:1px solid #E7E2DA;background:#FAF8F5;color:#1C1917;padding:0.4rem 0.95rem;border-radius:9999px;font-size:0.72rem;font-weight:700;display:inline-flex;align-items:center;gap:0.35rem;text-decoration:none;">
             <span>&#x1F4CC; Save Ideas</span>
           </a>
+          <a href="{home_link}contact/" style="color:#57534E;font-size:0.72rem;font-weight:600;text-decoration:none;" class="hover:opacity-75">Contact</a>
         </div>
       </div>
 
@@ -936,9 +1006,7 @@ def render_blogger_byline(
     branding: Optional[Any] = None,
 ) -> str:
     """Renders the top author byline & reading meta block for authentic blogger aesthetics."""
-    brand_name = getattr(branding, "brand_name", "") or "AnnaDeco"
-    if brand_name in ("ANNA", "HOMESTYLESDECO", "STYLEDAYS", "STYLESDAYS"):
-        brand_name = "AnnaDeco"
+    brand_name = getattr(branding, "brand_name", "") or "Editorial"
     display_author = author_name.strip() if author_name else (getattr(branding, "author_name", "") or f"{brand_name} Studio")
     accent = theme_tokens.get("accent", "#E60023")
     formatted_date = (lastmod or "2026-11-02")[:10]
@@ -954,10 +1022,6 @@ def render_blogger_byline(
             Curated by <span style="text-decoration:underline;text-decoration-color:{accent};">{html_lib.escape(display_author)}</span>
           </div>
           <div style="font-size:0.7rem;color:#78716C;display:flex;align-items:center;gap:0.4rem;flex-wrap:wrap;margin-top:0.15rem;">
-            <span>&#x23F1; 6 min read</span>
-            <span>&middot;</span>
-            <span>Updated {formatted_date}</span>
-            <span>&middot;</span>
             <span style="color:#15803D;font-weight:600;">&#x2713; Editorial Verified</span>
           </div>
         </div>
@@ -978,14 +1042,29 @@ def render_blogger_footer(
     branding: Optional[Any] = None,
 ) -> str:
     """Renders a rich multi-column blogger footer with brand manifesto, categories, and newsletter."""
-    brand_name = getattr(branding, "brand_name", "") or "ANNADECO"
-    if brand_name in ("ANNA", "HOMESTYLESDECO", "STYLEDAYS", "STYLESDAYS"):
-        brand_name = "ANNADECO"
+    brand_name = getattr(branding, "brand_name", "") or "Editorial"
     tagline = getattr(branding, "tagline", "") or "Home · Interiors · Living"
     clean_brand = brand_name.strip()
     accent = theme_tokens.get("accent", "#E60023")
     logo_compact = render_blogger_logo(brand_name, theme_tokens, compact=True, path_prefix=path_prefix, tagline=tagline)
     home_link = f"{path_prefix}/" if path_prefix else "/"
+
+    social_links = getattr(branding, "social_links", {}) if branding else {}
+    if not isinstance(social_links, dict):
+        social_links = {}
+    p_link = social_links.get("pinterest") or "https://pinterest.com/"
+    i_link = social_links.get("instagram") or "https://instagram.com/"
+    f_link = social_links.get("facebook") or ""
+    t_link = social_links.get("twitter") or ""
+    chips = [f'<a href="{p_link}" target="_blank" rel="noopener" class="pseo-social-chip">&#x1F4CC; Pinterest</a>']
+    if i_link:
+        chips.append(f'<a href="{i_link}" target="_blank" rel="noopener" class="pseo-social-chip">&#x1F4F7; Instagram</a>')
+    if f_link:
+        chips.append(f'<a href="{f_link}" target="_blank" rel="noopener" class="pseo-social-chip">&#x1F4D8; Facebook</a>')
+    if t_link:
+        chips.append(f'<a href="{t_link}" target="_blank" rel="noopener" class="pseo-social-chip">&#x1D54F; Twitter</a>')
+    chips.append(f'<a href="{home_link}" class="pseo-social-chip">&#x1F3DB;&#xFE0F; Curated Studio</a>')
+    chips_html = "\n            ".join(chips)
 
     return f"""
   <footer class="pseo-footer pseo-blogger-footer">
@@ -1000,9 +1079,7 @@ def render_blogger_footer(
             An independent visual archive and curated design journal exploring modern bedroom refreshes, Scandinavian minimalism, and intentional interior styling.
           </p>
           <div class="pseo-footer-social">
-            <a href="https://pinterest.com/" target="_blank" rel="noopener" class="pseo-social-chip">&#x1F4CC; Pinterest</a>
-            <a href="https://instagram.com/" target="_blank" rel="noopener" class="pseo-social-chip">&#x1F4F7; Instagram</a>
-            <a href="{home_link}" class="pseo-social-chip">&#x1F3DB;&#xFE0F; Curated Studio</a>
+            {chips_html}
           </div>
         </div>
 
@@ -1024,7 +1101,7 @@ def render_blogger_footer(
           <ul class="pseo-footer-links">
             
             
-            <li><a href="{home_link}">Architectural Spec Guides</a></li>
+            <li><a href="{home_link}">Architectural Design Specifications</a></li>
             <li><a href="{home_link}">Material Sourcing Standards</a></li>
             <li><a href="{home_link}">Curatorial Standards</a></li>
           </ul>
@@ -1034,7 +1111,7 @@ def render_blogger_footer(
         <div class="pseo-footer-col pseo-footer-newsletter-col">
           <div class="pseo-footer-title">The Weekly Room Edit</div>
           <p class="pseo-footer-newsletter-desc">
-            Get handpicked bedroom makeovers, material swatches, and weekend styling guides delivered to your inbox every Friday.
+            Get handpicked bedroom makeovers, material swatches, and weekend styling inspiration delivered to your inbox every Friday.
           </p>
           <form class="pseo-newsletter-form" onsubmit="event.preventDefault(); var btn=this.querySelector('button'); btn.innerText='Subscribed! ✨'; btn.style.background='#15803D'; this.querySelector('input').disabled=true;">
             <input type="email" placeholder="Your email address..." required class="pseo-newsletter-input" aria-label="Email address for weekly room edit">
@@ -1061,6 +1138,99 @@ def render_blogger_footer(
   """
 
 
+def clean_and_wrap_article_images(
+    raw_html: str,
+    canonical_url: str,
+    canonical_base: str,
+    page_title: str = "",
+    path_prefix: str = "",
+) -> str:
+    """Purges foreign/scraped Pinterest save buttons & wrappers, fixes asset paths,
+    and wraps all in-article images with a native, high-contrast Pinterest Save overlay button."""
+    if not raw_html:
+        return ""
+
+    from bs4 import BeautifulSoup
+    soup = BeautifulSoup(raw_html, "html.parser")
+
+    # 1. Decompose all legacy scraped Pinterest buttons, overlays, and wrappers
+    for bad in soup.find_all(lambda el: any(c in (el.get("class") or []) for c in [
+        "ss-on-media-wrapper", "pinsavepinterest-pin-it-button", "pin-it-container-button",
+        "ss-bottom-left-on-media", "ss-pin-button", "pinterest-pin-it-button"
+    ]) or any("pinsave" in str(c) for c in (el.get("class") or [])) or any("ss-pin" in str(c) for c in (el.get("class") or []))):
+        bad.decompose()
+
+    for a in soup.find_all("a", href=re.compile(r"pinterest\.com/pin/create/")):
+        a.decompose()
+
+    # 2. Unwrap legacy WordPress / Social Warfare container tags
+    for wrap in soup.find_all(lambda el: el.name in ("div", "span") and any(c in (el.get("class") or []) for c in [
+        "ss-on-media-container", "ss-on-media-image-wrap", "pin-it-container"
+    ])):
+        wrap.unwrap()
+
+    # 3. Clean empty paragraphs
+    for p in soup.find_all("p"):
+        if not p.text.strip() and not p.find("img"):
+            p.decompose()
+
+    # 4. Wrap all img tags with owned Pinterest Save overlay
+    pin_svg = '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.373 0 0 5.372 0 12c0 5.084 3.163 9.426 7.627 11.174-.105-.949-.2-2.405.042-3.441.218-.937 1.407-5.965 1.407-5.965s-.359-.719-.359-1.782c0-1.668.967-2.914 2.171-2.914 1.023 0 1.518.769 1.518 1.69 0 1.029-.655 2.568-.994 3.995-.283 1.194.599 2.169 1.777 2.169 2.133 0 3.772-2.249 3.772-5.495 0-2.873-2.064-4.882-5.012-4.882-3.414 0-5.418 2.561-5.418 5.207 0 1.031.397 2.138.893 2.738a.36.36 0 0 1 .083.345l-.333 1.36c-.053.22-.174.267-.402.161-1.499-.698-2.436-2.889-2.436-4.649 0-3.785 2.75-7.262 7.929-7.262 4.163 0 7.398 2.967 7.398 6.931 0 4.136-2.607 7.464-6.227 7.464-1.216 0-2.359-.631-2.75-1.378l-.748 2.853c-.271 1.043-1.002 2.35-1.492 3.146C9.57 23.812 10.763 24 12 24c6.627 0 12-5.373 12-12 0-6.628-5.373-12-12-12z"/></svg>'
+
+    clean_base = canonical_base.rstrip("/")
+    prefix = path_prefix.rstrip("/") if path_prefix else ""
+    _assets_pfx = f"{prefix}/assets/" if prefix else "/assets/"
+
+    for img in soup.find_all("img"):
+        if img.find_parent("div", class_="pseo-photo-container"):
+            continue
+        classes = img.get("class", [])
+        img["class"] = [c for c in classes if not c.startswith("ss-on-media")] + [
+            "w-full", "h-auto", "rounded-xl", "object-cover", "transition", "duration-500", "group-hover:scale-[1.02]"
+        ]
+
+        src = img.get("src", "")
+        # Normalize local asset path: strip any worker or project folders (e.g. /assets/<project>/images/ -> /assets/images/)
+        if "/assets/" in src or src.startswith("assets/"):
+            fname = src.split("/assets/")[-1] if "/assets/" in src else src.split("assets/")[-1]
+            clean_fname = fname.split("/")[-1].lstrip("/")
+            src = f"{_assets_pfx}images/{clean_fname}"
+            img["src"] = src
+
+        if src.startswith("/"):
+            abs_media = f"{clean_base}{src}"
+        elif not src.startswith("http"):
+            abs_media = f"{clean_base}/{src}"
+        else:
+            abs_media = src
+
+        alt = img.get("alt", "") or page_title or "Interior Design Idea"
+
+        pin_params = urllib.parse.urlencode({
+            "url": canonical_url,
+            "media": abs_media,
+            "description": alt
+        })
+        pin_href = f"https://www.pinterest.com/pin/create/button/?{pin_params}"
+
+        wrapper = soup.new_tag("div", **{"class": "pseo-photo-container group relative my-8 overflow-hidden rounded-xl border border-stone-200 shadow-xs"})
+        onclick_js = "var c=this.closest('.pseo-photo-container, .group, .pseo-img-wrapper, figure, div');var i=c?c.querySelector('img'):null;if(i){var u=new URL(this.href,window.location.origin);var s=i.currentSrc||i.src;if(s){u.searchParams.set('media',s);this.href=u.toString();}}"
+        btn = BeautifulSoup(
+            f'<a href="{pin_href}" onclick="{onclick_js}" target="_blank" rel="noopener noreferrer" class="pseo-pin-save-btn absolute top-4 right-4 bg-[#E60023] hover:bg-[#ad081b] text-white text-xs font-semibold px-3 py-1.5 rounded-full shadow-md flex items-center gap-1.5 opacity-90 group-hover:opacity-100 transition z-10" title="Save to Pinterest">{pin_svg}<span>Save</span></a>',
+            "html.parser"
+        )
+
+        img.wrap(wrapper)
+        wrapper.append(btn)
+
+    result_html = str(soup)
+    # Clean any old domain references in prose
+    if "asqstyle.com" in result_html or "asqstyle" in result_html:
+        result_html = re.sub(r'https?://(?:www\.)?asqstyle\.com/[^\s"\'&<>]*', canonical_url, result_html)
+        result_html = re.sub(r'https?://(?:www\.)?asqstyle\.com', clean_base, result_html)
+    return result_html
+
+
 def render_checklist(checklist: list[Any], slug: str, theme: dict[str, str], source_domain: str = "stylesdays.com") -> str:
     """Checklist items eliminated per Section 24 specification."""
     return ""
@@ -1079,18 +1249,9 @@ def render_taxonomy_pills(posts: list[Any], current_slug: str, theme: dict[str, 
             web_path = getattr(p, "web_path", None) or (p.get("web_path") if isinstance(p, dict) else f"/{slug}/")
             candidates.append({"slug": slug, "title": title, "web_path": web_path})
 
-    # If no sibling posts are present, provide default curated taxonomy navigation pills
+    # If no sibling posts are present, return empty string
     if not candidates:
-        default_topics = [
-            ("ikea-hacks", "IKEA Hacks & DIY"),
-            ("closet-storage", "Closet & PAX Storage"),
-            ("bedroom-design", "Bedroom Styling"),
-            ("living-room", "Living Room Layouts"),
-            ("guest-bedroom", "Guest Room Daybeds"),
-            ("kitchen-organization", "Kitchen Organization"),
-        ]
-        for s, t in default_topics:
-            candidates.append({"slug": s, "title": t, "web_path": f"/{s}/"})
+        return ""
 
     sample_size = min(6, len(candidates))
     selected = candidates[:sample_size]
@@ -1106,13 +1267,25 @@ def render_taxonomy_pills(posts: list[Any], current_slug: str, theme: dict[str, 
 
     return f"""
     <div class="pseo-pills-bar">
-      <span style="font-size: 0.65rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: #A8A29E; margin-right: 0.25rem; flex-shrink: 0;">Featured Guides:</span>
+      <span style="font-size: 0.65rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: #A8A29E; margin-right: 0.25rem; flex-shrink: 0;">Featured Articles:</span>
       {pills_html}
     </div>
     """
 
 
-def render_related_guides(posts: list[Any], current_slug: str, theme: dict[str, str], base_url: str = "") -> str:
+def extract_related_cards_html(html: str) -> str:
+    """Extracts inner <article> card elements if html contains a full section wrapper."""
+    if not html:
+        return ""
+    if "<article" in html and ("<section" in html or "pseo-related-grid" in html):
+        import re
+        articles = re.findall(r"(<article\b.*?</article>)", html, re.DOTALL)
+        if articles:
+            return "\n".join(articles)
+    return html
+
+
+def render_related_guides(posts: list[Any], current_slug: str, theme: dict[str, str], base_url: str = "", cards_only: bool = False) -> str:
     """Renders 3-column Related Guides cards with thumbnail, title, excerpt, and link."""
     candidates = []
     for p in (posts or []):
@@ -1159,40 +1332,48 @@ def render_related_guides(posts: list[Any], current_slug: str, theme: dict[str, 
         img_src = c["image"]
         if not img_src.startswith("http"):
             clean_rel_img = img_src.lstrip("/")
+            if clean_rel_img.startswith("static-site/"):
+                clean_rel_img = clean_rel_img[len("static-site/"):]
             img_src = f"{path_prefix}/{clean_rel_img}" if path_prefix else f"/{clean_rel_img}"
         fallback_svg = _resolve_fallback_svg(c["slug"], path_prefix)
 
+        accent_val = theme.get("accent", "#09090B") if isinstance(theme, dict) else "#09090B"
         cards_html += f"""
-        <article class="pseo-card group">
-          <a href="{link}" style="display: flex; flex-direction: column; height: 100%;">
-            <div class="pseo-hero-media">
-              <img src="{img_src}" alt="{html_lib.escape(c['title'])}" width="600" height="375" loading="lazy" decoding="async" onerror="this.onerror=null; this.src='{fallback_svg}';">
-              <span class="pseo-badge" style="position: absolute; top: 0.75rem; left: 0.75rem; background-color: rgba(255, 255, 255, 0.95); color: #1C1917; font-size: 0.625rem;">
+        <article class="pseo-card group bg-white rounded-xl border border-stone-200 overflow-hidden shadow-sm hover:shadow-md transition flex flex-col justify-between" style="background-color: var(--pseo-card-bg, #FFFFFF); border: 1px solid var(--pseo-card-border, #E7E5E4); border-radius: 0.75rem; overflow: hidden; display: flex; flex-direction: column; justify-content: space-between; height: 100%;">
+          <a href="{link}" class="flex flex-col h-full" style="display: flex; flex-direction: column; height: 100%;">
+            <div class="pseo-hero-media relative w-full aspect-[16/10] overflow-hidden bg-stone-100" style="position: relative; overflow: hidden; width: 100%; aspect-ratio: 16/10;">
+              <img src="{img_src}" alt="{html_lib.escape(c['title'])}" width="600" height="375" class="w-full h-full object-cover group-hover:scale-105 transition duration-300" style="width: 100%; height: 100%; object-fit: cover;" loading="lazy" decoding="async" onerror="this.onerror=null; this.src='{fallback_svg}';">
+              <span class="pseo-badge absolute top-3 left-3 bg-white/95 backdrop-blur-sm text-stone-900 text-[10px] font-semibold px-2 py-0.5 rounded shadow-sm uppercase tracking-wider" style="position: absolute; top: 0.75rem; left: 0.75rem; background-color: rgba(255, 255, 255, 0.95); color: #1C1917; font-size: 0.625rem; font-weight: 600; padding: 0.125rem 0.5rem; border-radius: 0.25rem;">
                 {html_lib.escape(c['category'])}
               </span>
             </div>
-            <div style="padding: 1.25rem; flex: 1 0 auto;">
-              <h3 class="font-serif-editorial text-base sm:text-lg font-bold text-stone-900 group-hover:text-[{theme['accent']}]" style="margin-bottom: 0.5rem; transition: color 0.15s ease;">
-                {html_lib.escape(c['title'])}
-              </h3>
-              <p class="text-xs text-stone-500" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
-                {html_lib.escape(c['excerpt'][:120])}...
-              </p>
+            <div class="p-4 flex-1 flex flex-col justify-between" style="padding: 1.25rem; flex: 1 0 auto; display: flex; flex-direction: column; justify-content: space-between;">
+              <div>
+                <h3 class="font-serif-editorial text-base sm:text-lg font-bold text-stone-900 group-hover:text-stone-700 leading-snug mb-2" style="font-family: inherit; font-size: 1.125rem; font-weight: 700; color: #1C1917; margin-bottom: 0.5rem; line-height: 1.35; transition: color 0.15s ease;">
+                  {html_lib.escape(c['title'])}
+                </h3>
+                <p class="text-xs text-stone-500 leading-relaxed" style="font-size: 0.75rem; color: #78716C; line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
+                  {html_lib.escape(c['excerpt'][:120])}...
+                </p>
+              </div>
             </div>
-            <div style="padding: 0.75rem 1.25rem; background-color: #FAFAFA; border-top: 1px solid var(--pseo-card-border); display: flex; align-items: center; justify-content: space-between; font-size: 0.75rem; font-weight: 500; color: #78716C;">
-              <span>Read Guide</span>
-              <span style="color: {theme['accent']}; font-weight: 700;">→</span>
+            <div class="px-4 py-2.5 bg-stone-50 border-t border-stone-100 flex items-center justify-between text-xs font-medium text-stone-500" style="padding: 0.75rem 1.25rem; background-color: #FAFAFA; border-top: 1px solid var(--pseo-card-border, #E7E5E4); display: flex; align-items: center; justify-content: space-between; font-size: 0.75rem; font-weight: 500; color: #78716C;">
+              <span>Read Article</span>
+              <span style="color: {accent_val}; font-weight: 700;">→</span>
             </div>
           </a>
         </article>
         """
 
+    if cards_only:
+        return cards_html
+
     return f"""
-    <section style="margin-top: 3.5rem; padding-top: 2.5rem; border-top: 1px solid var(--pseo-card-border);">
+    <section class="mt-14 pt-8 border-t border-stone-200" style="margin-top: 3.5rem; padding-top: 2.5rem; border-top: 1px solid var(--pseo-card-border, #E7E5E4);">
       <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem;">
-        <h2 class="font-serif-editorial text-2xl font-bold text-stone-900">Related Guides &amp; Inspiration</h2>
+        <h2 class="font-serif-editorial text-2xl font-bold text-stone-900">Related Articles &amp; Inspiration</h2>
       </div>
-      <div class="pseo-related-grid">
+      <div class="pseo-related-grid grid grid-cols-1 sm:grid-cols-3 gap-6" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem;">
         {cards_html}
       </div>
     </section>
@@ -1305,8 +1486,8 @@ def render_faq_section(
             "a": f"All specific room dimensions, paint swatch codes, and furniture sourcing references are detailed directly in our editorial notes above with recommended suppliers and artisan makers.",
         },
         {
-            "q": f"Are the styling moodboards and guides printable or saveable to Pinterest?",
-            "a": f"Yes! Every room image is high-resolution Pinterest-optimized (16:10 format). You can click our 'Save to Board' badge to pin immediately, and browse through our curated design guides in real time.",
+            "q": f"Are the styling moodboards and articles printable or saveable to Pinterest?",
+            "a": f"Yes! Every room image is high-resolution Pinterest-optimized (16:10 format). You can click our 'Save to Board' badge to pin immediately, and browse through our curated design articles in real time.",
         },
     ]
 
@@ -1414,6 +1595,7 @@ def render_editorial_warm_layout(
     toc_html: str = "", faq_html: str = "", eeat_html: str = "",
     branding: Optional[Any] = None,
     content_html: str = "",
+    **kwargs: Any,
 ) -> str:
     """Kinfolk Lifestyle Journal: warm linen editorial, Playfair drop-caps, sourcing notes."""
     accent = theme_tokens["accent"]
@@ -1422,25 +1604,36 @@ def render_editorial_warm_layout(
     esc_category = html_lib.escape(category)
     esc_canonical = html_lib.escape(canonical_url)
     author_name = getattr(branding, "author_name", "") if branding else ""
-    clean_brand = getattr(branding, "brand_name", "") or "ANNADECO"
-    clean_brand = getattr(branding, "brand_name", "") or "ANNADECO"
-    clean_brand = getattr(branding, "brand_name", "") or "ANNADECO"
+    clean_brand = getattr(branding, "brand_name", "") or "Styleire"
     pin_target_url = urllib.parse.quote(canonical_url, safe="") if canonical_url else ""
     pin_media_url = urllib.parse.quote(image_src, safe="") if image_src else ""
     pin_title = urllib.parse.quote(title, safe="") if title else ""
     pin_href = f"https://www.pinterest.com/pin/create/button/?url={pin_target_url}&media={pin_media_url}&description={pin_title}"
-    header_html = render_blogger_header(clean_domain, breadcrumb_html, pills_html, theme_tokens, path_prefix=path_prefix, canonical_url=canonical_url, branding=branding)
+    header_html = render_blogger_header(clean_domain, breadcrumb_html, pills_html, theme_tokens, path_prefix=path_prefix, canonical_url=canonical_url, branding=branding, categories=kwargs.get("categories"), all_posts=kwargs.get("all_posts"), routing_mode=kwargs.get("routing_mode", "single"))
     byline_html = render_blogger_byline(clean_domain, lastmod, esc_category, theme_tokens, canonical_url=canonical_url, author_name=author_name, branding=branding)
     footer_html = render_blogger_footer(clean_domain, theme_tokens, path_prefix=path_prefix, branding=branding)
-    if content_html and len(content_html.strip()) > 20:
-        article_body_html = f'<div class="ns-prose pseo-article-body" style="margin:2rem 0;font-size:1rem;line-height:1.75;color:#334155;">{content_html}</div>'
-    else:
-        article_body_html = f'<p class="ns-prose pseo-article-body" style="margin:2rem 0;font-size:1rem;line-height:1.75;color:#334155;">Curated architectural specifications and styling guide for {esc_title}.</p>'
+    domain_match = re.match(r"^(https?://[^/]+)", str(canonical_url))
+    canonical_base = kwargs.get("canonical_base") or (domain_match.group(1) if domain_match else (f"https://{clean_domain}" if clean_domain else "https://styleire.com"))
+    canonical_base = canonical_base.rstrip("/")
     drop_excerpt = html_lib.escape(excerpt[:200]) + ("..." if len(excerpt) > 200 else "")
     if content_html and len(content_html.strip()) > 20:
-        article_body_html = f'<div class="ew-prose pseo-article-body" style="margin:2rem 0;font-size:1.05rem;line-height:1.85;color:#292524;">{content_html}</div>'
+        article_body_html = f'<div class="ew-prose pseo-article-body" style="margin:2rem 0;font-size:1.05rem;line-height:1.85;color:#292524;">{clean_and_wrap_article_images(content_html, canonical_url, canonical_base, page_title=title, path_prefix=path_prefix)}</div>'
     else:
         article_body_html = f'<p class="text-stone-700 text-base leading-relaxed ew-drop-cap" style="margin-bottom:2rem;">Curated design concepts and styling specifications for {esc_title}.</p>'
+
+    raw_cards_m1 = extract_related_cards_html(related_html) if related_html else ""
+    related_section_m1 = ""
+    if raw_cards_m1 and raw_cards_m1.strip():
+        related_section_m1 = f'''
+        <section class="mt-14 pt-8 border-t border-stone-200" style="margin-top: 3.5rem; padding-top: 2rem; border-top: 1px solid var(--pseo-card-border, #E7E5E4);">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem;">
+            <h2 class="font-serif-editorial text-2xl font-bold text-stone-900">Related Articles &amp; Inspiration</h2>
+          </div>
+          <div class="pseo-related-grid grid grid-cols-1 sm:grid-cols-3 gap-6" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem;">
+            {raw_cards_m1}
+          </div>
+        </section>
+        '''
 
     return f"""<!DOCTYPE html>
 <html lang="en">
@@ -1587,14 +1780,14 @@ def render_editorial_warm_layout(
         <div style="position:absolute;top:1rem;left:1rem;z-index:20;">
           <span class="pseo-badge" style="background:rgba(255,255,255,0.95);color:#1C1917;border:1px solid #E7E2DA;">{esc_category}</span>
         </div>
-        <a href="{pin_href}" target="_blank" rel="noopener noreferrer" class="pseo-pin-save-btn" title="Save to Pinterest">
+        <a href="{pin_href}" onclick="var c=this.closest('.pseo-photo-container, .group, .pseo-img-wrapper, figure, div');var i=c?c.querySelector('img'):null;if(i){{var u=new URL(this.href,window.location.origin);var s=i.currentSrc||i.src;if(s){{u.searchParams.set('media',s);this.href=u.toString();}}}}" target="_blank" rel="noopener noreferrer" class="pseo-pin-save-btn" title="Save to Pinterest">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.373 0 0 5.372 0 12c0 5.084 3.163 9.426 7.627 11.174-.105-.949-.2-2.405.042-3.441.218-.937 1.407-5.965 1.407-5.965s-.359-.719-.359-1.782c0-1.668.967-2.914 2.171-2.914 1.023 0 1.518.769 1.518 1.69 0 1.029-.655 2.568-.994 3.995-.283 1.194.599 2.169 1.777 2.169 2.133 0 3.772-2.249 3.772-5.495 0-2.873-2.064-4.882-5.012-4.882-3.414 0-5.418 2.561-5.418 5.207 0 1.031.397 2.138.893 2.738a.36.36 0 0 1 .083.345l-.333 1.36c-.053.22-.174.267-.402.161-1.499-.698-2.436-2.889-2.436-4.649 0-3.785 2.75-7.262 7.929-7.262 4.163 0 7.398 2.967 7.398 6.931 0 4.136-2.607 7.464-6.227 7.464-1.216 0-2.359-.631-2.75-1.378l-.748 2.853c-.271 1.043-1.002 2.35-1.492 3.146C9.57 23.812 10.763 24 12 24c6.627 0 12-5.373 12-12 0-6.628-5.373-12-12-12z"/></svg>
           <span>Save</span>
         </a>
       </div>
 
       <div class="ew-body">
-        <div class="ew-kicker">{esc_category} &nbsp;&middot;&nbsp; Updated {(lastmod or "2026")[:10]}</div>
+        <div class="ew-kicker">{esc_category}</div>
         <h1 class="ew-title">{esc_title}</h1>
         {byline_html}
         
@@ -1611,37 +1804,58 @@ def render_editorial_warm_layout(
     </div>
 
     
-    <div id="related">{related_html}</div>
+    <div id="related">{related_section_m1}</div>
   </main>
 
 {footer_html}
   <script>
-    document.addEventListener("DOMContentLoaded", function() {{
-      var articleImgs = document.querySelectorAll(".pseo-article-body img");
-      var pageUrl = encodeURIComponent(window.location.href);
-      var pageTitle = encodeURIComponent(document.title || "");
-      articleImgs.forEach(function(img) {{
-        if (img.closest(".pseo-img-wrapper")) return;
-        var wrapper = document.createElement("div");
-        wrapper.className = "pseo-img-wrapper";
-        wrapper.style.position = "relative";
-        wrapper.style.display = "block";
-        wrapper.style.margin = "1.5rem 0";
-        
-        var pinBtn = document.createElement("a");
-        pinBtn.className = "pseo-pin-save-btn";
-        var mediaSrc = encodeURIComponent(img.src || img.getAttribute("src") || "");
-        pinBtn.href = "https://www.pinterest.com/pin/create/button/?url=" + pageUrl + "&media=" + mediaSrc + "&description=" + pageTitle;
-        pinBtn.target = "_blank";
-        pinBtn.rel = "noopener noreferrer";
-        pinBtn.title = "Save to Pinterest";
-        pinBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.373 0 0 5.372 0 12c0 5.084 3.163 9.426 7.627 11.174-.105-.949-.2-2.405.042-3.441.218-.937 1.407-5.965 1.407-5.965s-.359-.719-.359-1.782c0-1.668.967-2.914 2.171-2.914 1.023 0 1.518.769 1.518 1.69 0 1.029-.655 2.568-.994 3.995-.283 1.194.599 2.169 1.777 2.169 2.133 0 3.772-2.249 3.772-5.495 0-2.873-2.064-4.882-5.012-4.882-3.414 0-5.418 2.561-5.418 5.207 0 1.031.397 2.138.893 2.738a.36.36 0 0 1 .083.345l-.333 1.36c-.053.22-.174.267-.402.161-1.499-.698-2.436-2.889-2.436-4.649 0-3.785 2.75-7.262 7.929-7.262 4.163 0 7.398 2.967 7.398 6.931 0 4.136-2.607 7.464-6.227 7.464-1.216 0-2.359-.631-2.75-1.378l-.748 2.853c-.271 1.043-1.002 2.35-1.492 3.146C9.57 23.812 10.763 24 12 24c6.627 0 12-5.373 12-12 0-6.628-5.373-12-12-12z"/></svg><span>Save</span>';
-        
-        img.parentNode.insertBefore(wrapper, img);
-        wrapper.appendChild(img);
-        wrapper.appendChild(pinBtn);
-      }});
-    }});
+    (function() {{
+      function syncPinterestButtons() {{
+        document.querySelectorAll('a[title="Save to Pinterest"], a.pseo-pin-save-btn, a[href*="pinterest.com/pin/create/button"]').forEach(function(btn) {{
+          var container = btn.closest('.pseo-photo-container, .group, .pseo-img-wrapper, figure, div');
+          var img = container ? container.querySelector('img') : null;
+          if (!img) img = document.querySelector('article img, main img');
+          if (img) {{
+            var liveSrc = img.currentSrc || img.src || img.getAttribute('src') || '';
+            if (liveSrc && liveSrc.startsWith('/')) {{
+              liveSrc = window.location.origin + liveSrc;
+            }}
+            if (liveSrc) {{
+              try {{
+                var u = new URL(btn.href, window.location.origin);
+                u.searchParams.set('media', liveSrc);
+                btn.href = u.toString();
+              }} catch(e) {{}}
+            }}
+          }}
+        }});
+      }}
+      if (document.readyState === 'loading') {{
+        document.addEventListener('DOMContentLoaded', syncPinterestButtons);
+      }} else {{
+        syncPinterestButtons();
+      }}
+      document.addEventListener('click', function(e) {{
+        var btn = e.target.closest('a[title="Save to Pinterest"], a.pseo-pin-save-btn, a[href*="pinterest.com/pin/create/button"]');
+        if (!btn) return;
+        var container = btn.closest('.pseo-photo-container, .group, .pseo-img-wrapper, figure, div');
+        var img = container ? container.querySelector('img') : null;
+        if (!img) img = document.querySelector('article img, main img');
+        if (img) {{
+          var liveSrc = img.currentSrc || img.src || img.getAttribute('src') || '';
+          if (liveSrc && liveSrc.startsWith('/')) {{
+            liveSrc = window.location.origin + liveSrc;
+          }}
+          if (liveSrc) {{
+            try {{
+              var u = new URL(btn.href, window.location.origin);
+              u.searchParams.set('media', liveSrc);
+              btn.href = u.toString();
+            }} catch (err) {{}}
+          }}
+        }}
+      }}, true);
+    }})();
   </script>
 </body>
 </html>"""
@@ -1656,19 +1870,58 @@ def render_nordic_studio_layout(
     toc_html: str = "", faq_html: str = "", eeat_html: str = "",
     branding: Optional[Any] = None,
     content_html: str = "",
+    categories: Optional[list[Any]] = None,
+    routing_mode: str = "single",
+    all_posts: Optional[list[Any]] = None,
+    **kwargs: Any,
 ) -> str:
-    """The Nordroom: Scandinavian Minimalist 740px Centered Reading Column."""
+    """The Nordroom: Scandinavian Minimalist 740px Centered Reading Column with dynamic categories and user branding."""
     accent = theme_tokens.get("accent", "#8C6D53")
     esc_title = html_lib.escape(title)
     esc_excerpt = html_lib.escape(excerpt)
     esc_category = html_lib.escape(category or "Home Tour")
     esc_canonical = html_lib.escape(canonical_url)
-    
-    brand_clean = getattr(branding, "brand_name", "") or "THE NORDROOM"
+
+    brand_name_val = getattr(branding, "brand_name", "") if branding else ""
+    if not brand_name_val and clean_domain and clean_domain not in ("stylesdays.com", "asqstyle.com"):
+        brand_name_val = clean_domain.split(".")[0].replace("-", " ").title()
+    brand_clean = brand_name_val or "Styleire"
+
+    tagline_val = getattr(branding, "tagline", "") if branding else ""
+    kicker_val = tagline_val or "Curated Living & Architectural Design"
+    subtitle_val = tagline_val or f"{brand_clean} is an independent design publication with curated articles and practical inspiration."
+    utility_strip_text = f"{brand_clean.upper()} • {tagline_val.upper()}" if tagline_val else f"{brand_clean.upper()} • CURATED LIVING • DESIGN INSPIRATION"
+
     author_name = getattr(branding, "author_name", "") or "Rachel"
-    author_bio = getattr(branding, "author_bio", "") or "Creator of The Nordroom • Interior design specialist passionate about Scandinavian homes, architectural renovations, and spatial curation."
+    author_bio = getattr(branding, "author_bio", "") or f"Creator of {brand_clean} • Interior design specialist passionate about homes, architectural renovations, and spatial curation."
     home_link = f"{path_prefix}/" if path_prefix else "/"
-    
+
+    social_links = getattr(branding, "social_links", {}) if branding else {}
+    if not isinstance(social_links, dict):
+        social_links = {}
+    nordic_fb = social_links.get("facebook") or "https://www.facebook.com"
+    nordic_pin = social_links.get("pinterest") or "https://pinterest.com"
+
+    logo_path = getattr(branding, "logo_path", "") if branding else ""
+    if logo_path:
+        clean_logo = logo_path.lstrip("/")
+        logo_url = f"{path_prefix}/{clean_logo}" if path_prefix else f"/{clean_logo}"
+        brand_heading_html = f'<a href="{home_link}" class="inline-block hover:opacity-90 transition-opacity"><img src="{logo_url}" alt="{html_lib.escape(brand_clean)}" class="max-h-14 mx-auto mb-2 object-contain pseo-custom-logo"></a>'
+    else:
+        brand_heading_html = f'<a href="{home_link}" class="hover:opacity-90 transition-opacity">{html_lib.escape(brand_clean)}</a>'
+
+    # Dynamic Ingested Categories Navigation (ZERO fake supplemental categories)
+    dynamic_cats = build_dynamic_nav_links(categories, all_posts=all_posts, path_prefix=path_prefix, routing_mode=routing_mode)
+    nav_items = [f'<a href="{home_link}" class="hover:text-[#8C6D53] transition-colors">Home</a>']
+    for c_name, c_url in dynamic_cats:
+        nav_items.append(f'<a href="{c_url}" class="hover:text-[#8C6D53] transition-colors">{html_lib.escape(c_name)}</a>')
+    nav_links_html = "\n        ".join(nav_items)
+
+    footer_cat_items = []
+    for c_name, c_url in dynamic_cats[:6]:
+        footer_cat_items.append(f'<li><a href="{c_url}" class="hover:text-white transition-colors">{html_lib.escape(c_name)}</a></li>')
+    footer_cats_html = "\n          ".join(footer_cat_items) or f'<li><a href="{home_link}" class="hover:text-white transition-colors">All Published Articles</a></li>'
+
     pin_target_url = urllib.parse.quote(canonical_url, safe="") if canonical_url else ""
     pin_media_url = urllib.parse.quote(image_src, safe="") if image_src else ""
     pin_title = urllib.parse.quote(title, safe="") if title else ""
@@ -1679,19 +1932,23 @@ def render_nordic_studio_layout(
     if lastmod and len(lastmod) >= 4 and lastmod[:4].isdigit():
         year_val = lastmod[:4]
 
-    # Clean body prose: zero fake robot checklists!
+    domain_match = re.match(r"^(https?://[^/]+)", str(canonical_url))
+    canonical_base = kwargs.get("canonical_base") or (domain_match.group(1) if domain_match else (f"https://{clean_domain}" if clean_domain else "https://styleire.com"))
+    canonical_base = canonical_base.rstrip("/")
+
+    # Clean body prose: zero fake robot checklists & clean wrapped photos!
     if content_html and len(content_html.strip()) > 20:
-        article_body_html = f'<div class="nordroom-prose pseo-article-body">{content_html}</div>'
+        article_body_html = f'<div class="nordroom-prose pseo-article-body">{clean_and_wrap_article_images(content_html, canonical_url, canonical_base, page_title=title, path_prefix=path_prefix)}</div>'
     else:
         article_body_html = f'''
         <div class="nordroom-prose pseo-article-body">
-          <p>Discovering intentional simplicity begins with decluttering the visual field. In this curated guide for {esc_title}, we explore how natural light, warm oak joinery, and tactual limewash surfaces combine to establish an acoustic and architectural retreat within the modern home.</p>
+          <p>Discovering intentional simplicity begins with decluttering the visual field. In this curated article for {esc_title}, we explore how natural light, warm oak joinery, and tactual limewash surfaces combine to establish an acoustic and architectural retreat within the modern home.</p>
           <p>Scandinavian interior design is grounded in the philosophy that beauty and function are inseparable companions. By selecting materials that age with grace—such as untreated linen, Roman travertine, and brushed brass—rooms gain a tranquil permanence that outlasts shifting trends.</p>
           <p>Whether reconfiguring an urban apartment or refreshing a light-filled country cottage, the key lies in deliberate negative space: leaving intentional room between objects so architectural character can breathe freely.</p>
         </div>
         '''
 
-    # Conditional Material & Design Notes (ONLY if real takeaways exist - zero fake robot checklists!)
+    # Conditional Material & Design Notes
     specs_card_html = ""
     if takeaways_html and takeaways_html.strip():
         specs_card_html = f'''
@@ -1704,14 +1961,15 @@ def render_nordic_studio_layout(
         '''
 
     # Related Guides (3-card grid)
+    raw_cards_m2 = extract_related_cards_html(related_html) if related_html else ""
     related_section_html = ""
-    if related_html and related_html.strip():
+    if raw_cards_m2 and raw_cards_m2.strip():
         related_section_html = f'''
-        <section class="mt-14 pt-8 border-t border-[#EBEBEA]">
-          <span class="text-[11px] tracking-[0.2em] uppercase font-semibold text-[#8C6D53] block mb-1">Curated Reading</span>
-          <h2 class="font-serif text-2xl font-bold text-[#1C1C1C] mb-6">More Scandinavian Living Inspiration</h2>
-          <div class="grid grid-cols-1 sm:grid-cols-3 gap-6">
-            {related_html}
+        <section class="mt-14 pt-8 border-t border-[#EBEBEA]" style="margin-top: 3.5rem; padding-top: 2rem; border-top: 1px solid #EBEBEA;">
+          <span class="text-[11px] tracking-[0.2em] uppercase font-semibold text-[#8C6D53] block mb-1">Related Reading</span>
+          <h2 class="font-serif text-2xl font-bold text-[#1C1C1C] mb-6">More Curated Inspiration</h2>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-6" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem;">
+            {raw_cards_m2}
           </div>
         </section>
         '''
@@ -1728,6 +1986,7 @@ def render_nordic_studio_layout(
   <meta name="description" content="{esc_excerpt}">
   <meta name="robots" content="index, follow, max-image-preview:large">
   <link rel="canonical" href="{esc_canonical}">
+  <link rel="icon" href="{path_prefix}/favicon.ico" type="image/x-icon"/>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 100 100\'><text y=\'.9em\' font-size=\'90\'>&#x1F3E0;</text></svg>">
   <meta property="og:type" content="article">
   <meta property="og:title" content="{esc_title}">
@@ -1803,6 +2062,22 @@ def render_nordic_studio_layout(
       color: #1C1C1C;
       margin: 2rem 0 0.75rem;
     }}
+    .pseo-hero-media {{
+      position: relative !important;
+      overflow: hidden !important;
+      border-radius: 0.5rem;
+      width: 100%;
+      aspect-ratio: 16/10;
+    }}
+    .pseo-card {{
+      position: relative !important;
+    }}
+    .pseo-badge {{
+      position: absolute !important;
+      top: 0.75rem !important;
+      left: 0.75rem !important;
+      z-index: 10;
+    }}
     .pseo-pin-save-btn {{
       position: absolute;
       top: 1rem;
@@ -1831,41 +2106,32 @@ def render_nordic_studio_layout(
 
   <!-- TOP UTILITY STRIP -->
   <div class="w-full bg-[#1C1C1C] text-white py-2 px-4 sm:px-8 text-center sm:text-left flex flex-col sm:flex-row items-center justify-between text-[11px] tracking-[0.18em] uppercase font-medium">
-    <div>SCANDINAVIAN INTERIORS • HOME TOURS • DESIGN INSPIRATION</div>
+    <div>{utility_strip_text}</div>
     <div class="hidden sm:flex items-center gap-4 text-stone-300">
-      <a href="{home_link}" class="hover:text-white transition-colors">Home Tours</a>
+      <a href="{nordic_fb}" target="_blank" rel="noopener noreferrer" class="hover:text-white transition-colors">Facebook</a>
       <span>•</span>
-      <a href="#newsletter" class="hover:text-white transition-colors">Newsletter</a>
+      <a href="{nordic_pin}" target="_blank" rel="noopener noreferrer" class="hover:text-white transition-colors">Pinterest</a>
       <span>•</span>
-      <a href="https://pinterest.com" target="_blank" rel="noopener noreferrer" class="hover:text-white transition-colors">Pinterest</a>
-      <span>•</span>
-      <a href="{home_link}" class="hover:text-white transition-colors">About</a>
+      <a href="{home_link}contact/" class="hover:text-white transition-colors">Contact</a>
     </div>
   </div>
 
-  <!-- CENTERED THE NORDROOM MASTHEAD -->
+  <!-- CENTERED MASTHEAD -->
   <header class="w-full bg-white border-b border-[#EBEBEA] py-8 px-4 text-center">
     <div class="max-w-[1200px] mx-auto">
-      <span class="text-[11px] tracking-[0.25em] uppercase text-[#8C6D53] font-semibold block mb-2">Nordic Living & Interior Architecture</span>
+      <span class="text-[11px] tracking-[0.25em] uppercase text-[#8C6D53] font-semibold block mb-2">{html_lib.escape(kicker_val)}</span>
       <h1 class="font-serif text-4xl sm:text-5xl md:text-6xl tracking-[0.16em] font-medium text-[#1C1C1C] uppercase mb-2">
-        <a href="{home_link}" class="hover:opacity-90 transition-opacity">{html_lib.escape(brand_clean)}</a>
+        {brand_heading_html}
       </h1>
-      <p class="text-xs sm:text-sm text-[#686866] italic font-serif">Curated Interior Design, Space Transformations & Scandinavian Living</p>
+      <p class="text-xs sm:text-sm text-[#686866] italic font-serif">{html_lib.escape(subtitle_val)}</p>
     </div>
   </header>
 
-  <!-- NAVIGATION BAR -->
+  <!-- NAVIGATION BAR (STRICTLY INGESTED CATEGORIES) -->
   <nav class="w-full bg-white border-b border-[#EBEBEA] sticky top-0 z-30 shadow-xs">
     <div class="max-w-[1200px] mx-auto px-4 flex items-center justify-between overflow-x-auto py-3 gap-6 text-[12px] font-semibold tracking-[0.14em] uppercase text-[#1C1C1C]">
       <div class="flex items-center gap-6 whitespace-nowrap">
-        <a href="{home_link}" class="hover:text-[#8C6D53] transition-colors">Home</a>
-        <a href="{home_link}" class="hover:text-[#8C6D53] transition-colors">Living Rooms</a>
-        <a href="{home_link}" class="hover:text-[#8C6D53] transition-colors">Bedrooms</a>
-        <a href="{home_link}" class="hover:text-[#8C6D53] transition-colors">Kitchens</a>
-        <a href="{home_link}" class="hover:text-[#8C6D53] transition-colors">Bathrooms</a>
-        <a href="{home_link}" class="hover:text-[#8C6D53] transition-colors">Garden & Outdoor</a>
-        <a href="{home_link}" class="hover:text-[#8C6D53] transition-colors">Small Spaces</a>
-        <a href="{home_link}" class="hover:text-[#8C6D53] transition-colors">Color Trends</a>
+        {nav_links_html}
       </div>
       <div class="hidden md:flex items-center gap-3">
         <a href="{pin_href}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 px-3 py-1 bg-[#E60023] hover:bg-[#AD081B] text-white rounded-full text-[11px] font-semibold tracking-normal shadow-xs transition-colors" title="Pin Article">
@@ -1891,7 +2157,7 @@ def render_nordic_studio_layout(
 
       <!-- CATEGORY KICKER -->
       <div class="text-[11px] tracking-[0.2em] uppercase font-semibold text-[#8C6D53] mb-3">
-        {esc_category} • 5 MIN READ • UPDATED {year_val}
+        {esc_category}
       </div>
 
       <!-- HEADLINE -->
@@ -1912,25 +2178,15 @@ def render_nordic_studio_layout(
           </div>
           <div>
             <span class="font-serif font-bold text-sm text-[#1C1C1C] block">By {html_lib.escape(author_name)}</span>
-            <span class="text-[11px] text-[#686866]">Updated {lastmod or 'Recently'} • Spatial Curation</span>
+            <span class="text-[11px] text-[#686866]">Spatial Curation</span>
           </div>
         </div>
-
-        <a href="{pin_href}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-[#E60023] hover:bg-[#AD081B] text-white rounded-full text-xs font-semibold shadow-xs transition-colors" title="Save to Pinterest">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.373 0 0 5.372 0 12c0 5.084 3.163 9.426 7.627 11.174-.105-.949-.2-2.405.042-3.441.218-.937 1.407-5.965 1.407-5.965s-.359-.719-.359-1.782c0-1.668.967-2.914 2.171-2.914 1.023 0 1.518.769 1.518 1.69 0 1.029-.655 2.568-.994 3.995-.283 1.194.599 2.169 1.777 2.169 2.133 0 3.772-2.249 3.772-5.495 0-2.873-2.064-4.882-5.012-4.882-3.414 0-5.418 2.561-5.418 5.207 0 1.031.397 2.138.893 2.738a.36.36 0 0 1 .083.345l-.333 1.36c-.053.22-.174.267-.402.161-1.499-.698-2.436-2.889-2.436-4.649 0-3.785 2.75-7.262 7.929-7.262 4.163 0 7.398 2.967 7.398 6.931 0 4.136-2.607 7.464-6.227 7.464-1.216 0-2.359-.631-2.75-1.378l-.748 2.853c-.271 1.043-1.002 2.35-1.492 3.146C9.57 23.812 10.763 24 12 24c6.627 0 12-5.373 12-12 0-6.628-5.373-12-12-12z"/></svg>
-          Save to Pinterest
-        </a>
-      </div>
-
-      <!-- HERO IMAGE (16:10 RATIO) -->
-      <div class="relative aspect-[16/10] overflow-hidden rounded-lg border border-[#EBEBEA] mb-3 bg-[#F4F3F0]">
-        <img src="{image_src}" alt="{esc_title}" class="w-full h-full object-cover" fetchpriority="high" decoding="async" onerror="this.onerror=null;this.src='{fallback_svg}';">
-        <a href="{pin_href}" target="_blank" rel="noopener noreferrer" class="pseo-pin-save-btn" title="Save to Pinterest">
+        <a href="{pin_href}" onclick="var c=this.closest('.pseo-photo-container, .group, .pseo-img-wrapper, figure, div');var i=c?c.querySelector('img'):null;if(i){{var u=new URL(this.href,window.location.origin);var s=i.currentSrc||i.src;if(s){{u.searchParams.set('media',s);this.href=u.toString();}}}}" target="_blank" rel="noopener noreferrer" class="pseo-pin-save-btn" title="Save to Pinterest">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.373 0 0 5.372 0 12c0 5.084 3.163 9.426 7.627 11.174-.105-.949-.2-2.405.042-3.441.218-.937 1.407-5.965 1.407-5.965s-.359-.719-.359-1.782c0-1.668.967-2.914 2.171-2.914 1.023 0 1.518.769 1.518 1.69 0 1.029-.655 2.568-.994 3.995-.283 1.194.599 2.169 1.777 2.169 2.133 0 3.772-2.249 3.772-5.495 0-2.873-2.064-4.882-5.012-4.882-3.414 0-5.418 2.561-5.418 5.207 0 1.031.397 2.138.893 2.738a.36.36 0 0 1 .083.345l-.333 1.36c-.053.22-.174.267-.402.161-1.499-.698-2.436-2.889-2.436-4.649 0-3.785 2.75-7.262 7.929-7.262 4.163 0 7.398 2.967 7.398 6.931 0 4.136-2.607 7.464-6.227 7.464-1.216 0-2.359-.631-2.75-1.378l-.748 2.853c-.271 1.043-1.002 2.35-1.492 3.146C9.57 23.812 10.763 24 12 24c6.627 0 12-5.373 12-12 0-6.628-5.373-12-12-12z"/></svg>
           Save
         </a>
       </div>
-      <p class="text-[11px] text-[#686866] italic text-center mb-8">Photography & Spatial Curation via The Nordroom Archives</p>
+      <p class="text-[11px] text-[#686866] italic text-center mb-8">Photography & Spatial Curation via {html_lib.escape(brand_clean)} Archives</p>
 
       <!-- ARTICLE BODY -->
       {article_body_html}
@@ -1956,110 +2212,185 @@ def render_nordic_studio_layout(
         </div>
       </div>
 
-      <!-- RELATED GUIDES -->
+      <!-- RELATED ARTICLES -->
       {related_section_html}
 
     </article>
   </main>
 
-  <!-- THE NORDROOM 4-COLUMN FOOTER -->
+  <!-- 4-COLUMN FOOTER (DYNAMIC CATEGORIES) -->
   <footer class="w-full bg-[#1C1C1C] text-stone-300 pt-14 pb-8 border-t border-stone-800">
     <div class="max-w-[1200px] mx-auto px-4 sm:px-8 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-10 mb-12">
       <div>
         <h4 class="font-serif text-2xl font-bold text-white mb-3 uppercase tracking-wider">{html_lib.escape(brand_clean)}</h4>
         <p class="text-xs text-stone-400 leading-relaxed mb-4">
-          An internationally acclaimed interior design and Scandinavian living publication showcasing serene house tours, room layout solutions, and organic material palettes.
+          An independent design and curated living publication showcasing serene room solutions, articles, and organic material palettes.
         </p>
-        <span class="text-[11px] text-[#8C6D53] font-semibold uppercase tracking-widest block">Founded by {html_lib.escape(author_name)}</span>
+        <span class="text-[11px] text-[#8C6D53] font-semibold uppercase tracking-widest block">Curated by {html_lib.escape(author_name)}</span>
       </div>
       <div>
         <h5 class="text-xs font-semibold tracking-widest uppercase text-white mb-4">Room Inspiration</h5>
         <ul class="space-y-2 text-xs text-stone-400">
-          <li><a href="{home_link}" class="hover:text-white transition-colors">Living Room Ideas</a></li>
-          <li><a href="{home_link}" class="hover:text-white transition-colors">Scandinavian Bedrooms</a></li>
-          <li><a href="{home_link}" class="hover:text-white transition-colors">Kitchens & Pantries</a></li>
-          <li><a href="{home_link}" class="hover:text-white transition-colors">Garden & Outdoor Living</a></li>
-          <li><a href="{home_link}" class="hover:text-white transition-colors">Small Space Living</a></li>
+          {footer_cats_html}
         </ul>
       </div>
       <div>
-        <h5 class="text-xs font-semibold tracking-widest uppercase text-white mb-4">Design Styles</h5>
+        <h5 class="text-xs font-semibold tracking-widest uppercase text-white mb-4">Editorial & Trust</h5>
         <ul class="space-y-2 text-xs text-stone-400">
-          <li><a href="{home_link}" class="hover:text-white transition-colors">Nordic Warm Minimalism</a></li>
-          <li><a href="{home_link}" class="hover:text-white transition-colors">Japandi Aesthetics</a></li>
-          <li><a href="{home_link}" class="hover:text-white transition-colors">Mid-Century Modern</a></li>
-          <li><a href="{home_link}" class="hover:text-white transition-colors">Earth & Lime Wash Finishes</a></li>
-          <li><a href="{home_link}" class="hover:text-white transition-colors">Small Apartment Hacks</a></li>
+          <li><a href="{path_prefix}/about/" class="hover:text-white transition-colors">About Us</a></li>
+          <li><a href="{path_prefix}/contact/" class="hover:text-white transition-colors">Contact</a></li>
+          <li><a href="{path_prefix}/editorial-policy/" class="hover:text-white transition-colors">Editorial Policy</a></li>
+          <li><a href="{path_prefix}/privacy-policy/" class="hover:text-white transition-colors">Privacy Policy</a></li>
+          <li><a href="{path_prefix}/terms/" class="hover:text-white transition-colors">Terms of Service</a></li>
         </ul>
       </div>
       <div>
         <h5 class="text-xs font-semibold tracking-widest uppercase text-white mb-4">Curate & Connect</h5>
-        <p class="text-xs text-stone-400 mb-3">Join our community of 85,000+ design enthusiasts.</p>
+        <p class="text-xs text-stone-400 mb-3">Join our community of design enthusiasts.</p>
         <div class="flex items-center gap-3 mb-4">
-          <a href="https://pinterest.com" target="_blank" rel="noopener noreferrer" class="px-3 py-1.5 bg-[#E60023] hover:bg-[#AD081B] text-white rounded text-xs font-semibold">Pinterest</a>
+          <a href="{nordic_pin}" target="_blank" rel="noopener noreferrer" class="px-3 py-1.5 bg-[#E60023] hover:bg-[#AD081B] text-white rounded text-xs font-semibold">Pinterest</a>
           <a href="#newsletter" class="px-3 py-1.5 bg-stone-800 hover:bg-stone-700 text-stone-200 rounded text-xs">Newsletter</a>
         </div>
         <span class="text-[11px] text-stone-500 block">&copy; {year_val} {html_lib.escape(brand_clean)}. All Rights Reserved.</span>
       </div>
     </div>
     <div class="max-w-[1200px] mx-auto px-4 text-center text-[11px] text-stone-500 pt-6 border-t border-stone-800/80">
-      Designed with pure Scandinavian minimalism • Zero robotic filler • Hand-crafted editorial curation.
+      Hand-crafted editorial curation • Zero robotic filler • Sourced from real data.
     </div>
   </footer>
 
   <script>
-    document.addEventListener("DOMContentLoaded", function() {{
-      var articleImgs = document.querySelectorAll(".nordroom-prose img");
-      var pageUrl = encodeURIComponent(window.location.href);
-      var pageTitle = encodeURIComponent(document.title || "");
-      articleImgs.forEach(function(img) {{
-        if (img.closest(".pseo-img-wrapper")) return;
-        var wrapper = document.createElement("div");
-        wrapper.className = "pseo-img-wrapper";
-        wrapper.style.position = "relative";
-        wrapper.style.display = "block";
-        wrapper.style.margin = "1.5rem 0";
-        
-        var pinBtn = document.createElement("a");
-        pinBtn.className = "pseo-pin-save-btn";
-        var mediaSrc = encodeURIComponent(img.src || img.getAttribute("src") || "");
-        pinBtn.href = "https://www.pinterest.com/pin/create/button/?url=" + pageUrl + "&media=" + mediaSrc + "&description=" + pageTitle;
-        pinBtn.target = "_blank";
-        pinBtn.rel = "noopener noreferrer";
-        pinBtn.title = "Save to Pinterest";
-        pinBtn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.373 0 0 5.372 0 12c0 5.084 3.163 9.426 7.627 11.174-.105-.949-.2-2.405.042-3.441.218-.937 1.407-5.965 1.407-5.965s-.359-.719-.359-1.782c0-1.668.967-2.914 2.171-2.914 1.023 0 1.518.769 1.518 1.69 0 1.029-.655 2.568-.994 3.995-.283 1.194.599 2.169 1.777 2.169 2.133 0 3.772-2.249 3.772-5.495 0-2.873-2.064-4.882-5.012-4.882-3.414 0-5.418 2.561-5.418 5.207 0 1.031.397 2.138.893 2.738a.36.36 0 0 1 .083.345l-.333 1.36c-.053.22-.174.267-.402.161-1.499-.698-2.436-2.889-2.436-4.649 0-3.785 2.75-7.262 7.929-7.262 4.163 0 7.398 2.967 7.398 6.931 0 4.136-2.607 7.464-6.227 7.464-1.216 0-2.359-.631-2.75-1.378l-.748 2.853c-.271 1.043-1.002 2.35-1.492 3.146C9.57 23.812 10.763 24 12 24c6.627 0 12-5.373 12-12 0-6.628-5.373-12-12-12z"/></svg><span>Save</span>';
-        
-        img.parentNode.insertBefore(wrapper, img);
-        wrapper.appendChild(img);
-        wrapper.appendChild(pinBtn);
-      }});
-    }});
+    (function() {{
+      function syncPinterestButtons() {{
+        document.querySelectorAll('a[title="Save to Pinterest"], a.pseo-pin-save-btn, a[href*="pinterest.com/pin/create/button"]').forEach(function(btn) {{
+          var container = btn.closest('.pseo-photo-container, .group, .pseo-img-wrapper, figure, div');
+          var img = container ? container.querySelector('img') : null;
+          if (!img) img = document.querySelector('article img, main img');
+          if (img) {{
+            var liveSrc = img.currentSrc || img.src || img.getAttribute('src') || '';
+            if (liveSrc && liveSrc.startsWith('/')) {{
+              liveSrc = window.location.origin + liveSrc;
+            }}
+            if (liveSrc) {{
+              try {{
+                var u = new URL(btn.href, window.location.origin);
+                u.searchParams.set('media', liveSrc);
+                btn.href = u.toString();
+              }} catch(e) {{}}
+            }}
+          }}
+        }});
+      }}
+      if (document.readyState === 'loading') {{
+        document.addEventListener('DOMContentLoaded', syncPinterestButtons);
+      }} else {{
+        syncPinterestButtons();
+      }}
+      document.addEventListener('click', function(e) {{
+        var btn = e.target.closest('a[title="Save to Pinterest"], a.pseo-pin-save-btn, a[href*="pinterest.com/pin/create/button"]');
+        if (!btn) return;
+        var container = btn.closest('.pseo-photo-container, .group, .pseo-img-wrapper, figure, div');
+        var img = container ? container.querySelector('img') : null;
+        if (!img) img = document.querySelector('article img, main img');
+        if (img) {{
+          var liveSrc = img.currentSrc || img.src || img.getAttribute('src') || '';
+          if (liveSrc && liveSrc.startsWith('/')) {{
+            liveSrc = window.location.origin + liveSrc;
+          }}
+          if (liveSrc) {{
+            try {{
+              var u = new URL(btn.href, window.location.origin);
+              u.searchParams.set('media', liveSrc);
+              btn.href = u.toString();
+            }} catch (err) {{}}
+          }}
+        }}
+      }}, true);
+    }})();
   </script>
 </body>
 </html>'''
 
 
-
-
-def build_styleire_header(brand_name: str, path_prefix: str = "") -> str:
-    """Builds the sticky blurred masthead for Styleire."""
+def build_styleire_header(
+    brand_name: str,
+    path_prefix: str = "",
+    categories: Optional[list[Any]] = None,
+    all_posts: Optional[list[Any]] = None,
+    routing_mode: str = "single",
+    logo_path: str = "",
+    **kwargs: Any,
+) -> str:
+    """Builds the sticky blurred masthead with top utility/social bar for Styleire with strictly dynamic ingested categories."""
     prefix = path_prefix.rstrip("/") if path_prefix else ""
     home_url = f"{prefix}/" if prefix else "/"
-    cats = [
-        ("Living Room", f"{prefix}/category/living-room/"),
-        ("Bedroom", f"{prefix}/category/bedroom/"),
-        ("Kitchen & Dining", f"{prefix}/category/kitchen-dining/"),
-        ("Outdoor Spaces", f"{prefix}/category/outdoor-spaces/"),
-        ("DIY & Craft", f"{prefix}/category/diy-decor/"),
-        ("Seasonal & Trends", f"{prefix}/category/seasonal-trends/"),
-    ]
-    nav_links = "".join([f'<a href="{url}" class="text-stone-600 transition hover:text-stone-900 font-medium">{name}</a>' for name, url in cats])
-    mobile_links = "".join([f'<a href="{url}" class="whitespace-nowrap transition hover:text-stone-900">{name}</a>' for name, url in cats])
+    cats = build_dynamic_nav_links(categories, all_posts=all_posts, path_prefix=path_prefix, routing_mode=routing_mode)
+    nav_links = "".join([f'<a href="{url}" class="text-stone-600 transition hover:text-stone-900 font-medium">{html_lib.escape(name)}</a>' for name, url in cats])
+    mobile_links = "".join([f'<a href="{url}" class="whitespace-nowrap transition hover:text-stone-900">{html_lib.escape(name)}</a>' for name, url in cats])
     about_url = f"{prefix}/about/"
+    contact_url = f"{prefix}/contact/"
 
-    return f'''<header class="sticky top-0 z-40 border-b border-stone-200 bg-white/90 backdrop-blur">
+    branding = kwargs.get("branding")
+    social_links = getattr(branding, "social_links", {}) if branding else (kwargs.get("social_links") or {})
+    if not isinstance(social_links, dict):
+        social_links = {}
+
+    fb_url = social_links.get("facebook") or kwargs.get("facebook_url") or "https://www.facebook.com"
+    pin_url = social_links.get("pinterest") or kwargs.get("pinterest_url") or "https://www.pinterest.com"
+    ig_url = social_links.get("instagram") or kwargs.get("instagram_url") or ""
+    x_url = social_links.get("twitter") or kwargs.get("twitter_url") or ""
+
+    social_items = []
+    if fb_url:
+        social_items.append(f'''<a href="{fb_url}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 text-stone-600 hover:text-[#1877F2] transition" title="Facebook">
+            <svg class="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+            <span>Facebook</span>
+          </a>''')
+    if pin_url:
+        social_items.append(f'''<a href="{pin_url}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 text-stone-600 hover:text-[#E60023] transition" title="Pinterest">
+            <svg class="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24"><path d="M12 0C5.373 0 0 5.372 0 12c0 5.084 3.163 9.426 7.627 11.174-.105-.949-.2-2.405.042-3.441.218-.937 1.407-5.965 1.407-5.965s-.359-.719-.359-1.782c0-1.668.967-2.914 2.171-2.914 1.023 0 1.518.769 1.518 1.69 0 1.029-.655 2.568-.994 3.995-.283 1.194.599 2.169 1.777 2.169 2.133 0 3.772-2.249 3.772-5.495 0-2.873-2.064-4.882-5.012-4.882-3.414 0-5.418 2.561-5.418 5.207 0 1.031.397 2.138.893 2.738a.36.36 0 0 1 .083.345l-.333 1.36c-.053.22-.174.267-.402.161-1.499-.698-2.436-2.889-2.436-4.649 0-3.785 2.75-7.262 7.929-7.262 4.163 0 7.398 2.967 7.398 6.931 0 4.136-2.607 7.464-6.227 7.464-1.216 0-2.359-.631-2.75-1.378l-.748 2.853c-.271 1.043-1.002 2.35-1.492 3.146C9.57 23.812 10.763 24 12 24c6.627 0 12-5.373 12-12 0-6.628-5.373-12-12-12z"/></svg>
+            <span>Pinterest</span>
+          </a>''')
+    if ig_url:
+        social_items.append(f'''<a href="{ig_url}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 text-stone-600 hover:text-[#E1306C] transition" title="Instagram">
+            <svg class="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg>
+            <span>Instagram</span>
+          </a>''')
+    if x_url:
+        social_items.append(f'''<a href="{x_url}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 text-stone-600 hover:text-stone-900 transition" title="X">
+            <svg class="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+            <span>X</span>
+          </a>''')
+
+    social_bar_html = "\n          ".join(social_items)
+
+    if logo_path:
+        clean_l = logo_path.lstrip("/")
+        logo_url = f"{prefix}/{clean_l}" if prefix else f"/{clean_l}"
+        brand_html = f'<a class="font-serif text-2xl font-bold tracking-tight text-stone-900 hover:opacity-90 inline-block" href="{home_url}"><img src="{logo_url}" alt="{html_lib.escape(brand_name)}" class="h-8 max-w-[180px] object-contain pseo-custom-logo"></a>'
+    else:
+        brand_html = f'<a class="font-serif text-2xl font-bold tracking-tight text-stone-900 hover:opacity-90" href="{home_url}">{html_lib.escape(brand_name)}</a>'
+
+    return f'''<header class="sticky top-0 z-40 border-b border-stone-200 bg-white/95 backdrop-blur">
+  <!-- TOP UTILITY / SOCIAL BAR -->
+  <div class="border-b border-stone-200/80 bg-stone-100/90 text-stone-600 text-xs py-1.5 px-4">
+    <div class="mx-auto flex max-w-6xl items-center justify-end">
+      <div class="flex items-center gap-4 sm:gap-5 text-xs font-medium">
+        <div class="flex items-center gap-4">
+          {social_bar_html}
+        </div>
+        <div class="h-3 w-px bg-stone-300"></div>
+        <a href="{contact_url}" class="inline-flex items-center gap-1.5 text-stone-600 hover:text-stone-900 transition font-semibold" title="Contact Us">
+          <svg class="w-3.5 h-3.5 fill-none stroke-current stroke-2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+          <span>Contact</span>
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- MAIN HEADER / BRAND & CATEGORY NAVIGATION -->
   <div class="mx-auto flex max-w-6xl items-center justify-between gap-6 px-4 py-4">
-    <a class="font-serif text-2xl font-bold tracking-tight text-stone-900 hover:opacity-90" href="{home_url}">{html_lib.escape(brand_name)}</a>
+    {brand_html}
     <nav class="hidden items-center gap-6 text-sm md:flex">
       {nav_links}
     </nav>
@@ -2073,26 +2404,78 @@ def build_styleire_header(brand_name: str, path_prefix: str = "") -> str:
 </header>'''
 
 
-def build_styleire_footer(brand_name: str, path_prefix: str = "") -> str:
-    """Builds the 4-column trust and directory footer for Styleire."""
+def build_styleire_footer(
+    brand_name: str,
+    path_prefix: str = "",
+    categories: Optional[list[Any]] = None,
+    all_posts: Optional[list[Any]] = None,
+    routing_mode: str = "single",
+    logo_path: str = "",
+    **kwargs: Any,
+) -> str:
+    """Builds the 4-column trust and directory footer for Styleire with strictly dynamic ingested categories."""
     prefix = path_prefix.rstrip("/") if path_prefix else ""
+    cats = build_dynamic_nav_links(categories, all_posts=all_posts, path_prefix=path_prefix, routing_mode=routing_mode)
+    cat_items = "".join([f'<li><a href="{url}" class="hover:text-stone-900">{html_lib.escape(name)}</a></li>' for name, url in cats[:6]]) or f'<li><a href="{prefix}/" class="hover:text-stone-900">All Published Articles</a></li>'
+
+    branding = kwargs.get("branding")
+    social_links = getattr(branding, "social_links", {}) if branding else (kwargs.get("social_links") or {})
+    if not isinstance(social_links, dict):
+        social_links = {}
+
+    footer_social_items = []
+    f_link = social_links.get("facebook") or kwargs.get("facebook_url") or "https://www.facebook.com"
+    if f_link:
+        footer_social_items.append(f'''<a href="{f_link}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 text-xs text-stone-600 hover:text-[#1877F2] transition font-medium" title="Facebook">
+            <svg class="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+            <span>Facebook</span>
+          </a>''')
+    p_link = social_links.get("pinterest") or kwargs.get("pinterest_url") or "https://www.pinterest.com"
+    if p_link:
+        footer_social_items.append(f'''<a href="{p_link}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 text-xs text-stone-600 hover:text-[#E60023] transition font-medium" title="Pinterest">
+            <svg class="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24"><path d="M12 0C5.373 0 0 5.372 0 12c0 5.084 3.163 9.426 7.627 11.174-.105-.949-.2-2.405.042-3.441.218-.937 1.407-5.965 1.407-5.965s-.359-.719-.359-1.782c0-1.668.967-2.914 2.171-2.914 1.023 0 1.518.769 1.518 1.69 0 1.029-.655 2.568-.994 3.995-.283 1.194.599 2.169 1.777 2.169 2.133 0 3.772-2.249 3.772-5.495 0-2.873-2.064-4.882-5.012-4.882-3.414 0-5.418 2.561-5.418 5.207 0 1.031.397 2.138.893 2.738a.36.36 0 0 1 .083.345l-.333 1.36c-.053.22-.174.267-.402.161-1.499-.698-2.436-2.889-2.436-4.649 0-3.785 2.75-7.262 7.929-7.262 4.163 0 7.398 2.967 7.398 6.931 0 4.136-2.607 7.464-6.227 7.464-1.216 0-2.359-.631-2.75-1.378l-.748 2.853c-.271 1.043-1.002 2.35-1.492 3.146C9.57 23.812 10.763 24 12 24c6.627 0 12-5.373 12-12 0-6.628-5.373-12-12-12z"/></svg>
+            <span>Pinterest</span>
+          </a>''')
+    i_link = social_links.get("instagram") or kwargs.get("instagram_url") or ""
+    if i_link:
+        footer_social_items.append(f'''<a href="{i_link}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 text-xs text-stone-600 hover:text-[#E1306C] transition font-medium" title="Instagram">
+            <svg class="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg>
+            <span>Instagram</span>
+          </a>''')
+    t_link = social_links.get("twitter") or kwargs.get("twitter_url") or ""
+    if t_link:
+        footer_social_items.append(f'''<a href="{t_link}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 text-xs text-stone-600 hover:text-stone-900 transition font-medium" title="X">
+            <svg class="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+            <span>X</span>
+          </a>''')
+    tk_link = social_links.get("tiktok") or kwargs.get("tiktok_url") or ""
+    if tk_link:
+        footer_social_items.append(f'''<a href="{tk_link}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 text-xs text-stone-600 hover:text-[#25F4EE] transition font-medium" title="TikTok">
+            <svg class="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64c.298-.002.595.042.88.13V9.4a6.33 6.33 0 0 0-1-.08A6.34 6.34 0 0 0 3 15.66a6.34 6.34 0 0 0 10.82 4.47 6.27 6.27 0 0 0 1.88-4.46V8.62a8.28 8.28 0 0 0 4.89 1.58V6.75a4.85 4.85 0 0 1-1-.06z"/></svg>
+            <span>TikTok</span>
+          </a>''')
+    yt_link = social_links.get("youtube") or kwargs.get("youtube_url") or ""
+    if yt_link:
+        footer_social_items.append(f'''<a href="{yt_link}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 text-xs text-stone-600 hover:text-[#FF0000] transition font-medium" title="YouTube">
+            <svg class="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
+            <span>YouTube</span>
+          </a>''')
+
+    footer_social_html = f'<div class="mt-4 flex flex-wrap items-center gap-4">{"".join(footer_social_items)}</div>' if footer_social_items else ""
+
     return f'''<footer class="border-t border-stone-200 bg-stone-50 mt-16">
   <div class="mx-auto grid max-w-6xl gap-8 px-4 py-12 md:grid-cols-4">
     <div class="md:col-span-2">
       <div class="font-serif text-xl font-bold text-stone-900">{html_lib.escape(brand_name)}</div>
       <p class="mt-2 max-w-sm text-sm text-stone-600 leading-relaxed">
-        {html_lib.escape(brand_name)} is an independent home decor publication with practical guides, expert styling advice, and inspiration for every room of your home.
+        {html_lib.escape(brand_name)} is an independent home decor publication with practical articles, expert styling advice, and inspiration for every room of your home.
       </p>
+      {footer_social_html}
     </div>
     <div>
       <div class="mb-3 text-sm font-semibold uppercase tracking-wider text-stone-900">Explore</div>
       <ul class="space-y-2 text-sm text-stone-600">
-        <li><a href="{prefix}/category/living-room/" class="hover:text-stone-900">Living Room</a></li>
-        <li><a href="{prefix}/category/bedroom/" class="hover:text-stone-900">Bedroom</a></li>
-        <li><a href="{prefix}/category/kitchen-dining/" class="hover:text-stone-900">Kitchen &amp; Dining</a></li>
-        <li><a href="{prefix}/category/outdoor-spaces/" class="hover:text-stone-900">Outdoor Spaces</a></li>
-        <li><a href="{prefix}/category/diy-decor/" class="hover:text-stone-900">DIY &amp; Craft</a></li>
-        <li><a href="{prefix}/category/seasonal-trends/" class="hover:text-stone-900">Seasonal &amp; Trends</a></li>
+        {cat_items}
       </ul>
     </div>
     <div>
@@ -2133,7 +2516,10 @@ def render_styleire_layout(
     """Renders single article post in the exact Styleire editorial design."""
     prefix = path_prefix.rstrip("/") if path_prefix else ""
     home_url = f"{prefix}/" if prefix else "/"
-    brand_name = getattr(branding, "brand_name", "") or "Styleire"
+    brand_name = getattr(branding, "brand_name", "") or "Editorial"
+    if canonical_url and brand_name.lower() in canonical_url.lower() and "workers.dev" in canonical_url.lower():
+        clean_domain_derived = clean_domain.split(".")[0].replace("-", " ").title() if clean_domain else "Editorial"
+        brand_name = clean_domain_derived
     author_name = getattr(branding, "author_name", "") or "Sophia Bennett"
     author_role = getattr(branding, "author_role", "") or "Senior Home Decor Editor & Interior Stylist"
     author_bio = getattr(branding, "author_bio", "") or (
@@ -2145,11 +2531,21 @@ def render_styleire_layout(
     author_url = f"{prefix}/author/{author_slug}/"
     author_img = f"{prefix}/assets/images/author-sophia.jpg"
     cat_slug = slugify(category or "bedroom")
+    if cat_slug in ("diy-craft", "diy-decor", "diy"):
+        cat_slug = "diy-decor"
     cat_url = f"{prefix}/category/{cat_slug}/"
+    if image_src and not image_src.startswith("http"):
+        _clean_isrc = image_src.lstrip("/")
+        if _clean_isrc.startswith("static-site/"):
+            _clean_isrc = _clean_isrc[len("static-site/"):]
+        if "/images/" in _clean_isrc and not _clean_isrc.startswith("assets/images/"):
+            _fname = _clean_isrc.split("/images/")[-1]
+            _clean_isrc = f"assets/images/{_fname}"
+        image_src = f"{prefix}/{_clean_isrc}" if prefix else f"/{_clean_isrc}"
 
     esc_title = html_lib.escape(title)
     esc_excerpt = html_lib.escape(excerpt)
-    esc_category = html_lib.escape(category or "Guides")
+    esc_category = html_lib.escape(category or "Articles")
 
     # Format date
     raw_date = (lastmod or "2026-05-20")[:10]
@@ -2160,23 +2556,47 @@ def render_styleire_layout(
     except Exception:
         formatted_date = raw_date
 
+    domain_match = re.match(r"^(https?://[^/]+)", str(canonical_url))
+    canonical_base = kwargs.get("canonical_base") or (domain_match.group(1) if domain_match else (f"https://{clean_domain}" if clean_domain else "https://styleire.com"))
+    canonical_base = canonical_base.rstrip("/")
+
+    social_image = image_src
+    if social_image and not social_image.startswith("http"):
+        social_image = f"{canonical_base}/{social_image.lstrip('/')}"
+
     # Pinterest Pin Button
     pin_target_url = urllib.parse.quote(canonical_url, safe="") if canonical_url else ""
-    pin_media_url = urllib.parse.quote(image_src, safe="") if image_src else ""
+    pin_media_url = urllib.parse.quote(social_image, safe="") if social_image else ""
     pin_title = urllib.parse.quote(title, safe="") if title else ""
     pin_href = f"https://www.pinterest.com/pin/create/button/?url={pin_target_url}&media={pin_media_url}&description={pin_title}"
 
-    # Header and Footer
-    header_markup = build_styleire_header(brand_name, path_prefix)
-    footer_markup = build_styleire_footer(brand_name, path_prefix)
+    # Header and Footer (forwarding dynamic categories and user branding)
+    categories_arg = kwargs.get("categories")
+    all_posts_arg = kwargs.get("all_posts")
+    routing_mode_arg = kwargs.get("routing_mode", "single")
+    logo_path_val = getattr(branding, "logo_path", "") if branding else ""
+    header_markup = build_styleire_header(brand_name, path_prefix, categories=categories_arg, all_posts=all_posts_arg, routing_mode=routing_mode_arg, logo_path=logo_path_val, branding=branding)
+    footer_markup = build_styleire_footer(brand_name, path_prefix, categories=categories_arg, all_posts=all_posts_arg, routing_mode=routing_mode_arg, branding=branding)
 
     # Multi-tier schema injection
     multi_tier_schemas = ""
+    post_obj = kwargs.get("post")
+    post_faqs = []
+    if post_obj:
+        raw_m = getattr(post_obj, "raw_meta", None) or (post_obj.get("raw_meta") if isinstance(post_obj, dict) else {})
+        if isinstance(raw_m, dict):
+            post_faqs = raw_m.get("faq") or raw_m.get("faqs") or []
+    if not post_faqs:
+        post_faqs = [
+            {"q": f"What is the best way to get started with {title}?", "a": f"Start with the core principles outlined in this article: assess room dimensions, choose a cohesive palette, and prioritize functional layout."},
+            {"q": "How long does this room styling project typically take?", "a": "Most room styling projects can be completed over a single weekend with proper preparation."}
+        ]
     try:
         from app.seo.schema import generate_multi_tier_json_ld_scripts
         post_mock = {
             "slug": slug, "title": title, "excerpt": excerpt, "category": category,
             "category_slug": cat_slug, "date": raw_date, "image": image_src,
+            "faq": post_faqs, "raw_meta": {"faq": post_faqs},
         }
         route_mock = {
             "web_path": f"{prefix}/blog/{slug}/",
@@ -2189,16 +2609,22 @@ def render_styleire_layout(
             ]
         }
         multi_tier_schemas = generate_multi_tier_json_ld_scripts(
-            post=post_mock, route=route_mock, base_url=canonical_url,
+            post=post_mock, route=route_mock, base_url=canonical_base,
             source_domain=clean_domain, author_name=author_name, author_slug=author_slug,
             brand_name=brand_name
         )
     except Exception:
         multi_tier_schemas = f'<script type="application/ld+json">{schema_json}</script>' if schema_json else ""
 
-    # Prose content
+    # Prose content: Purges foreign/scraped Pinterest save buttons & wrappers, and injects our owned Pinterest Save button over every photo
     if content_html and len(content_html.strip()) > 30:
-        article_prose = content_html
+        article_prose = clean_and_wrap_article_images(
+            raw_html=content_html,
+            canonical_url=canonical_url,
+            canonical_base=canonical_base,
+            page_title=title,
+            path_prefix=prefix,
+        )
     else:
         article_prose = f'''
         <p>Creating a cohesive, inviting room requires balancing proportion, texture, and light. When styling your {esc_category.lower()}, prioritize function first: ensure natural pathways remain clear and seating arrangements encourage conversation.</p>
@@ -2272,12 +2698,14 @@ def render_styleire_layout(
     '''
 
     # Related Reading Grid
-    if related_html and len(related_html.strip()) > 50:
+    raw_cards_m3 = extract_related_cards_html(related_html) if related_html else ""
+    if raw_cards_m3 and len(raw_cards_m3.strip()) > 30:
         related_section = f'''
-        <section class="mt-16">
-          <h2 class="mb-6 font-serif text-2xl font-bold text-stone-900">Related reading</h2>
-          <div class="grid gap-6 sm:grid-cols-2 md:grid-cols-3">
-            {related_html}
+        <!-- Related Reading -->
+        <section class="mt-16 pt-10 border-t border-stone-200" style="margin-top: 4rem; padding-top: 2.5rem; border-top: 1px solid #E7E5E4;">
+          <h2 class="mb-6 font-serif text-2xl font-bold text-stone-900" style="font-family: 'Playfair Display', Georgia, serif; font-size: 1.5rem; font-weight: 700; margin-bottom: 1.5rem;">Related reading</h2>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-6" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem;">
+            {raw_cards_m3}
           </div>
         </section>
         '''
@@ -2292,15 +2720,17 @@ def render_styleire_layout(
   <title>{esc_title} | {brand_name}</title>
   <meta name="description" content="{esc_excerpt}"/>
   <link rel="canonical" href="{canonical_url}"/>
+  <link rel="icon" href="{path_prefix}/favicon.ico" type="image/x-icon"/>
   <meta property="og:site_name" content="{brand_name}"/>
   <meta property="og:type" content="article"/>
+  <meta property="og:url" content="{canonical_url}"/>
   <meta property="og:title" content="{esc_title} | {brand_name}"/>
   <meta property="og:description" content="{esc_excerpt}"/>
-  <meta property="og:image" content="{image_src}"/>
+  <meta property="og:image" content="{social_image}"/>
   <meta name="twitter:card" content="summary_large_image"/>
   <meta name="twitter:title" content="{esc_title} | {brand_name}"/>
   <meta name="twitter:description" content="{esc_excerpt}"/>
-  <meta name="twitter:image" content="{image_src}"/>
+  <meta name="twitter:image" content="{social_image}"/>
   {multi_tier_schemas}
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
@@ -2343,16 +2773,12 @@ def render_styleire_layout(
         <!-- Byline -->
         <div class="mt-4 flex flex-wrap items-center gap-3 text-sm text-stone-500">
           <span>By <a href="{author_url}" class="text-stone-900 font-medium hover:underline">{author_name}</a></span>
-          <span>•</span>
-          <time datetime="{raw_date}">{formatted_date}</time>
-          <span>•</span>
-          <span>5 min read</span>
         </div>
 
         <!-- Hero Featured Image with Pinterest Save Hover Overlay -->
         <div class="group relative mt-8 overflow-hidden rounded-xl border border-stone-200">
           <img src="{image_src}" alt="{esc_title}" class="aspect-[3/2] w-full object-cover transition duration-500 group-hover:scale-105" loading="eager" onerror="this.onerror=null;this.src='{fallback_svg}';"/>
-          <a href="{pin_href}" target="_blank" rel="noopener noreferrer" class="absolute top-4 right-4 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold px-3 py-1.5 rounded-full shadow-md flex items-center gap-1.5 opacity-90 group-hover:opacity-100 transition" title="Save to Pinterest">
+          <a href="{pin_href}" onclick="var c=this.closest('.pseo-photo-container, .group, .pseo-img-wrapper, figure, div');var i=c?c.querySelector('img'):null;if(i){{var u=new URL(this.href,window.location.origin);var s=i.currentSrc||i.src;if(s){{u.searchParams.set('media',s);this.href=u.toString();}}}}" target="_blank" rel="noopener noreferrer" class="pseo-pin-save-btn absolute top-4 right-4 bg-[#E60023] hover:bg-[#ad081b] text-white text-xs font-semibold px-3 py-1.5 rounded-full shadow-md flex items-center gap-1.5 opacity-90 group-hover:opacity-100 transition z-10" title="Save to Pinterest">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.373 0 0 5.372 0 12c0 5.084 3.163 9.426 7.627 11.174-.105-.949-.2-2.405.042-3.441.218-.937 1.407-5.965 1.407-5.965s-.359-.719-.359-1.782c0-1.668.967-2.914 2.171-2.914 1.023 0 1.518.769 1.518 1.69 0 1.029-.655 2.568-.994 3.995-.283 1.194.599 2.169 1.777 2.169 2.133 0 3.772-2.249 3.772-5.495 0-2.873-2.064-4.882-5.012-4.882-3.414 0-5.418 2.561-5.418 5.207 0 1.031.397 2.138.893 2.738a.36.36 0 0 1 .083.345l-.333 1.36c-.053.22-.174.267-.402.161-1.499-.698-2.436-2.889-2.436-4.649 0-3.785 2.75-7.262 7.929-7.262 4.163 0 7.398 2.967 7.398 6.931 0 4.136-2.607 7.464-6.227 7.464-1.216 0-2.359-.631-2.75-1.378l-.748 2.853c-.271 1.043-1.002 2.35-1.492 3.146C9.57 23.812 10.763 24 12 24c6.627 0 12-5.373 12-12 0-6.628-5.373-12-12-12z"/></svg>
             <span>Save</span>
           </a>
@@ -2379,6 +2805,55 @@ def render_styleire_layout(
 
     {footer_markup}
   </div>
+  <script>
+    (function() {{
+      function syncPinterestButtons() {{
+        document.querySelectorAll('a[title="Save to Pinterest"], a.pseo-pin-save-btn, a[href*="pinterest.com/pin/create/button"]').forEach(function(btn) {{
+          var container = btn.closest('.pseo-photo-container, .group, .pseo-img-wrapper, figure, div');
+          var img = container ? container.querySelector('img') : null;
+          if (!img) img = document.querySelector('article img, main img');
+          if (img) {{
+            var liveSrc = img.currentSrc || img.src || img.getAttribute('src') || '';
+            if (liveSrc && liveSrc.startsWith('/')) {{
+              liveSrc = window.location.origin + liveSrc;
+            }}
+            if (liveSrc) {{
+              try {{
+                var u = new URL(btn.href, window.location.origin);
+                u.searchParams.set('media', liveSrc);
+                btn.href = u.toString();
+              }} catch(e) {{}}
+            }}
+          }}
+        }});
+      }}
+      if (document.readyState === 'loading') {{
+        document.addEventListener('DOMContentLoaded', syncPinterestButtons);
+      }} else {{
+        syncPinterestButtons();
+      }}
+      document.addEventListener('click', function(e) {{
+        var btn = e.target.closest('a[title="Save to Pinterest"], a.pseo-pin-save-btn, a[href*="pinterest.com/pin/create/button"]');
+        if (!btn) return;
+        var container = btn.closest('.pseo-photo-container, .group, .pseo-img-wrapper, figure, div');
+        var img = container ? container.querySelector('img') : null;
+        if (!img) img = document.querySelector('article img, main img');
+        if (img) {{
+          var liveSrc = img.currentSrc || img.src || img.getAttribute('src') || '';
+          if (liveSrc && liveSrc.startsWith('/')) {{
+            liveSrc = window.location.origin + liveSrc;
+          }}
+          if (liveSrc) {{
+            try {{
+              var u = new URL(btn.href, window.location.origin);
+              u.searchParams.set('media', liveSrc);
+              btn.href = u.toString();
+            }} catch (err) {{}}
+          }}
+        }}
+      }}, true);
+    }})();
+  </script>
 </body>
 </html>'''
 
@@ -2400,40 +2875,65 @@ def render_styleire_hub(
     **kwargs: Any,
 ) -> str:
     """Renders the Root Organization Hub (/index.html) in Styleire editorial design."""
+    theme_tokens = get_theme_tokens(theme)
     prefix = path_prefix.rstrip("/") if path_prefix else ""
     home_url = f"{prefix}/" if prefix else "/"
     brand_name = getattr(branding, "brand_name", "") or "Styleire"
     clean_domain = _clean_source_domain(source_domain)
+    if "asqstyle" in clean_domain.lower():
+        clean_domain = "styleire.com"
     canonical_base = base_url.rstrip("/") if (base_url and "://" in base_url) else f"https://{clean_domain}"
 
-    header_markup = build_styleire_header(brand_name, path_prefix)
-    footer_markup = build_styleire_footer(brand_name, path_prefix)
+    header_markup = build_styleire_header(
+        brand_name, path_prefix,
+        categories=categories or kwargs.get("categories"),
+        all_posts=posts,
+        routing_mode=kwargs.get("routing_mode", "single"),
+        logo_path=getattr(branding, "logo_path", ""),
+        branding=branding,
+    )
+    footer_markup = build_styleire_footer(
+        brand_name, path_prefix,
+        categories=categories or kwargs.get("categories"),
+        all_posts=posts,
+        routing_mode=kwargs.get("routing_mode", "single"),
+        logo_path=getattr(branding, "logo_path", ""),
+        branding=branding,
+    )
 
     cover_post = posts[0] if posts else None
-    secondary_posts = posts[1:4] if len(posts) > 1 else []
-    remaining_posts = posts[4:] if len(posts) > 4 else posts
+    remaining_posts = posts[1:] if len(posts) > 1 else posts
+
+    post_routes = kwargs.get("post_routes") or {}
 
     # Cover Post Details
     if cover_post:
-        c_slug = getattr(cover_post, "slug", "") or (cover_post.get("slug") if isinstance(cover_post, dict) else "guide")
-        c_title = getattr(cover_post, "title", "") or (cover_post.get("title") if isinstance(cover_post, dict) else c_slug.replace("-", " ").title())
-        c_excerpt = getattr(cover_post, "excerpt", "") or (cover_post.get("excerpt") if isinstance(cover_post, dict) else (cover_post.get("description", "") if isinstance(cover_post, dict) else ""))
-        c_cat = getattr(cover_post, "category", "") or (cover_post.get("category") if isinstance(cover_post, dict) else "Living Room")
-        c_date = (getattr(cover_post, "date", "") or (cover_post.get("date") if isinstance(cover_post, dict) else "2026-05-20"))[:10]
-        c_link = f"{prefix}/blog/{c_slug}/"
-        c_cat_link = f"{prefix}/category/{slugify(c_cat)}/"
+        c_slug = getattr(cover_post, "slug", "") or (cover_post.get("slug") if isinstance(cover_post, dict) else "") or "guide"
+        c_title = getattr(cover_post, "title", "") or (cover_post.get("title") if isinstance(cover_post, dict) else "") or c_slug.replace("-", " ").title()
+        c_excerpt = getattr(cover_post, "excerpt", "") or (cover_post.get("excerpt") if isinstance(cover_post, dict) else "") or (cover_post.get("description") if isinstance(cover_post, dict) else "") or ""
+        c_cat = getattr(cover_post, "category", "") or (cover_post.get("category") if isinstance(cover_post, dict) else "") or "Living Room"
+        c_date = (str(getattr(cover_post, "date", "") or (cover_post.get("date") if isinstance(cover_post, dict) else "") or "2026-05-20"))[:10]
+        c_route = post_routes.get(c_slug)
+        c_link = (f"{prefix}{c_route.web_path}" if prefix else c_route.web_path) if c_route else (f"{prefix}/{c_slug}/" if prefix else f"/{c_slug}/")
+        _c_s = slugify(c_cat)
+        if _c_s in ("diy-craft", "diy-decor", "diy"):
+            _c_s = "diy-decor"
+        c_cat_link = f"{prefix}/category/{_c_s}/"
         c_img = getattr(cover_post, "local_image_path", "") or (cover_post.get("local_image_path") if isinstance(cover_post, dict) else (cover_post.get("image", "") if isinstance(cover_post, dict) else ""))
         if not c_img or c_img.endswith(".svg"):
             c_img = "https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?auto=format&fit=crop&w=1200&q=80"
         elif not c_img.startswith("http"):
-            c_img = f"{prefix}/{c_img.lstrip('/')}"
+            c_clean = c_img.lstrip("/")
+            if c_clean.startswith("static-site/"):
+                c_clean = c_clean[len("static-site/"):]
+            c_img = f"{prefix}/{c_clean}" if prefix else f"/{c_clean}"
     else:
         c_slug = "how-to-choose-bedding"
         c_title = "How to Choose Bedding That Actually Feels Good"
         c_excerpt = "Thread count is mostly noise. Here is what actually determines how bedding feels and lasts across seasons."
         c_cat = "Bedroom"
         c_date = "2026-05-20"
-        c_link = f"{prefix}/blog/{c_slug}/"
+        c_link = f"{prefix}/{c_slug}/" if prefix else f"/{c_slug}/"
         c_cat_link = f"{prefix}/category/bedroom/"
         c_img = "https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?auto=format&fit=crop&w=1200&q=80"
 
@@ -2454,10 +2954,6 @@ def render_styleire_hub(
             </p>
             <div class="flex items-center gap-3 text-xs text-stone-500 font-medium">
               <span>By Sophia Bennett</span>
-              <span>•</span>
-              <time datetime="{c_date}">{c_date}</time>
-              <span>•</span>
-              <span>6 min read</span>
             </div>
           </div>
         </div>
@@ -2465,46 +2961,56 @@ def render_styleire_hub(
     </section>
     '''
 
-    # Silo Taxonomy Grid
-    silo_categories = [
-        ("Living Room", "living-room", "14 guides", "https://images.unsplash.com/photo-1555041469-a586c61ea9bc?auto=format&fit=crop&w=600&q=80"),
-        ("Bedroom", "bedroom", "12 guides", "https://images.unsplash.com/photo-1540518614846-7ede433c4ef7?auto=format&fit=crop&w=600&q=80"),
-        ("Kitchen & Dining", "kitchen-dining", "10 guides", "https://images.unsplash.com/photo-1556911220-e15b29be8c8f?auto=format&fit=crop&w=600&q=80"),
-        ("Outdoor Spaces", "outdoor-spaces", "8 guides", "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=600&q=80"),
-        ("DIY & Craft", "diy-decor", "9 guides", "https://images.unsplash.com/photo-1513519245088-0e12902e5a38?auto=format&fit=crop&w=600&q=80"),
-        ("Seasonal & Trends", "seasonal-trends", "7 guides", "https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=600&q=80"),
-    ]
+    # Dynamic Silo Taxonomy Grid
+    dynamic_silo_categories = build_dynamic_nav_links(
+        categories or kwargs.get("categories"),
+        all_posts=posts,
+        routing_mode=kwargs.get("routing_mode", "single"),
+        path_prefix=path_prefix,
+    )
     silo_cards = []
-    for s_name, s_slug, s_count, s_img in silo_categories:
-        s_url = f"{prefix}/category/{s_slug}/"
+    secondary_color = theme_tokens.get("secondary_accent") or "#C2410C"
+    for idx, (s_name, s_url) in enumerate(dynamic_silo_categories):
         silo_cards.append(f'''
-        <a href="{s_url}" class="group relative overflow-hidden rounded-xl border border-stone-200 bg-white shadow-sm transition hover:shadow-md">
-          <div class="aspect-[16/10] overflow-hidden">
-            <img src="{s_img}" alt="{s_name}" class="h-full w-full object-cover transition duration-500 group-hover:scale-105" loading="lazy" width="400" height="250"/>
+        <a href="{s_url}" class="group relative flex flex-col justify-between overflow-hidden rounded-2xl border border-stone-200 border-t-4 p-6 transition-all duration-300 shadow-sm hover:shadow-md hover:-translate-y-1 bg-[#FAF9F6] hover:bg-[#F5F3EF]" style="background-color: #FAF9F6; border-color: #E7E5E4; border-top-color: {secondary_color}; border-top-width: 4px; min-height: 130px;">
+          <div class="flex items-start justify-between gap-4">
+            <h3 class="font-serif text-xl sm:text-2xl font-bold text-stone-900 group-hover:text-black leading-snug">{html_lib.escape(s_name)}</h3>
+            <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white shadow-sm transition-all duration-300 group-hover:scale-110 group-hover:shadow" style="background-color: {secondary_color}; font-weight: 700;">
+              →
+            </span>
           </div>
-          <div class="p-4">
-            <h3 class="font-serif text-lg font-bold text-stone-900 group-hover:underline">{s_name}</h3>
-            <p class="text-xs text-stone-500 mt-1">{s_count}</p>
+          <div class="mt-6 flex items-center justify-between border-t border-stone-200/80 pt-3">
+            <span class="text-xs font-bold uppercase tracking-wider group-hover:underline" style="color: {secondary_color};">Explore articles</span>
+            <span class="text-xs font-semibold group-hover:translate-x-0.5 transition" style="color: {secondary_color};">&rarr;</span>
           </div>
         </a>
         ''')
     silos_html = "".join(silo_cards)
 
-    # Latest Guides Grid
+    # Latest Guides Grid - render all remaining posts so all slugs are accessible
     guide_cards = []
-    for p in (remaining_posts or posts)[:12]:
-        p_slug = getattr(p, "slug", "") or (p.get("slug") if isinstance(p, dict) else "guide")
-        p_title = getattr(p, "title", "") or (p.get("title") if isinstance(p, dict) else p_slug.replace("-", " ").title())
-        p_excerpt = getattr(p, "excerpt", "") or (p.get("excerpt") if isinstance(p, dict) else (p.get("description", "") if isinstance(p, dict) else ""))
-        p_cat = getattr(p, "category", "") or (p.get("category") if isinstance(p, dict) else "Living Room")
-        p_date = (getattr(p, "date", "") or (p.get("date") if isinstance(p, dict) else "2026-05-20"))[:10]
-        p_link = f"{prefix}/blog/{p_slug}/"
-        p_cat_link = f"{prefix}/category/{slugify(p_cat)}/"
+    for p in (remaining_posts or posts):
+        p_slug = getattr(p, "slug", "") or (p.get("slug") if isinstance(p, dict) else "") or "guide"
+        p_title = getattr(p, "title", "") or (p.get("title") if isinstance(p, dict) else "") or p_slug.replace("-", " ").title()
+        p_excerpt = getattr(p, "excerpt", "") or (p.get("excerpt") if isinstance(p, dict) else "") or (p.get("description") if isinstance(p, dict) else "") or ""
+        if not p_excerpt or p_excerpt.strip().lower() in ("asqstyle", "asqstyle.com", "stylesdays", "stylesdays.com") or len(p_excerpt.strip()) < 15:
+            p_excerpt = f"Discover inspiring {p_title.lower()} with practical styling tips, curated palettes, and modern decor ideas."
+        p_cat = getattr(p, "category", "") or (p.get("category") if isinstance(p, dict) else "") or "Living Room"
+        p_date = (str(getattr(p, "date", "") or (p.get("date") if isinstance(p, dict) else "") or "2026-05-20"))[:10]
+        p_route = post_routes.get(p_slug)
+        p_link = (f"{prefix}{p_route.web_path}" if prefix else p_route.web_path) if p_route else (f"{prefix}/{p_slug}/" if prefix else f"/{p_slug}/")
+        _p_s = slugify(p_cat)
+        if _p_s in ("diy-craft", "diy-decor", "diy"):
+            _p_s = "diy-decor"
+        p_cat_link = f"{prefix}/category/{_p_s}/"
         p_img = getattr(p, "local_image_path", "") or (p.get("local_image_path") if isinstance(p, dict) else (p.get("image", "") if isinstance(p, dict) else ""))
         if not p_img or p_img.endswith(".svg"):
             p_img = "https://images.unsplash.com/photo-1586023492125-27b2c045efd7?auto=format&fit=crop&w=600&q=80"
         elif not p_img.startswith("http"):
-            p_img = f"{prefix}/{p_img.lstrip('/')}"
+            p_clean = p_img.lstrip("/")
+            if p_clean.startswith("static-site/"):
+                p_clean = p_clean[len("static-site/"):]
+            p_img = f"{prefix}/{p_clean}" if prefix else f"/{p_clean}"
 
         guide_cards.append(f'''
         <article class="group flex flex-col overflow-hidden rounded-xl border border-stone-200 bg-white transition hover:shadow-md">
@@ -2519,10 +3025,6 @@ def render_styleire_hub(
             <p class="mt-2 line-clamp-2 flex-1 text-sm text-stone-600 leading-relaxed">
               {html_lib.escape(p_excerpt)}
             </p>
-            <div class="mt-4 flex items-center justify-between text-xs text-stone-500 font-medium">
-              <time datetime="{p_date}">{p_date}</time>
-              <span>5 min read</span>
-            </div>
           </div>
         </article>
         ''')
@@ -2538,12 +3040,13 @@ def render_styleire_hub(
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>{brand_name} — Home decor ideas, guides, and inspiration</title>
-  <meta name="description" content="{html_lib.escape(subtitle or "Styleire is an independent home decor publication with practical guides, expert styling advice, and inspiration for every room of your home.")}"/>
+  <title>{brand_name} — Home decor ideas, articles, and inspiration</title>
+  <meta name="description" content="{html_lib.escape(subtitle or "Styleire is an independent home decor publication with practical articles, expert styling advice, and inspiration for every room of your home.")}"/>
   <link rel="canonical" href="{canonical_base}/"/>
+  <link rel="icon" href="{path_prefix}/favicon.ico" type="image/x-icon"/>
   <meta property="og:site_name" content="{brand_name}"/>
   <meta property="og:type" content="website"/>
-  <meta property="og:title" content="{brand_name} — Home decor ideas, guides, and inspiration"/>
+  <meta property="og:title" content="{brand_name} — Home decor ideas, articles, and inspiration"/>
   <meta property="og:description" content="{html_lib.escape(subtitle or "Styleire is an independent home decor publication.")}"/>
   <meta property="og:url" content="{canonical_base}/"/>
   <meta property="og:image" content="{c_img}"/>
@@ -2573,14 +3076,17 @@ def render_styleire_hub(
     <main class="flex-1">
       {hero_html}
 
-      <!-- Topic Silos -->
+      <!-- All Categories -->
       <section class="py-12 md:py-16">
         <div class="mx-auto max-w-6xl px-4">
           <div class="mb-8 flex items-end justify-between">
             <div>
-              <h2 class="font-serif text-2xl font-bold tracking-tight text-stone-900 sm:text-3xl">Curated Room Silos</h2>
-              <p class="mt-1 text-sm text-stone-500">Explore architectural guides organized by room and design project.</p>
+              <h2 class="font-serif text-2xl font-bold tracking-tight text-stone-900 sm:text-3xl">All Categories</h2>
+              <p class="mt-1 text-sm text-stone-500">Explore our categories.</p>
             </div>
+            <span class="hidden sm:inline-block text-xs font-semibold uppercase tracking-wider text-stone-600 bg-stone-100 px-3.5 py-1.5 rounded-full border border-stone-200">
+              {len(dynamic_silo_categories)} Categories
+            </span>
           </div>
           <div class="grid gap-6 sm:grid-cols-2 md:grid-cols-3">
             {silos_html}
@@ -2588,12 +3094,12 @@ def render_styleire_hub(
         </div>
       </section>
 
-      <!-- Latest Published Guides -->
+      <!-- Latest Published Articles -->
       <section class="border-t border-stone-200 bg-stone-50/50 py-12 md:py-16">
         <div class="mx-auto max-w-6xl px-4">
           <div class="mb-8 flex items-end justify-between">
             <div>
-              <h2 class="font-serif text-2xl font-bold tracking-tight text-stone-900 sm:text-3xl">Latest Published Guides</h2>
+              <h2 class="font-serif text-2xl font-bold tracking-tight text-stone-900 sm:text-3xl">Latest Published Articles</h2>
               <p class="mt-1 text-sm text-stone-500">Comprehensive styling advice tested in real living spaces.</p>
             </div>
             <a href="{prefix}/sitemap/" class="hidden text-sm font-semibold text-stone-900 hover:underline md:inline">View Complete Directory &rarr;</a>
@@ -2633,6 +3139,8 @@ def render_styleire_category_index(
     base_url: str = "",
     branding: Optional[Any] = None,
     source_domain: str = "styleire.com",
+    post_routes: Optional[dict[str, Any]] = None,
+    routing_mode: str = "single",
     **kwargs: Any,
 ) -> str:
     """Renders Category Silo Index (/category/<slug>/index.html) in Styleire editorial design."""
@@ -2641,36 +3149,71 @@ def render_styleire_category_index(
     home_url = f"{prefix}/" if prefix else "/"
     brand_name = getattr(branding, "brand_name", "") or "Styleire"
     clean_domain = _clean_source_domain(source_domain)
+    if "asqstyle" in clean_domain.lower():
+        clean_domain = "styleire.com"
     canonical_base = base_url.rstrip("/") if (base_url and "://" in base_url) else f"https://{clean_domain}"
     cat_url = f"{prefix}/category/{category_slug}/"
-    clean_name = category_name or category_slug.replace("-", " ").title()
+    raw_cat_name = category_name or category_slug.replace("-", " ").title()
+    clean_name = re.sub(r'\s+guides?$', '', raw_cat_name, flags=re.IGNORECASE).strip() or raw_cat_name
 
-    header_markup = build_styleire_header(brand_name, path_prefix)
-    footer_markup = build_styleire_footer(brand_name, path_prefix)
+    header_markup = build_styleire_header(
+        brand_name, path_prefix,
+        categories=all_categories or kwargs.get("categories"),
+        all_posts=posts or kwargs.get("all_posts"),
+        routing_mode=routing_mode or kwargs.get("routing_mode", "single"),
+        logo_path=getattr(branding, "logo_path", ""),
+        branding=branding,
+    )
+    footer_markup = build_styleire_footer(
+        brand_name, path_prefix,
+        categories=all_categories or kwargs.get("categories"),
+        all_posts=posts or kwargs.get("all_posts"),
+        routing_mode=routing_mode or kwargs.get("routing_mode", "single"),
+        logo_path=getattr(branding, "logo_path", ""),
+        branding=branding,
+    )
 
     # Category Descriptions mapping
     DESCRIPTIONS = {
-        "bedroom": "Restful bedrooms start with the right bed, bedding, lighting, and layout. Practical guides for every bedroom size.",
+        "bedroom": "Restful bedrooms start with the right bed, bedding, lighting, and layout. Practical inspiration for every bedroom size.",
         "living-room": "Living rooms are where homes happen. Layouts, sofas, rugs, lighting, and styling advice for spaces that get lived in.",
         "kitchen-dining": "Kitchens and dining rooms demand both function and warmth. Practical advice on dining tables, seating, lighting, and layout.",
         "outdoor-spaces": "Patios, balconies, and backyards designed for year-round living, entertaining, and quiet mornings.",
-        "diy-decor": "Hands-on projects, material guides, and creative craft ideas that make a tangible difference in your home.",
+        "diy-decor": "Hands-on projects, material references, and creative craft ideas that make a tangible difference in your home.",
         "seasonal-trends": "Thoughtful seasonal transitions, color palettes, and enduring design trends that outlast the news cycle.",
     }
-    desc = DESCRIPTIONS.get(category_slug, f"Practical styling guides, room ideas, and architectural advice for {clean_name.lower()}.")
+    desc = DESCRIPTIONS.get(category_slug, f"Practical design inspiration, room ideas, and architectural advice for {clean_name.lower()}.")
 
     guide_cards = []
     for p in posts:
-        p_slug = getattr(p, "slug", "") or (p.get("slug") if isinstance(p, dict) else "guide")
-        p_title = getattr(p, "title", "") or (p.get("title") if isinstance(p, dict) else p_slug.replace("-", " ").title())
-        p_excerpt = getattr(p, "excerpt", "") or (p.get("excerpt") if isinstance(p, dict) else (p.get("description", "") if isinstance(p, dict) else ""))
-        p_date = (getattr(p, "date", "") or (p.get("date") if isinstance(p, dict) else "2026-05-20"))[:10]
-        p_link = f"{prefix}/blog/{p_slug}/"
+        p_slug = getattr(p, "slug", "") or (p.get("slug") if isinstance(p, dict) else "") or "guide"
+        p_title = getattr(p, "title", "") or (p.get("title") if isinstance(p, dict) else "") or p_slug.replace("-", " ").title()
+        p_excerpt = getattr(p, "excerpt", "") or (p.get("excerpt") if isinstance(p, dict) else "") or (p.get("description") if isinstance(p, dict) else "") or ""
+        if not p_excerpt or p_excerpt.strip().lower() in ("asqstyle", "asqstyle.com", "stylesdays", "stylesdays.com") or len(p_excerpt.strip()) < 15:
+            p_excerpt = f"Discover inspiring {p_title.lower()} with practical styling tips, curated palettes, and modern decor ideas."
+        p_date = (str(getattr(p, "date", "") or (p.get("date") if isinstance(p, dict) else "") or "2026-05-20"))[:10]
+        pr = post_routes.get(p_slug) if (post_routes and p_slug in post_routes) else None
+        if pr and hasattr(pr, "web_path"):
+            p_web_path = pr.web_path
+        elif isinstance(pr, dict) and "web_path" in pr:
+            p_web_path = pr["web_path"]
+        elif getattr(p, "web_path", None):
+            p_web_path = getattr(p, "web_path")
+        elif isinstance(p, dict) and p.get("web_path"):
+            p_web_path = p.get("web_path")
+        elif routing_mode == "single":
+            p_web_path = f"/{p_slug}/"
+        else:
+            p_web_path = f"/{category_slug}/{p_slug}/"
+        p_link = f"{prefix}{p_web_path}" if prefix else p_web_path
         p_img = getattr(p, "local_image_path", "") or (p.get("local_image_path") if isinstance(p, dict) else (p.get("image", "") if isinstance(p, dict) else ""))
         if not p_img or p_img.endswith(".svg"):
             p_img = "https://images.unsplash.com/photo-1540518614846-7ede433c4ef7?auto=format&fit=crop&w=600&q=80"
         elif not p_img.startswith("http"):
-            p_img = f"{prefix}/{p_img.lstrip('/')}"
+            clean_rel = p_img.lstrip("/")
+            if clean_rel.startswith("static-site/"):
+                clean_rel = clean_rel[len("static-site/"):]
+            p_img = f"{prefix}/{clean_rel}" if prefix else f"/{clean_rel}"
 
         guide_cards.append(f'''
         <article class="group flex flex-col overflow-hidden rounded-xl border border-stone-200 bg-white transition hover:shadow-md">
@@ -2685,10 +3228,6 @@ def render_styleire_category_index(
             <p class="mt-2 line-clamp-2 flex-1 text-sm text-stone-600 leading-relaxed">
               {html_lib.escape(p_excerpt)}
             </p>
-            <div class="mt-4 flex items-center justify-between text-xs text-stone-500 font-medium">
-              <time datetime="{p_date}">{p_date}</time>
-              <span>5 min read</span>
-            </div>
           </div>
         </article>
         ''')
@@ -2703,9 +3242,10 @@ def render_styleire_category_index(
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>{clean_name} — Guides &amp; Inspiration | {brand_name}</title>
+  <title>{clean_name} — Articles &amp; Inspiration | {brand_name}</title>
   <meta name="description" content="{html_lib.escape(desc)}"/>
   <link rel="canonical" href="{canonical_base}/category/{category_slug}/"/>
+  <link rel="icon" href="{path_prefix}/favicon.ico" type="image/x-icon"/>
   <meta property="og:site_name" content="{brand_name}"/>
   <meta property="og:title" content="{clean_name} | {brand_name}"/>
   <meta property="og:description" content="{html_lib.escape(desc)}"/>
@@ -2770,21 +3310,47 @@ def render_author_page(
     base_url: str = "",
     source_domain: str = "styleire.com",
     branding: Optional[Any] = None,
+    post_routes: Optional[dict[str, Any]] = None,
+    routing_mode: str = "single",
     **kwargs: Any,
 ) -> str:
     """Universal E-E-A-T Author Profile page supporting all 3 templates."""
     path_prefix = _extract_path_prefix(base_url)
     prefix = path_prefix.rstrip("/") if path_prefix else ""
     home_url = f"{prefix}/" if prefix else "/"
-    brand_name = getattr(branding, "brand_name", "") or "Styleire"
+    brand_name = _get_branding_field(branding, "brand_name", "") or "Styleire"
     clean_domain = _clean_source_domain(source_domain)
+    if "asqstyle" in clean_domain.lower():
+        clean_domain = "styleire.com"
     canonical_base = base_url.rstrip("/") if (base_url and "://" in base_url) else f"https://{clean_domain}"
     author_slug = "sophia-bennett"
     author_url = f"{canonical_base}/author/{author_slug}/"
     author_img = author_image or f"{prefix}/assets/images/author-sophia.jpg"
 
-    header_markup = build_styleire_header(brand_name, path_prefix)
-    footer_markup = build_styleire_footer(brand_name, path_prefix)
+    logo_path_val = _get_branding_field(branding, "logo_path", "")
+    categories_val = kwargs.get("categories")
+    all_posts_val = posts or kwargs.get("all_posts")
+    r_mode = routing_mode or kwargs.get("routing_mode", "single")
+    safe_kwargs = {k: v for k, v in kwargs.items() if k not in ("categories", "all_posts", "routing_mode", "logo_path")}
+
+    header_markup = build_styleire_header(
+        brand_name, path_prefix,
+        categories=categories_val,
+        all_posts=all_posts_val,
+        routing_mode=r_mode,
+        logo_path=logo_path_val,
+        branding=branding,
+        **safe_kwargs,
+    )
+    footer_markup = build_styleire_footer(
+        brand_name, path_prefix,
+        categories=categories_val,
+        all_posts=all_posts_val,
+        routing_mode=r_mode,
+        logo_path=logo_path_val,
+        branding=branding,
+        **safe_kwargs,
+    )
 
     posts_list = posts or []
     guide_cards = []
@@ -2792,14 +3358,32 @@ def render_author_page(
         p_slug = getattr(p, "slug", "") or (p.get("slug") if isinstance(p, dict) else "guide")
         p_title = getattr(p, "title", "") or (p.get("title") if isinstance(p, dict) else p_slug.replace("-", " ").title())
         p_excerpt = getattr(p, "excerpt", "") or (p.get("excerpt") if isinstance(p, dict) else (p.get("description", "") if isinstance(p, dict) else ""))
-        p_cat = getattr(p, "category", "") or (p.get("category") if isinstance(p, dict) else "Guides")
+        if not p_excerpt or p_excerpt.strip().lower() in ("asqstyle", "asqstyle.com", "stylesdays", "stylesdays.com") or len(p_excerpt.strip()) < 15:
+            p_excerpt = f"Discover inspiring {p_title.lower()} with practical styling tips, curated palettes, and modern decor ideas."
+        p_cat = getattr(p, "category", "") or (p.get("category") if isinstance(p, dict) else "Articles")
         p_date = (getattr(p, "date", "") or (p.get("date") if isinstance(p, dict) else "2026-05-20"))[:10]
-        p_link = f"{prefix}/blog/{p_slug}/"
+        pr = post_routes.get(p_slug) if (post_routes and p_slug in post_routes) else None
+        if pr and hasattr(pr, "web_path"):
+            p_web_path = pr.web_path
+        elif isinstance(pr, dict) and "web_path" in pr:
+            p_web_path = pr["web_path"]
+        elif getattr(p, "web_path", None):
+            p_web_path = getattr(p, "web_path")
+        elif isinstance(p, dict) and p.get("web_path"):
+            p_web_path = p.get("web_path")
+        elif routing_mode == "single":
+            p_web_path = f"/{p_slug}/"
+        else:
+            p_web_path = f"/{category_slug}/{p_slug}/"
+        p_link = f"{prefix}{p_web_path}" if prefix else p_web_path
         p_img = getattr(p, "local_image_path", "") or (p.get("local_image_path") if isinstance(p, dict) else (p.get("image", "") if isinstance(p, dict) else ""))
         if not p_img or p_img.endswith(".svg"):
             p_img = "https://images.unsplash.com/photo-1540518614846-7ede433c4ef7?auto=format&fit=crop&w=600&q=80"
         elif not p_img.startswith("http"):
-            p_img = f"{prefix}/{p_img.lstrip('/')}"
+            clean_rel = p_img.lstrip("/")
+            if clean_rel.startswith("static-site/"):
+                clean_rel = clean_rel[len("static-site/"):]
+            p_img = f"{prefix}/{clean_rel}" if prefix else f"/{clean_rel}"
 
         guide_cards.append(f'''
         <article class="group flex flex-col overflow-hidden rounded-xl border border-stone-200 bg-white transition hover:shadow-md">
@@ -2814,10 +3398,6 @@ def render_author_page(
             <p class="mt-2 line-clamp-2 flex-1 text-sm text-stone-600 leading-relaxed">
               {html_lib.escape(p_excerpt)}
             </p>
-            <div class="mt-4 flex items-center justify-between text-xs text-stone-500 font-medium">
-              <time datetime="{p_date}">{p_date}</time>
-              <span>5 min read</span>
-            </div>
           </div>
         </article>
         ''')
@@ -2833,7 +3413,7 @@ def render_author_page(
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>{author_name} — {author_role} | {brand_name}</title>
-  <meta name="description" content="Editorial portfolio and published interior guides by {author_name}."/>
+  <meta name="description" content="Editorial portfolio and published interior articles by {author_name}."/>
   <link rel="canonical" href="{author_url}"/>
   {author_schema}
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -2891,13 +3471,13 @@ def render_author_page(
             </div>
 
             <section class="space-y-4 text-base leading-relaxed text-stone-700">
-              <p>Sophia began her career as an assistant on residential styling shoots before moving into full-time editorial journalism. Since then, she has written and edited hundreds of long-form guides on furniture selection, spatial layout, color theory, layered lighting, and sustainable home design.</p>
-              <p>At {brand_name}, she leads a dedicated editorial team that tests decor products in real homes, interviews practicing interior architects, and rigorously audits every guide for real-world accuracy before publication. She personally fact-checks all material, care, and safety guidance.</p>
+              <p>Sophia began her career as an assistant on residential styling shoots before moving into full-time editorial journalism. Since then, she has written and edited hundreds of long-form articles on furniture selection, spatial layout, color theory, layered lighting, and sustainable home design.</p>
+              <p>At {brand_name}, she leads a dedicated editorial team that tests decor products in real homes, interviews practicing interior architects, and rigorously audits every article for real-world accuracy before publication. She personally fact-checks all material, care, and safety guidance.</p>
               <p>Sophia holds a certificate in interior styling from the KLC School of Design and lives in an 1890s brick home that serves as her constant testing ground for paint finishes, textiles, and joinery.</p>
             </section>
 
             <div class="pt-8 border-t border-stone-200">
-              <h2 class="font-serif text-2xl font-bold tracking-tight text-stone-900 mb-6">Published Guides by {author_name} ({len(posts_list)})</h2>
+              <h2 class="font-serif text-2xl font-bold tracking-tight text-stone-900 mb-6">Published Articles by {author_name} ({len(posts_list)})</h2>
               <div class="grid gap-6 sm:grid-cols-2">
                 {articles_html}
               </div>
@@ -2927,8 +3507,16 @@ def render_trust_page(
     path_prefix = _extract_path_prefix(base_url)
     prefix = path_prefix.rstrip("/") if path_prefix else ""
     home_url = f"{prefix}/" if prefix else "/"
-    brand_name = getattr(branding, "brand_name", "") or "Styleire"
     clean_domain = _clean_source_domain(source_domain)
+    if base_url:
+        import urllib.parse
+        p_netloc = urllib.parse.urlparse(base_url).netloc
+        if p_netloc and "workers.dev" not in p_netloc.lower():
+            clean_domain = p_netloc
+
+    brand_name = _get_branding_field(branding, "brand_name", "")
+    if not brand_name or (base_url and brand_name.lower() in base_url.lower() and "workers.dev" in base_url.lower()):
+        brand_name = clean_domain.split(".")[0].replace("-", " ").title() if clean_domain else "Editorial"
     canonical_base = base_url.rstrip("/") if (base_url and "://" in base_url) else f"https://{clean_domain}"
     page_url = f"{canonical_base}/{slug}/"
 
@@ -2938,8 +3526,30 @@ def render_trust_page(
     page_subtitle = data.get("subtitle", "")
     page_content = content_html or data["content_html"]
 
-    header_markup = build_styleire_header(brand_name, path_prefix)
-    footer_markup = build_styleire_footer(brand_name, path_prefix)
+    logo_path_val = _get_branding_field(branding, "logo_path", "")
+    categories_val = kwargs.get("categories")
+    all_posts_val = kwargs.get("all_posts")
+    r_mode = kwargs.get("routing_mode", "single")
+    safe_kwargs = {k: v for k, v in kwargs.items() if k not in ("categories", "all_posts", "routing_mode", "logo_path")}
+
+    header_markup = build_styleire_header(
+        brand_name, path_prefix,
+        categories=categories_val,
+        all_posts=all_posts_val,
+        routing_mode=r_mode,
+        logo_path=logo_path_val,
+        branding=branding,
+        **safe_kwargs,
+    )
+    footer_markup = build_styleire_footer(
+        brand_name, path_prefix,
+        categories=categories_val,
+        all_posts=all_posts_val,
+        routing_mode=r_mode,
+        logo_path=logo_path_val,
+        branding=branding,
+        **safe_kwargs,
+    )
 
     return f'''<!DOCTYPE html>
 <html lang="en">
@@ -3010,25 +3620,33 @@ def render_html_sitemap(
     home_url = f"{prefix}/" if prefix else "/"
     brand_name = getattr(branding, "brand_name", "") or "Styleire"
     clean_domain = _clean_source_domain(source_domain)
+    if "asqstyle" in clean_domain.lower():
+        clean_domain = "styleire.com"
     canonical_base = base_url.rstrip("/") if (base_url and "://" in base_url) else f"https://{clean_domain}"
     sitemap_url = f"{canonical_base}/sitemap/"
 
-    header_markup = build_styleire_header(brand_name, path_prefix)
-    footer_markup = build_styleire_footer(brand_name, path_prefix)
+    header_markup = build_styleire_header(
+        brand_name, path_prefix,
+        categories=categories,
+        all_posts=posts,
+        routing_mode=kwargs.get("routing_mode", "single"),
+        logo_path=getattr(branding, "logo_path", ""),
+        branding=branding,
+    )
+    footer_markup = build_styleire_footer(
+        brand_name, path_prefix,
+        categories=categories,
+        all_posts=posts,
+        routing_mode=kwargs.get("routing_mode", "single"),
+        logo_path=getattr(branding, "logo_path", ""),
+        branding=branding,
+    )
 
-    # Categories List
+    # Categories List (strictly dynamic ingested categories)
     cat_items = []
-    default_cats = [
-        ("Living Room", "living-room"),
-        ("Bedroom", "bedroom"),
-        ("Kitchen & Dining", "kitchen-dining"),
-        ("Outdoor Spaces", "outdoor-spaces"),
-        ("DIY & Craft", "diy-decor"),
-        ("Seasonal & Trends", "seasonal-trends"),
-    ]
-    for c_name, c_slug in default_cats:
-        c_url = f"{prefix}/category/{c_slug}/"
-        cat_items.append(f'<li><a class="hover:underline text-stone-700 hover:text-stone-900" href="{c_url}">{c_name}</a></li>')
+    dynamic_sitemap_cats = build_dynamic_nav_links(categories, all_posts=posts, path_prefix=path_prefix, routing_mode=kwargs.get("routing_mode", "single"))
+    for c_name, c_url in dynamic_sitemap_cats:
+        cat_items.append(f'<li><a class="hover:underline text-stone-700 hover:text-stone-900" href="{c_url}">{html_lib.escape(c_name)}</a></li>')
     cats_html = "".join(cat_items)
 
     # Trust Pages List
@@ -3060,7 +3678,7 @@ def render_html_sitemap(
         for p in cat_posts:
             p_slug = getattr(p, "slug", "") or (p.get("slug") if isinstance(p, dict) else "guide")
             p_title = getattr(p, "title", "") or (p.get("title") if isinstance(p, dict) else p_slug.replace("-", " ").title())
-            p_link = f"{prefix}/blog/{p_slug}/"
+            p_link = f"{prefix}/{p_slug}/" if prefix else f"/{p_slug}/"
             links.append(f'<li><a class="hover:underline text-stone-700 hover:text-stone-900" href="{p_link}">{html_lib.escape(p_title)}</a></li>')
         grouped_guides.append(f'''
         <div class="space-y-3">
@@ -3078,7 +3696,7 @@ def render_html_sitemap(
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>Sitemap &amp; Complete Directory | {brand_name}</title>
-  <meta name="description" content="Complete directory of all architectural guides, category silos, and legal policies on {brand_name}."/>
+  <meta name="description" content="Complete directory of all architectural articles, category silos, and legal policies on {brand_name}."/>
   <link rel="canonical" href="{sitemap_url}"/>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
@@ -3112,7 +3730,7 @@ def render_html_sitemap(
         </nav>
 
         <h1 class="font-serif text-4xl font-bold tracking-tight text-stone-900 md:text-5xl">Sitemap</h1>
-        <p class="mt-2 text-stone-600">Explore the complete index of architectural guides, category silos, and publication policies.</p>
+        <p class="mt-2 text-stone-600">Explore the complete index of architectural articles, category silos, and publication policies.</p>
 
         <!-- Section 1: Main Site Pages -->
         <section class="mt-10">
@@ -3130,9 +3748,9 @@ def render_html_sitemap(
           </ul>
         </section>
 
-        <!-- Section 3: All Published Guides -->
+        <!-- Section 3: All Published Articles -->
         <section class="mt-10 pt-8 border-t border-stone-200">
-          <h2 class="font-serif text-2xl font-bold text-stone-900 mb-6">All Published Guides ({len(posts)})</h2>
+          <h2 class="font-serif text-2xl font-bold text-stone-900 mb-6">All Published Articles ({len(posts)})</h2>
           <div class="space-y-8">
             {guides_grouped_html}
           </div>
@@ -3152,6 +3770,11 @@ def render_post(
     base_url: str = "",
     theme: str = "editorial-warm",
     source_domain: str = "stylesdays.com",
+    categories: Optional[list[Any]] = None,
+    routing_mode: str = "single",
+    branding: Optional[Any] = None,
+    seo_head: str = "",
+    route: Optional[Any] = None,
     **kwargs: Any,
 ) -> str:
     """
@@ -3180,14 +3803,18 @@ def render_post(
 
     path_prefix = _extract_path_prefix(base_url)
     clean_domain = _clean_source_domain(source_domain)
+    if "asqstyle" in clean_domain.lower():
+        clean_domain = "styleire.com"
     canonical_base = base_url.rstrip("/") if (base_url and "://" in base_url) else f"https://{clean_domain}"
     full_page_url = f"{canonical_base}{web_path}"
 
     raw_canonical = kwargs.get("canonical_url") or (
         getattr(post, "canonical_url", None)
         or (post.get("canonical_url") if isinstance(post, dict) else None)
-        or f"https://{clean_domain}/{slug}/"
+        or full_page_url
     )
+    if raw_canonical and "asqstyle" in str(raw_canonical).lower():
+        raw_canonical = full_page_url
     canonical_url = str(raw_canonical).replace("https://https://", "https://").replace("http://http://", "http://")
 
     # Demo image mapping: assign high-resolution photography for each model
@@ -3210,6 +3837,11 @@ def render_post(
         full_image_url = raw_img
     else:
         clean_img = raw_img.lstrip("/")
+        if clean_img.startswith("static-site/"):
+            clean_img = clean_img[len("static-site/"):]
+        if "/images/" in clean_img and not clean_img.startswith("assets/images/"):
+            _fname = clean_img.split("/images/")[-1]
+            clean_img = f"assets/images/{_fname}"
         image_src = f"{path_prefix}/{clean_img}" if path_prefix else f"/{clean_img}"
         full_image_url = f"{canonical_base}/{clean_img}"
     fallback_svg = _resolve_fallback_svg(slug, path_prefix)
@@ -3225,7 +3857,7 @@ def render_post(
         schema_json = build_fallback_schema(post, canonical_base, clean_domain)
 
     # Extract branding and programmatic SEO options
-    branding = kwargs.get("branding")
+    branding = branding or kwargs.get("branding")
     author_name = getattr(branding, "author_name", "Anna Lindqvist") if branding else "Anna Lindqvist"
     author_bio = getattr(branding, "author_bio", "Senior Interior Architect & Kinfolk Stylist") if branding else "Senior Interior Architect & Kinfolk Stylist"
     enable_toc = getattr(branding, "enable_toc", True) if branding else True
@@ -3236,7 +3868,7 @@ def render_post(
     pills_html = render_taxonomy_pills(all_posts, current_slug=slug, theme=theme_tokens, base_url=base_url)
     takeaways_html = render_takeaways(takeaways_items, theme=theme_tokens, title=title, category=category)
     checklist_html = render_checklist(checklist_items, slug=slug, theme=theme_tokens, source_domain=clean_domain)
-    related_html = render_related_guides(all_posts, current_slug=slug, theme=theme_tokens, base_url=base_url)
+    related_html = render_related_guides(all_posts, current_slug=slug, theme=theme_tokens, base_url=base_url, cards_only=True)
     toc_html = ""
     faq_html = ""
     eeat_html = ""
@@ -3254,9 +3886,12 @@ def render_post(
 
     content_html = getattr(post, "content_html", None) or (post.get("content_html") if isinstance(post, dict) else "")
     layout_args = dict(
+        post=post,
+        all_posts=all_posts,
         slug=slug, title=title, excerpt=excerpt, category=category, lastmod=lastmod,
         content_html=content_html,
         image_src=image_src, fallback_svg=fallback_svg, canonical_url=canonical_url,
+        canonical_base=canonical_base,
         clean_domain=clean_domain, pills_html=pills_html, takeaways_html=takeaways_html,
         checklist_html=checklist_html, related_html=related_html,
         schema_json=schema_json, fallback_css=fallback_css,
@@ -3264,6 +3899,8 @@ def render_post(
         path_prefix=path_prefix,
         toc_html=toc_html, faq_html=faq_html, eeat_html=eeat_html,
         branding=branding,
+        categories=categories,
+        routing_mode=routing_mode,
     )
 
     if theme == "nordic-studio":
@@ -3282,12 +3919,15 @@ def render_category_index(
     theme: str = "editorial-warm",
     source_domain: str = "stylesdays.com",
     branding: Optional[Any] = None,
+    post_routes: Optional[dict[str, Any]] = None,
+    routing_mode: str = "single",
     **kwargs: Any,
 ) -> str:
     """
     Renders an intermediate category silo index page (e.g. /ikea-hacks/index.html)
     guaranteeing non-404 traversal with curated post cards.
     """
+    category_name = re.sub(r'\s+guides?$', '', category_name or category_slug.replace('-', ' ').title(), flags=re.IGNORECASE).strip()
     if theme in ("pinterest-mag", "styleire"):
         return render_styleire_category_index(
             category_name=category_name,
@@ -3297,22 +3937,36 @@ def render_category_index(
             base_url=base_url,
             branding=branding,
             source_domain=source_domain,
+            post_routes=post_routes,
+            routing_mode=routing_mode,
             **kwargs,
         )
 
     path_prefix = _extract_path_prefix(base_url)
     theme_tokens = get_theme_tokens(theme)
     clean_domain = _clean_source_domain(source_domain)
-    brand_clean = getattr(branding, "brand_name", "") or (clean_domain.split(".")[0].title() if clean_domain else "AnnaDeco")
+    brand_clean = getattr(branding, "brand_name", "") or (clean_domain.split(".")[0].title() if clean_domain else "Styleire")
     canonical_base = base_url.rstrip("/") if (base_url and "://" in base_url) else f"https://{clean_domain}"
     fallback_css = get_embedded_fallback_css(theme_tokens)
 
     cards_html = ""
     for p in posts:
-        slug = getattr(p, "slug", None) or (p.get("slug") if isinstance(p, dict) else "")
-        title = getattr(p, "title", None) or (p.get("title") if isinstance(p, dict) else slug.replace("-", " ").title())
-        excerpt = getattr(p, "excerpt", None) or (p.get("excerpt") if isinstance(p, dict) else (p.get("description", "") if isinstance(p, dict) else ""))
-        web_path = getattr(p, "web_path", None) or (p.get("web_path") if isinstance(p, dict) else f"/{category_slug}/{slug}/")
+        slug = getattr(p, "slug", "") or (p.get("slug") if isinstance(p, dict) else "") or ""
+        title = getattr(p, "title", "") or (p.get("title") if isinstance(p, dict) else "") or (slug.replace("-", " ").title() if slug else "Guide")
+        excerpt = getattr(p, "excerpt", "") or (p.get("excerpt") if isinstance(p, dict) else "") or (p.get("description") if isinstance(p, dict) else "") or ""
+        pr = post_routes.get(slug) if (post_routes and slug in post_routes) else None
+        if pr and hasattr(pr, "web_path"):
+            web_path = pr.web_path
+        elif isinstance(pr, dict) and "web_path" in pr:
+            web_path = pr["web_path"]
+        elif getattr(p, "web_path", None):
+            web_path = getattr(p, "web_path")
+        elif isinstance(p, dict) and p.get("web_path"):
+            web_path = p.get("web_path")
+        elif routing_mode == "single":
+            web_path = f"/{slug}/"
+        else:
+            web_path = f"/{category_slug}/{slug}/" 
         local_img = getattr(p, "local_image_path", None) or (p.get("local_image_path") if isinstance(p, dict) else (p.get("local_image", "") if isinstance(p, dict) else ""))
         link = f"{path_prefix}{web_path}" if path_prefix else web_path
         raw_img = local_img or f"assets/images/{slug}.svg"
@@ -3342,7 +3996,7 @@ def render_category_index(
               </p>
             </div>
             <div style="padding: 0.75rem 1.25rem; background-color: #FAFAFA; border-top: 1px solid var(--pseo-card-border); display: flex; align-items: center; justify-content: space-between; font-size: 0.75rem; font-weight: 500; color: #78716C;">
-              <span>Read Guide</span>
+              <span>Read Article</span>
               <span style="color: {theme_tokens['accent']}; font-weight: 700;">→</span>
             </div>
           </a>
@@ -3358,7 +4012,8 @@ def render_category_index(
             if c_slug:
                 is_curr = c_slug == category_slug
                 active_style = f"background-color: {theme_tokens['accent']}; color: #FFFFFF;" if is_curr else ""
-                cat_pills += f'<a href="{path_prefix}/{c_slug}/" class="pseo-pill" style="{active_style}">{html_lib.escape(c_name)}</a>'
+                cat_url = f"{path_prefix}/category/{c_slug}/" if routing_mode == "pseo_nested_silo" else (f"{path_prefix}/{c_slug}/" if path_prefix else f"/{c_slug}/")
+                cat_pills += f'<a href="{cat_url}" class="pseo-pill" style="{active_style}">{html_lib.escape(c_name)}</a>'
 
     home_link = f"{path_prefix}/" if path_prefix else "/"
     branding = kwargs.get("branding")
@@ -3377,8 +4032,8 @@ def render_category_index(
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{html_lib.escape(category_name)} Guides | {html_lib.escape(brand_clean)} Editorial Hub</title>
-  <meta name="description" content="Browse {len(posts)} curated {category_name} tutorials and room styling guides.">
+  <title>{html_lib.escape(category_name)} | {html_lib.escape(brand_clean)} Editorial Hub</title>
+  <meta name="description" content="Browse {len(posts)} curated {category_name} articles and room styling inspiration.">
   <meta name="robots" content="index, follow">
   <link rel="canonical" href="{canonical_base}/{category_slug}/">
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
@@ -3398,8 +4053,8 @@ def render_category_index(
   <main class="pseo-container pseo-main">
     <div style="margin-bottom: 2rem;">
       <span class="pseo-badge" style="background-color: {theme_tokens['badge_bg']}; color: #FFFFFF; margin-bottom: 0.5rem;">Category Silo</span>
-      <h1 class="font-serif-editorial text-3xl sm:text-4xl font-bold text-stone-900">{html_lib.escape(category_name)} Guides</h1>
-      <p class="text-sm text-stone-600 mt-1">Browse {len(posts)} curated tutorials, room guides, and styling ideas.</p>
+      <h1 class="font-serif-editorial text-3xl sm:text-4xl font-bold text-stone-900">{html_lib.escape(category_name)}</h1>
+      <p class="text-sm text-stone-600 mt-1">Browse {len(posts)} curated articles, room inspiration, and styling ideas.</p>
     </div>
 
     <div class="pseo-related-grid">
@@ -3472,6 +4127,8 @@ def render_stitch_editorial_hub(
         hero_slug = getattr(lead_post, "slug", None) or (lead_post.get("slug") if isinstance(lead_post, dict) else "")
         hero_title = getattr(lead_post, "title", None) or (lead_post.get("title") if isinstance(lead_post, dict) else hero_slug.replace("-", " ").title())
         hero_excerpt = getattr(lead_post, "excerpt", None) or (lead_post.get("excerpt") if isinstance(lead_post, dict) else "")
+        if not hero_excerpt or hero_excerpt.strip().lower() in ("asqstyle", "asqstyle.com", "stylesdays", "stylesdays.com") or len(hero_excerpt.strip()) < 15:
+            hero_excerpt = f"Discover inspiring {hero_title.lower()} with practical styling tips, curated palettes, and modern decor ideas."
         hero_web_path = getattr(lead_post, "web_path", None) or (lead_post.get("web_path") if isinstance(lead_post, dict) else f"/{hero_slug}/")
         lead_link = f"{path_prefix}{hero_web_path}" if path_prefix else hero_web_path
         
@@ -3497,54 +4154,76 @@ def render_stitch_editorial_hub(
         lead_link = "#editorial-essay"
         lead_img = "https://lh3.googleusercontent.com/aida-public/AB6AXuCIKFbvPzr53nLf40yg4jHGPl5BccpgtZaQIGHS3tkwqdUoU5Sr6u35YGVsmb9A_6RzdLrnIeqgvBeoBpYw9iecdKG0fc3iaLKR8qOf8spozFbI6JduIDDSfyq_DUth9BEpG-Gy14IzRw2HBupaLIyHiIDEQb_IS7elPtLKOiyrEI6c3_pftWna3paJtK9mOCDeh0fEddi_WPYYVQ1JOHv9gAIoiHm6kKxuyVUJVxbI"
 
-    # Category Pill options
-    silo_cats = [
-        {"slug": "all", "name": "All Guides"},
-        {"slug": "bedroom", "name": "Bedroom Inspo"},
-        {"slug": "fire-pit", "name": "Fire Pits"},
-        {"slug": "patio", "name": "Patio Design"},
-        {"slug": "gazebo", "name": "Gazebos & Pergolas"},
-        {"slug": "landscaping", "name": "Landscaping Ideas"},
-        {"slug": "pool", "name": "Pool & Oasis"},
-        {"slug": "lighting", "name": "Curated Lighting"},
-    ]
+    # Dynamic Category Pill options derived from active categories or posts
+    silo_cats = [{"slug": "all", "name": "All Articles"}]
+    seen_cat_slugs = set()
+    active_cats = categories or kwargs.get("categories") or []
+    if active_cats:
+        for c in active_cats:
+            if isinstance(c, dict):
+                c_name = c.get("name") or c.get("title") or ""
+                c_slug = c.get("slug") or (slugify(c_name) if c_name else "")
+            elif isinstance(c, str):
+                c_name = c.replace("-", " ").title()
+                c_slug = slugify(c)
+            else:
+                c_name = getattr(c, "name", "") or getattr(c, "title", "")
+                c_slug = getattr(c, "slug", "") or (slugify(c_name) if c_name else "")
+            if c_slug and c_slug not in seen_cat_slugs and c_slug.lower() not in ("all", "uncategorized"):
+                seen_cat_slugs.add(c_slug)
+                silo_cats.append({"slug": c_slug, "name": c_name or c_slug.replace("-", " ").title()})
+    else:
+        for p in post_items:
+            c_name = getattr(p, "category", "") or (p.get("category") if isinstance(p, dict) else "")
+            c_slug = getattr(p, "category_slug", "") or (p.get("category_slug") if isinstance(p, dict) else "")
+            if c_name and not c_slug:
+                c_slug = slugify(c_name)
+            if c_slug and c_slug not in seen_cat_slugs and c_slug.lower() not in ("all", "uncategorized"):
+                seen_cat_slugs.add(c_slug)
+                silo_cats.append({"slug": c_slug, "name": c_name or c_slug.replace("-", " ").title()})
 
     pills_markup = ""
     for idx, sc in enumerate(silo_cats):
         active_cls = "bg-primary text-on-primary font-semibold shadow-sm text-white" if idx == 0 else "bg-surface-container hover:bg-surface-container-high text-on-surface-variant"
         pills_markup += f"""
         <button class="cat-pill px-5 py-2 rounded-full font-label-md text-label-md uppercase tracking-wider transition-all {active_cls}" data-category="{sc['slug']}" onclick="filterArticles('{sc['slug']}', this)">
-          {sc['name']}
+          {html_lib.escape(sc['name'])}
         </button>"""
+
+    # Dynamic Section 2 Topic Silos
+    topic_silos_cards = []
+    for sc in silo_cats[1:]:
+        sc_slug = sc["slug"]
+        sc_name = sc["name"]
+        matching_count = len([
+            p for p in post_items
+            if (getattr(p, "category_slug", None) or (p.get("category_slug") if isinstance(p, dict) else "") or slugify(getattr(p, "category", "") or (p.get("category") if isinstance(p, dict) else ""))) == sc_slug
+        ])
+        article_label = f"{matching_count} {'article' if matching_count == 1 else 'articles'} available"
+        topic_silos_cards.append(f"""
+          <button class="p-4 bg-surface-container-low hover:bg-surface-container border border-surface-container hover:border-outline-variant/60 rounded-xl text-left transition-all group flex flex-col justify-between" onclick="filterArticles('{sc_slug}')">
+            <div>
+              <h3 class="font-serif-editorial text-base text-on-surface font-semibold leading-snug group-hover:text-primary transition-colors">{html_lib.escape(sc_name)}</h3>
+            </div>
+            <span class="font-label-sm text-[11px] text-secondary font-medium mt-3 block text-emerald-800">{article_label}</span>
+          </button>""")
+    topic_silos_html = "".join(topic_silos_cards)
 
     # Post Cards HTML
     cards_html = ""
     for idx, p in enumerate(post_items):
-        slug = getattr(p, "slug", None) or (p.get("slug") if isinstance(p, dict) else "")
-        title_val = getattr(p, "title", None) or (p.get("title") if isinstance(p, dict) else slug.replace("-", " ").title())
-        excerpt_val = getattr(p, "excerpt", None) or (p.get("excerpt") if isinstance(p, dict) else "")
-        category_val = getattr(p, "category", None) or (p.get("category") if isinstance(p, dict) else "Spatial Design")
-        web_path_val = getattr(p, "web_path", None) or (p.get("web_path") if isinstance(p, dict) else f"/{slug}/")
-        local_img = getattr(p, "local_image_path", None) or (p.get("local_image_path") if isinstance(p, dict) else "")
+        slug = getattr(p, "slug", "") or (p.get("slug") if isinstance(p, dict) else "") or ""
+        title_val = getattr(p, "title", "") or (p.get("title") if isinstance(p, dict) else "") or (slug.replace("-", " ").title() if slug else "Guide")
+        excerpt_val = getattr(p, "excerpt", "") or (p.get("excerpt") if isinstance(p, dict) else "") or (p.get("description") if isinstance(p, dict) else "") or ""
+        category_val = getattr(p, "category", "") or (p.get("category") if isinstance(p, dict) else "") or "Spatial Design"
+        web_path_val = getattr(p, "web_path", "") or (p.get("web_path") if isinstance(p, dict) else "") or f"/{slug}/"
+        local_img = getattr(p, "local_image_path", "") or (p.get("local_image_path") if isinstance(p, dict) else "") or ""
         
-        # Determine category slug for filtering
-        cat_slug_lower = (category_val + " " + slug).lower()
-        if "bedroom" in cat_slug_lower:
-            data_cat = "bedroom"
-        elif "fire" in cat_slug_lower or "pit" in cat_slug_lower:
-            data_cat = "fire-pit"
-        elif "patio" in cat_slug_lower or "paver" in cat_slug_lower:
-            data_cat = "patio"
-        elif "pergola" in cat_slug_lower or "gazebo" in cat_slug_lower or "cabana" in cat_slug_lower:
-            data_cat = "gazebo"
-        elif "landscap" in cat_slug_lower or "rock" in cat_slug_lower or "garden" in cat_slug_lower:
-            data_cat = "landscaping"
-        elif "pool" in cat_slug_lower or "deck" in cat_slug_lower:
-            data_cat = "pool"
-        elif "light" in cat_slug_lower:
-            data_cat = "lighting"
-        else:
-            data_cat = "essay"
+        # Determine category slug dynamically for filtering
+        cat_slug_val = getattr(p, "category_slug", None) or (p.get("category_slug") if isinstance(p, dict) else "")
+        if not cat_slug_val and category_val:
+            cat_slug_val = slugify(category_val)
+        data_cat = cat_slug_val or "all"
 
         link = f"{path_prefix}{web_path_val}" if path_prefix else web_path_val
         if local_img and (local_img.startswith("http://") or local_img.startswith("https://")):
@@ -3556,7 +4235,6 @@ def render_stitch_editorial_hub(
             img_src = f"{path_prefix}/assets/images/{slug}.webp" if path_prefix else f"/assets/images/{slug}.webp"
         
         fallback_svg = f"{path_prefix}/assets/images/placeholder.svg" if path_prefix else "/assets/images/placeholder.svg"
-        read_time = f"{5 + (idx % 8)} Min Read"
         author_byline = "Helene Vane" if idx % 2 == 0 else ("Marcus Lindqvist" if idx % 3 == 0 else "Clara Thorne")
 
         init_style = "display: flex;" if idx < 9 else "display: none;"
@@ -3568,9 +4246,6 @@ def render_stitch_editorial_hub(
             </a>
             <span class="absolute top-3 left-3 px-3 py-1 bg-surface-container-lowest/90 backdrop-blur-md rounded font-label-sm text-label-sm uppercase tracking-wider font-semibold text-secondary pointer-events-none">
               {html_lib.escape(category_val)}
-            </span>
-            <span class="absolute bottom-3 right-3 px-2.5 py-0.5 bg-black/65 backdrop-blur-sm rounded text-surface-container-lowest font-label-sm text-[10px] tracking-wider text-white pointer-events-none">
-              {read_time}
             </span>
           </div>
           <div class="p-6 flex flex-col flex-1 justify-between">
@@ -3587,7 +4262,7 @@ def render_stitch_editorial_hub(
             <div class="pt-4 border-t border-surface-container flex items-center justify-between">
               <span class="font-label-sm text-label-sm text-on-surface-variant text-stone-500">By {author_byline}</span>
               <a class="font-label-sm text-label-sm uppercase tracking-wider text-primary font-semibold hover:underline inline-flex items-center gap-1" href="{link}">
-                Read Guide <span class="material-symbols-outlined text-[16px]">arrow_forward</span>
+                Read Article <span class="material-symbols-outlined text-[16px]">arrow_forward</span>
               </a>
             </div>
           </div>
@@ -3610,7 +4285,7 @@ def render_stitch_editorial_hub(
               <h4 class="font-body-md text-sm font-semibold text-on-surface group-hover:text-primary transition-colors leading-snug">
                 {html_lib.escape(t_title)}
               </h4>
-              <span class="font-label-sm text-[11px] text-on-surface-variant text-stone-500">{html_lib.escape(t_cat)} • {4 + idx} min read</span>
+              <span class="font-label-sm text-[11px] text-on-surface-variant text-stone-500">{html_lib.escape(t_cat)}</span>
             </div>
           </a>
         </li>"""
@@ -3648,6 +4323,7 @@ def render_stitch_editorial_hub(
   <meta name="description" content="{html_lib.escape(hub_subtitle)}"/>
   <meta name="robots" content="index, follow"/>
   <link rel="canonical" href="{canonical_base}/"/>
+  <link rel="icon" href="{path_prefix}/favicon.ico" type="image/x-icon"/>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏛️</text></svg>"/>
   
   <link href="https://fonts.googleapis.com" rel="preconnect"/>
@@ -3801,9 +4477,9 @@ def render_stitch_editorial_hub(
       <div class="flex items-center gap-space-sm lg:gap-space-md">
         <div class="relative hidden lg:flex items-center bg-surface-container-low rounded-lg px-3.5 py-2 w-64 border border-outline-variant/40 focus-within:border-primary">
           <span class="material-symbols-outlined text-[18px] text-on-surface-variant mr-2 text-stone-400">search</span>
-          <input class="w-full bg-transparent border-0 outline-none font-body-sm text-body-sm text-on-surface placeholder:text-on-surface-variant/70 text-xs" id="editorial-search" onkeyup="handleSearch(this.value)" placeholder="Search 50+ space guides..." type="text"/>
+          <input class="w-full bg-transparent border-0 outline-none font-body-sm text-body-sm text-on-surface placeholder:text-on-surface-variant/70 text-xs" id="editorial-search" onkeyup="handleSearch(this.value)" placeholder="Search 50+ design articles..." type="text"/>
         </div>
-        <button aria-label="Saved Guides" class="relative p-2 text-on-surface-variant hover:text-on-surface transition-colors" onclick="showQuickToast('Reading List: 4 saved guides ready to read')" title="Your Reading List" type="button">
+        <button aria-label="Saved Articles" class="relative p-2 text-on-surface-variant hover:text-on-surface transition-colors" onclick="showQuickToast('Reading List: 4 saved articles ready to read')" title="Your Reading List" type="button">
           <span class="material-symbols-outlined text-[22px]">bookmark</span>
           <span class="absolute top-1 right-1 w-4 h-4 rounded-full bg-secondary text-on-secondary font-label-sm text-[9px] flex items-center justify-center font-bold text-white">4</span>
         </button>
@@ -3869,76 +4545,22 @@ def render_stitch_editorial_hub(
         </div>
 
         <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <button class="p-4 bg-surface-container-low hover:bg-surface-container border border-surface-container hover:border-outline-variant/60 rounded-xl text-left transition-all group flex flex-col justify-between" onclick="filterArticles('bedroom')">
-            <div>
-              <h3 class="font-serif-editorial text-base text-on-surface font-semibold leading-snug group-hover:text-primary transition-colors">Bedroom Inspo Guides</h3>
-            </div>
-            <span class="font-label-sm text-[11px] text-secondary font-medium mt-3 block text-emerald-800">14 curated guides available</span>
-          </button>
-
-          <button class="p-4 bg-surface-container-low hover:bg-surface-container border border-surface-container hover:border-outline-variant/60 rounded-xl text-left transition-all group flex flex-col justify-between" onclick="filterArticles('fire-pit')">
-            <div>
-              <h3 class="font-serif-editorial text-base text-on-surface font-semibold leading-snug group-hover:text-primary transition-colors">Fire Pits & Hearths</h3>
-            </div>
-            <span class="font-label-sm text-[11px] text-secondary font-medium mt-3 block text-emerald-800">10 curated guides available</span>
-          </button>
-
-          <button class="p-4 bg-surface-container-low hover:bg-surface-container border border-surface-container hover:border-outline-variant/60 rounded-xl text-left transition-all group flex flex-col justify-between" onclick="filterArticles('patio')">
-            <div>
-              <h3 class="font-serif-editorial text-base text-on-surface font-semibold leading-snug group-hover:text-primary transition-colors">Patio & Pavers Guides</h3>
-            </div>
-            <span class="font-label-sm text-[11px] text-secondary font-medium mt-3 block text-emerald-800">21 curated guides available</span>
-          </button>
-
-          <button class="p-4 bg-surface-container-low hover:bg-surface-container border border-surface-container hover:border-outline-variant/60 rounded-xl text-left transition-all group flex flex-col justify-between" onclick="filterArticles('gazebo')">
-            <div>
-              <h3 class="font-serif-editorial text-base text-on-surface font-semibold leading-snug group-hover:text-primary transition-colors">Gazebos & Pergolas</h3>
-            </div>
-            <span class="font-label-sm text-[11px] text-secondary font-medium mt-3 block text-emerald-800">13 curated guides available</span>
-          </button>
-
-          <button class="p-4 bg-surface-container-low hover:bg-surface-container border border-surface-container hover:border-outline-variant/60 rounded-xl text-left transition-all group flex flex-col justify-between" onclick="filterArticles('landscaping')">
-            <div>
-              <h3 class="font-serif-editorial text-base text-on-surface font-semibold leading-snug group-hover:text-primary transition-colors">Landscaping Ideas</h3>
-            </div>
-            <span class="font-label-sm text-[11px] text-secondary font-medium mt-3 block text-emerald-800">17 curated guides available</span>
-          </button>
-
-          <button class="p-4 bg-surface-container-low hover:bg-surface-container border border-surface-container hover:border-outline-variant/60 rounded-xl text-left transition-all group flex flex-col justify-between" onclick="filterArticles('pool')">
-            <div>
-              <h3 class="font-serif-editorial text-base text-on-surface font-semibold leading-snug group-hover:text-primary transition-colors">Pool & Backyard Oasis</h3>
-            </div>
-            <span class="font-label-sm text-[11px] text-secondary font-medium mt-3 block text-emerald-800">19 curated guides available</span>
-          </button>
-
-          <button class="p-4 bg-surface-container-low hover:bg-surface-container border border-surface-container hover:border-outline-variant/60 rounded-xl text-left transition-all group flex flex-col justify-between" onclick="filterArticles('lighting')">
-            <div>
-              <h3 class="font-serif-editorial text-base text-on-surface font-semibold leading-snug group-hover:text-primary transition-colors">Lighting & Lumens</h3>
-            </div>
-            <span class="font-label-sm text-[11px] text-secondary font-medium mt-3 block text-emerald-800">8 curated guides available</span>
-          </button>
-
-          <button class="p-4 bg-surface-container-low hover:bg-surface-container border border-surface-container hover:border-outline-variant/60 rounded-xl text-left transition-all group flex flex-col justify-between" onclick="filterArticles('essay')">
-            <div>
-              <h3 class="font-serif-editorial text-base text-on-surface font-semibold leading-snug group-hover:text-primary transition-colors">Architect Essays</h3>
-            </div>
-            <span class="font-label-sm text-[11px] text-secondary font-medium mt-3 block text-emerald-800">15 essays published</span>
-          </button>
+          {topic_silos_html}
         </div>
       </section>
 
-      <!-- SECTION 3: ALL PUBLISHED GUIDES & CATEGORY FILTER PILL BAR -->
+      <!-- SECTION 3: ALL PUBLISHED ARTICLES & CATEGORY FILTER PILL BAR -->
       <section class="w-full max-w-[1440px] mx-auto px-margin-mobile lg:px-margin mb-8 px-4 sm:px-8" id="guides-feed">
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div>
-            <h2 class="font-serif-editorial text-2xl sm:text-3xl font-bold text-on-surface tracking-tight">All Published Guides</h2>
+            <h2 class="font-serif-editorial text-2xl sm:text-3xl font-bold text-on-surface tracking-tight">All Published Articles</h2>
             <p class="font-body-sm text-body-sm text-on-surface-variant mt-1 text-stone-500 text-xs">
               Refined step-by-step spatial blueprints, styling journals, and architectural case studies.
             </p>
           </div>
           <div class="flex items-center gap-3">
             <span class="font-label-md text-label-md text-on-surface-variant uppercase tracking-widest text-xs font-bold text-stone-500" id="article-count-badge">
-              {total_posts} Guides
+              {total_posts} Articles
             </span>
             <button class="p-2 rounded-lg bg-surface-container hover:bg-surface-container-high text-on-surface transition-colors" onclick="showQuickToast('Saved feed view to reading bookmarks')" title="Bookmark feed">
               <span class="material-symbols-outlined text-[18px]">bookmark_add</span>
@@ -4047,7 +4669,7 @@ def render_stitch_editorial_hub(
             <div class="flex items-center justify-between pb-4 border-b border-surface-container mb-4">
               <div class="flex items-center gap-2">
                 <span class="material-symbols-outlined text-primary text-[20px]">trending_up</span>
-                <h3 class="font-serif-editorial text-lg text-on-surface font-bold">Trending Guides</h3>
+                <h3 class="font-serif-editorial text-lg text-on-surface font-bold">Trending Articles</h3>
               </div>
               <span class="font-label-sm text-[11px] text-stone-400 uppercase">This Week</span>
             </div>
@@ -4149,7 +4771,7 @@ def render_stitch_editorial_hub(
         </div>
 
         <div>
-          <h4 class="font-label-md uppercase tracking-wider text-stone-900 font-bold mb-4 text-xs">Published Guides</h4>
+          <h4 class="font-label-md uppercase tracking-wider text-stone-900 font-bold mb-4 text-xs">Published Articles</h4>
           <ul class="space-y-2 font-body-md text-xs text-stone-600">
             <li><a class="hover:text-primary transition-colors" href="#guides-feed" onclick="filterArticles('bedroom')">Bedroom Inspo</a></li>
             <li><a class="hover:text-primary transition-colors" href="#guides-feed" onclick="filterArticles('fire-pit')">Fire Pits & Hearths</a></li>
@@ -4247,7 +4869,7 @@ def render_stitch_editorial_hub(
 
       const badge = document.getElementById('article-count-badge');
       if (badge) {{
-        badge.textContent = totalItems + ' Guides';
+        badge.textContent = totalItems + ' Articles';
       }}
 
       renderPaginationButtons(totalPages);
@@ -4361,15 +4983,30 @@ def render_nordic_studio_hub(
     routing_mode: str = "single",
     **kwargs: Any,
 ) -> str:
-    """Renders The Nordroom Scandinavian Homepage Hub with masthead, dynamic cover story, room taxonomy, and 3-col grid."""
-    brand_clean = getattr(branding, "brand_name", "") or "THE NORDROOM"
-    author_name = getattr(branding, "author_name", "") or "Rachel"
-    author_bio = getattr(branding, "author_bio", "") or "Creator of The Nordroom • Interior design specialist passionate about Scandinavian homes, architectural renovations, and spatial curation."
-    home_link = f"{path_prefix}/" if path_prefix else "/"
+    """Renders Scandinavian Homepage Hub with dynamic categories strictly from ingested data, and user branding."""
+    brand_name_val = getattr(branding, "brand_name", "") if branding else ""
     clean_domain = source_domain.replace("https://", "").replace("http://", "").rstrip("/")
+    if not brand_name_val and clean_domain and clean_domain not in ("stylesdays.com", "asqstyle.com"):
+        brand_name_val = clean_domain.split(".")[0].replace("-", " ").title()
+    brand_clean = brand_name_val or "Styleire"
+
+    author_name = getattr(branding, "author_name", "") or "Rachel"
+    home_link = f"{path_prefix}/" if path_prefix else "/"
     canonical_base = base_url.rstrip("/") if (base_url and "://" in base_url) else f"https://{clean_domain}"
-    hub_title = title or f"{brand_clean} — Scandinavian Interior Design & Home Tours"
-    hub_subtitle = subtitle or "Curated Scandinavian interiors, practical room layouts, and inspiring house tours."
+
+    tagline_val = getattr(branding, "tagline", "") if branding else ""
+    kicker_val = tagline_val or "Curated Living & Architectural Design"
+    hub_title = title or (f"{brand_clean} — {tagline_val}" if tagline_val else f"{brand_clean} — Architectural Curation & Living")
+    hub_subtitle = subtitle or tagline_val or "Curated home styling inspiration, room ideas, and architectural house tours."
+    utility_strip_text = f"{brand_clean.upper()} • {tagline_val.upper()}" if tagline_val else f"{brand_clean.upper()} • CURATED LIVING • DESIGN INSPIRATION"
+
+    logo_path = getattr(branding, "logo_path", "") if branding else ""
+    if logo_path:
+        clean_logo = logo_path.lstrip("/")
+        logo_url = f"{path_prefix}/{clean_logo}" if path_prefix else f"/{clean_logo}"
+        brand_heading_html = f'<a href="{home_link}" class="inline-block hover:opacity-90 transition-opacity"><img src="{logo_url}" alt="{html_lib.escape(brand_clean)}" class="max-h-14 mx-auto mb-2 object-contain pseo-custom-logo"></a>'
+    else:
+        brand_heading_html = f'<a href="{home_link}" class="hover:opacity-90 transition-opacity">{html_lib.escape(brand_clean)}</a>'
 
     total_posts = len(posts)
     post_items = list(posts)
@@ -4398,36 +5035,64 @@ def render_nordic_studio_hub(
         else:
             lead_img = "https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=1600&q=80"
 
-        lead_title = hero_title or "Scandinavian Warm Minimalism: 10 Calming Room Concepts in Stockholm"
-        lead_excerpt = hero_excerpt or "How raw oak cabinetry, textured lime wash walls, and understated linen textiles create a serene sanctuary that silences everyday auditory noise."
+        lead_title = hero_title or "Scandinavian Warm Minimalism: 10 Calming Room Concepts"
+        lead_excerpt = hero_excerpt or "How intentional materials and textures establish a tranquil home sanctuary."
         lead_category = hero_cat
     else:
-        lead_title = "Scandinavian Warm Minimalism: 10 Calming Room Concepts in Stockholm"
-        lead_excerpt = "How raw oak cabinetry, textured lime wash walls, and understated linen textiles create a serene sanctuary that silences everyday auditory noise."
+        lead_title = "Scandinavian Warm Minimalism: 10 Calming Room Concepts"
+        lead_excerpt = "How intentional materials and textures establish a tranquil home sanctuary."
         lead_link = "#nordic-home-tour"
         lead_category = "Home Tour"
         lead_img = "https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=1600&q=80"
 
-    # Category pills
-    silo_cats = [
-        {"slug": "all", "name": "All Guides"},
-        {"slug": "living-room", "name": "Living Rooms"},
-        {"slug": "bedroom", "name": "Bedrooms"},
-        {"slug": "kitchen", "name": "Kitchens & Pantries"},
-        {"slug": "bathroom", "name": "Bathrooms"},
-        {"slug": "garden", "name": "Garden & Outdoor"},
-        {"slug": "small-spaces", "name": "Small Spaces"},
-        {"slug": "colors", "name": "Color Trends"},
-    ]
+    # Strictly Dynamic Categories Navigation & Pills
+    dynamic_nav_cats = build_dynamic_nav_links(categories, all_posts=posts, path_prefix=path_prefix, routing_mode=routing_mode)
+    silo_cats = [{"slug": "all", "name": "All Articles"}]
+    for c_name, c_url in dynamic_nav_cats:
+        c_slug = c_url.strip("/").split("/")[-1]
+        silo_cats.append({"slug": c_slug, "name": c_name})
 
     pills_markup = ""
     for idx, sc in enumerate(silo_cats):
+        sc_slug = sc["slug"]
+        sc_name = sc["name"]
         active_cls = "bg-[#1C1C1C] text-white font-semibold shadow-xs" if idx == 0 else "bg-white hover:bg-[#F4F3F0] text-[#1C1C1C] border border-[#EBEBEA]"
         pills_markup += f'''
-        <button class="cat-pill px-4 py-2 rounded-full text-xs uppercase tracking-wider font-medium transition-all {active_cls}" onclick="filterArticles('{sc['slug']}', this)">
-          {sc['name']}
+        <button class="cat-pill px-4 py-2 rounded-full text-xs uppercase tracking-wider font-medium transition-all {active_cls}" onclick="filterArticles('{sc_slug}', this)">
+          {sc_name}
         </button>
         '''
+
+    # Dynamic Header Nav Buttons
+    hub_menu_items = [f'<a href="{home_link}" class="text-[#8C6D53] font-bold">All Articles</a>']
+    for sc in silo_cats[1:]:
+        sc_slug = sc["slug"]
+        sc_name_esc = html_lib.escape(sc["name"])
+        hub_menu_items.append(f"""<button onclick="filterArticles('{sc_slug}', this)" class="hover:text-[#8C6D53] transition-colors">{sc_name_esc}</button>""")
+    hub_nav_html = "\n        ".join(hub_menu_items)
+
+    # Dynamic Taxonomy Grid
+    taxonomy_cards = []
+    for sc in silo_cats[1:]:
+        c_slug = sc["slug"]
+        c_name = html_lib.escape(sc["name"])
+        cnt = sum(1 for p in post_items if (getattr(p, "category_slug", None) == c_slug) or (slugify(getattr(p, "category", "") or "") == c_slug))
+        taxonomy_cards.append(f'''
+        <button class="p-4 bg-white hover:bg-[#FBFBFA] border border-[#EBEBEA] hover:border-[#8C6D53] rounded-lg text-left transition-all group flex flex-col justify-between" onclick="filterArticles('{c_slug}', this)">
+          <div>
+            <h3 class="font-serif text-sm sm:text-base text-[#1C1C1C] font-semibold leading-snug group-hover:text-[#8C6D53] transition-colors">{c_name}</h3>
+          </div>
+          <span class="text-[11px] text-[#8C6D53] font-medium mt-3 block">{cnt} curated articles</span>
+        </button>''')
+    taxonomy_grid_html = "\n".join(taxonomy_cards)
+
+    # Dynamic Footer Categories
+    footer_cat_items = []
+    for sc in silo_cats[1:7]:
+        sc_slug = sc["slug"]
+        sc_name_esc = html_lib.escape(sc["name"])
+        footer_cat_items.append(f"""<li><button onclick="filterArticles('{sc_slug}', this)" class="hover:text-white transition-colors">{sc_name_esc}</button></li>""")
+    footer_cats_html = "\n          ".join(footer_cat_items) or f'<li><a href="{home_link}" class="hover:text-white transition-colors">All Published Articles</a></li>'
 
     # Cards grid
     cards_html = ""
@@ -4453,13 +5118,13 @@ def render_nordic_studio_hub(
             img_src = "https://images.unsplash.com/photo-1598928506311-c55ded91a20c?auto=format&fit=crop&w=800&q=80"
 
         fallback_svg = _resolve_fallback_svg(slug_val, path_prefix)
-        data_cat = category_val.lower().replace(" ", "-")
+        data_cat = getattr(p, "category_slug", None) or slugify(category_val)
         init_style = "display: flex;" if idx < 12 else "display: none;"
 
         cards_html += f'''
         <article class="article-card group bg-white rounded-lg overflow-hidden border border-[#EBEBEA] hover:border-[#8C6D53]/50 hover:shadow-sm transition-all flex flex-col" data-cat="{data_cat}" style="{init_style}">
           <a href="{link}" class="relative aspect-[4/3] overflow-hidden bg-[#F4F3F0] block">
-            <img alt="{html_lib.escape(title_val)}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src="{img_src}" loading="lazy" decoding="async" onerror="this.onerror=null; this.src='{fallback_svg}';">
+            <img alt="{html_lib.escape(title_val)}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src="{img_src}" loading="lazy" decoding="async" onerror="this.onerror=null; this.src=\'{fallback_svg}\';">
             <span class="absolute top-3 left-3 px-2.5 py-1 bg-white/95 backdrop-blur-sm rounded text-[10px] font-semibold tracking-wider uppercase text-[#1C1C1C] border border-[#EBEBEA] shadow-xs">
               {html_lib.escape(category_val)}
             </span>
@@ -4495,6 +5160,7 @@ def render_nordic_studio_hub(
   <meta name="description" content="{html_lib.escape(hub_subtitle)}">
   <meta name="robots" content="index, follow, max-image-preview:large">
   <link rel="canonical" href="{canonical_base}/">
+  <link rel="icon" href="{path_prefix}/favicon.ico" type="image/x-icon"/>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 100 100\'><text y=\'.9em\' font-size=\'90\'>&#x1F3E0;</text></svg>">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
@@ -4517,41 +5183,32 @@ def render_nordic_studio_hub(
 
   <!-- TOP UTILITY STRIP -->
   <div class="w-full bg-[#1C1C1C] text-white py-2 px-4 sm:px-8 text-center sm:text-left flex flex-col sm:flex-row items-center justify-between text-[11px] tracking-[0.18em] uppercase font-medium">
-    <div>SCANDINAVIAN INTERIORS • HOME TOURS • DESIGN INSPIRATION</div>
+    <div>{utility_strip_text}</div>
     <div class="hidden sm:flex items-center gap-4 text-stone-300">
-      <a href="{home_link}" class="hover:text-white transition-colors">Home Tours</a>
+      <a href="{nordic_fb}" target="_blank" rel="noopener noreferrer" class="hover:text-white transition-colors">Facebook</a>
       <span>•</span>
-      <a href="#newsletter" class="hover:text-white transition-colors">Newsletter</a>
+      <a href="{nordic_pin}" target="_blank" rel="noopener noreferrer" class="hover:text-white transition-colors">Pinterest</a>
       <span>•</span>
-      <a href="https://pinterest.com" target="_blank" rel="noopener noreferrer" class="hover:text-white transition-colors">Pinterest</a>
-      <span>•</span>
-      <a href="{home_link}" class="hover:text-white transition-colors">About</a>
+      <a href="{home_link}contact/" class="hover:text-white transition-colors">Contact</a>
     </div>
   </div>
 
-  <!-- CENTERED THE NORDROOM MASTHEAD -->
+  <!-- CENTERED MASTHEAD -->
   <header class="w-full bg-white border-b border-[#EBEBEA] py-8 px-4 text-center">
     <div class="max-w-[1200px] mx-auto">
-      <span class="text-[11px] tracking-[0.25em] uppercase text-[#8C6D53] font-semibold block mb-2">Nordic Living & Interior Architecture</span>
+      <span class="text-[11px] tracking-[0.25em] uppercase text-[#8C6D53] font-semibold block mb-2">{html_lib.escape(kicker_val)}</span>
       <h1 class="font-serif text-4xl sm:text-5xl md:text-6xl tracking-[0.16em] font-medium text-[#1C1C1C] uppercase mb-2">
-        <a href="{home_link}" class="hover:opacity-90 transition-opacity">{html_lib.escape(brand_clean)}</a>
+        {brand_heading_html}
       </h1>
-      <p class="text-xs sm:text-sm text-[#686866] italic font-serif">Curated Interior Design, Space Transformations & Scandinavian Living</p>
+      <p class="text-xs sm:text-sm text-[#686866] italic font-serif">{html_lib.escape(hub_subtitle)}</p>
     </div>
   </header>
 
-  <!-- NAVIGATION & ROOM MENU -->
+  <!-- NAVIGATION & ROOM MENU (DYNAMIC INGESTED CATEGORIES) -->
   <nav class="w-full bg-white border-b border-[#EBEBEA] sticky top-0 z-30 shadow-xs">
     <div class="max-w-[1200px] mx-auto px-4 flex items-center justify-between overflow-x-auto py-3 gap-6 text-[12px] font-semibold tracking-[0.14em] uppercase text-[#1C1C1C]">
       <div class="flex items-center gap-6 whitespace-nowrap">
-        <a href="{home_link}" class="text-[#8C6D53] font-bold">All Guides</a>
-        <button onclick="filterArticles('living')" class="hover:text-[#8C6D53] transition-colors">Living Rooms</button>
-        <button onclick="filterArticles('bedroom')" class="hover:text-[#8C6D53] transition-colors">Bedrooms</button>
-        <button onclick="filterArticles('kitchen')" class="hover:text-[#8C6D53] transition-colors">Kitchens</button>
-        <button onclick="filterArticles('bathroom')" class="hover:text-[#8C6D53] transition-colors">Bathrooms</button>
-        <button onclick="filterArticles('garden')" class="hover:text-[#8C6D53] transition-colors">Garden & Outdoor</button>
-        <button onclick="filterArticles('small')" class="hover:text-[#8C6D53] transition-colors">Small Spaces</button>
-        <button onclick="filterArticles('color')" class="hover:text-[#8C6D53] transition-colors">Color Trends</button>
+        {hub_nav_html}
       </div>
       <div class="hidden sm:flex items-center gap-2">
         <input type="text" id="nord-search-input" oninput="handleSearch(this.value)" placeholder="Search rooms..." class="px-3 py-1 text-xs border border-[#EBEBEA] rounded-full focus:outline-none focus:border-[#8C6D53] w-36 tracking-normal">
@@ -4561,175 +5218,130 @@ def render_nordic_studio_hub(
 
   <main class="flex-1 w-full py-8 sm:py-12">
 
-    <!-- HERO COVER STORY (LATEST POST) -->
-    <section class="max-w-[1200px] mx-auto px-4 sm:px-8 mb-14">
-      <div class="bg-white border border-[#EBEBEA] rounded-xl overflow-hidden shadow-xs hover:border-[#8C6D53]/50 transition-all">
-        <div class="grid grid-cols-1 lg:grid-cols-12 items-center">
-          <div class="lg:col-span-7 aspect-[16/10] overflow-hidden bg-[#F4F3F0]">
-            <a href="{lead_link}">
-              <img src="{lead_img}" alt="{html_lib.escape(lead_title)}" class="w-full h-full object-cover hover:scale-103 transition-transform duration-700" fetchpriority="high">
+    <!-- LEAD HOME TOUR STORY -->
+    <section class="max-w-[1200px] mx-auto px-4 sm:px-8 mb-16">
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center bg-white border border-[#EBEBEA] rounded-xl overflow-hidden p-6 sm:p-8">
+        <div class="lg:col-span-7 aspect-[16/10] overflow-hidden rounded-lg bg-[#F4F3F0] relative">
+          <img src="{lead_img}" alt="{html_lib.escape(lead_title)}" class="w-full h-full object-cover">
+          <span class="absolute top-4 left-4 px-3 py-1 bg-white/95 backdrop-blur-sm rounded text-[11px] font-bold tracking-widest uppercase text-[#1C1C1C] border border-[#EBEBEA]">
+            {html_lib.escape(lead_category)}
+          </span>
+        </div>
+        <div class="lg:col-span-5 flex flex-col justify-center">
+          <span class="text-[11px] tracking-[0.2em] uppercase font-semibold text-[#8C6D53] mb-2 block">Latest Architectural Feature</span>
+          <h2 class="font-serif text-2xl sm:text-3xl md:text-4xl font-bold text-[#1C1C1C] leading-snug mb-4">
+            <a href="{lead_link}" class="hover:text-[#8C6D53] transition-colors">{html_lib.escape(lead_title)}</a>
+          </h2>
+          <p class="text-sm sm:text-base text-[#686866] leading-relaxed mb-6 font-serif italic">
+            {html_lib.escape(lead_excerpt)}
+          </p>
+          <div class="flex items-center gap-4">
+            <a href="{lead_link}" class="inline-flex items-center gap-2 px-5 py-2.5 bg-[#1C1C1C] hover:bg-[#8C6D53] text-white text-xs uppercase tracking-widest font-semibold rounded transition-colors">
+              Read Story &rarr;
             </a>
-          </div>
-          <div class="lg:col-span-5 p-6 sm:p-10 flex flex-col justify-between">
-            <div>
-              <span class="text-[11px] tracking-[0.22em] uppercase font-semibold text-[#8C6D53] block mb-2">Featured Home Tour • {html_lib.escape(lead_category)}</span>
-              <a href="{lead_link}">
-                <h2 class="font-serif text-2xl sm:text-3xl md:text-4xl font-bold text-[#1C1C1C] leading-[1.2] mb-4 hover:text-[#8C6D53] transition-colors">
-                  {html_lib.escape(lead_title)}
-                </h2>
-              </a>
-              <p class="text-xs sm:text-sm text-[#686866] leading-relaxed mb-6 font-serif italic text-base">
-                {html_lib.escape(lead_excerpt)}
-              </p>
-            </div>
-            <div class="pt-4 border-t border-[#F4F3F0] flex items-center justify-between">
-              <span class="text-xs text-[#686866]">By {html_lib.escape(author_name)} • 4 Min Read</span>
-              <a href="{lead_link}" class="inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-wider text-[#8C6D53] hover:underline">
-                Read Tour &rarr;
-              </a>
-            </div>
           </div>
         </div>
       </div>
     </section>
 
-    <!-- CURATED ROOM TAXONOMY GRID (ZERO RAW SLUGS) -->
-    <section class="max-w-[1200px] mx-auto px-4 sm:px-8 mb-14">
+    <!-- CURATED TAXONOMY DIRECTORY (DYNAMIC INGESTED CATEGORIES) -->
+    <section class="max-w-[1200px] mx-auto px-4 sm:px-8 mb-16">
       <div class="flex items-center justify-between pb-3 mb-6 border-b border-[#EBEBEA]">
-        <div class="flex items-center gap-2">
-          <span class="material-symbols-outlined text-[#8C6D53] text-[20px]">roofing</span>
-          <h2 class="text-xs font-semibold tracking-widest uppercase text-[#1C1C1C]">Curated Room Collections</h2>
+        <div>
+          <span class="text-[11px] tracking-[0.2em] uppercase font-semibold text-[#8C6D53] block mb-1">Browse by Category</span>
+          <h2 class="font-serif text-2xl sm:text-3xl font-bold text-[#1C1C1C]">Curated Architectural Taxonomy</h2>
         </div>
-        <span class="text-[11px] tracking-wider uppercase text-[#686866]">The Nordroom Architectural Taxonomy</span>
+        <span class="text-[11px] tracking-wider uppercase text-[#686866]">{len(silo_cats)-1} Categories</span>
       </div>
 
       <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
-        <button class="p-4 bg-white hover:bg-[#FBFBFA] border border-[#EBEBEA] hover:border-[#8C6D53] rounded-lg text-left transition-all group flex flex-col justify-between" onclick="filterArticles('living')">
-          <div>
-            <h3 class="font-serif text-sm sm:text-base text-[#1C1C1C] font-semibold leading-snug group-hover:text-[#8C6D53] transition-colors">Living Rooms</h3>
-          </div>
-          <span class="text-[11px] text-[#8C6D53] font-medium mt-3 block">18 curated tours</span>
-        </button>
-        <button class="p-4 bg-white hover:bg-[#FBFBFA] border border-[#EBEBEA] hover:border-[#8C6D53] rounded-lg text-left transition-all group flex flex-col justify-between" onclick="filterArticles('bedroom')">
-          <div>
-            <h3 class="font-serif text-sm sm:text-base text-[#1C1C1C] font-semibold leading-snug group-hover:text-[#8C6D53] transition-colors">Bedrooms</h3>
-          </div>
-          <span class="text-[11px] text-[#8C6D53] font-medium mt-3 block">14 curated guides</span>
-        </button>
-        <button class="p-4 bg-white hover:bg-[#FBFBFA] border border-[#EBEBEA] hover:border-[#8C6D53] rounded-lg text-left transition-all group flex flex-col justify-between" onclick="filterArticles('kitchen')">
-          <div>
-            <h3 class="font-serif text-sm sm:text-base text-[#1C1C1C] font-semibold leading-snug group-hover:text-[#8C6D53] transition-colors">Kitchens & Pantries</h3>
-          </div>
-          <span class="text-[11px] text-[#8C6D53] font-medium mt-3 block">12 design guides</span>
-        </button>
-        <button class="p-4 bg-white hover:bg-[#FBFBFA] border border-[#EBEBEA] hover:border-[#8C6D53] rounded-lg text-left transition-all group flex flex-col justify-between" onclick="filterArticles('garden')">
-          <div>
-            <h3 class="font-serif text-sm sm:text-base text-[#1C1C1C] font-semibold leading-snug group-hover:text-[#8C6D53] transition-colors">Garden & Outdoor</h3>
-          </div>
-          <span class="text-[11px] text-[#8C6D53] font-medium mt-3 block">21 outdoor spaces</span>
-        </button>
-        <button class="p-4 bg-white hover:bg-[#FBFBFA] border border-[#EBEBEA] hover:border-[#8C6D53] rounded-lg text-left transition-all group flex flex-col justify-between" onclick="filterArticles('small')">
-          <div>
-            <h3 class="font-serif text-sm sm:text-base text-[#1C1C1C] font-semibold leading-snug group-hover:text-[#8C6D53] transition-colors">Small Spaces</h3>
-          </div>
-          <span class="text-[11px] text-[#8C6D53] font-medium mt-3 block">16 space hacks</span>
-        </button>
-        <button class="p-4 bg-white hover:bg-[#FBFBFA] border border-[#EBEBEA] hover:border-[#8C6D53] rounded-lg text-left transition-all group flex flex-col justify-between" onclick="filterArticles('color')">
-          <div>
-            <h3 class="font-serif text-sm sm:text-base text-[#1C1C1C] font-semibold leading-snug group-hover:text-[#8C6D53] transition-colors">Color Trends</h3>
-          </div>
-          <span class="text-[11px] text-[#8C6D53] font-medium mt-3 block">9 paint palettes</span>
-        </button>
+        {taxonomy_grid_html}
       </div>
     </section>
 
-    <!-- PUBLISHED GUIDES GRID -->
+    <!-- PUBLISHED ARTICLES GRID -->
     <section class="max-w-[1200px] mx-auto px-4 sm:px-8 mb-16" id="guides-feed">
       <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-3 mb-6 border-b border-[#EBEBEA] gap-4">
         <div>
-          <span class="text-[11px] tracking-[0.2em] uppercase font-semibold text-[#8C6D53] block mb-1">Scandinavian Living Feed</span>
-          <h2 class="font-serif text-2xl sm:text-3xl font-bold text-[#1C1C1C]">All Published Home Tours & Styling Guides</h2>
+          <span class="text-[11px] tracking-[0.2em] uppercase font-semibold text-[#8C6D53] block mb-1">Published Articles</span>
+          <h2 class="font-serif text-2xl sm:text-3xl font-bold text-[#1C1C1C]">All Published Home Tours &amp; Styling Articles</h2>
         </div>
-        <div class="flex items-center gap-3">
-          <span id="showing-text" class="text-xs text-[#686866]">Showing all published tours</span>
-          <span id="article-count-badge" class="px-2.5 py-1 bg-[#F4F3F0] rounded text-xs font-semibold text-[#1C1C1C] border border-[#EBEBEA]">{total_posts} Guides</span>
+        <div class="flex items-center gap-2 overflow-x-auto pb-2 sm:pb-0" id="cat-pills-bar">
+          {pills_markup}
         </div>
       </div>
 
-      <div class="flex items-center gap-2 overflow-x-auto pb-4 mb-8">
-        {pills_markup}
-      </div>
-
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8" id="article-grid">
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8" id="article-grid">
         {cards_html}
       </div>
 
       <!-- PAGINATION CONTROLS -->
-      <div id="pagination-controls" class="flex items-center justify-center gap-2 mt-12 pt-6 border-t border-[#EBEBEA]">
+      <div class="mt-12 flex flex-col sm:flex-row items-center justify-between pt-6 border-t border-[#EBEBEA] gap-4" id="pagination-bar">
+        <span class="text-xs text-[#686866]" id="showing-text">Showing 1–12 of {total_posts} published articles</span>
+        <div class="flex items-center gap-2">
+          <button id="prev-btn" onclick="prevPage()" class="px-4 py-2 border border-[#EBEBEA] rounded text-xs font-semibold hover:border-[#1C1C1C] transition-colors disabled:opacity-40 disabled:pointer-events-none">&larr; Previous</button>
+          <button id="next-btn" onclick="nextPage()" class="px-4 py-2 border border-[#EBEBEA] rounded text-xs font-semibold hover:border-[#1C1C1C] transition-colors disabled:opacity-40 disabled:pointer-events-none">Next &rarr;</button>
+        </div>
       </div>
     </section>
 
-    <!-- NEWSLETTER DISPATCH STRIP -->
+    <!-- NEWSLETTER CALLOUT -->
     <section class="max-w-[1200px] mx-auto px-4 sm:px-8 mb-16" id="newsletter">
-      <div class="p-8 sm:p-12 bg-[#F4F3F0] border border-[#EBEBEA] rounded-xl text-center">
-        <span class="text-[11px] tracking-[0.25em] uppercase font-semibold text-[#8C6D53] block mb-2">Weekly Inspiration</span>
-        <h2 class="font-serif text-3xl sm:text-4xl font-bold text-[#1C1C1C] mb-3">Join 85,000+ Scandinavian Living Readers</h2>
-        <p class="text-xs sm:text-sm text-[#686866] max-w-xl mx-auto leading-relaxed mb-6 font-serif italic text-base">
-          Receive our weekly curation of Nordic house tours, minimalist room layouts, and organic material guides directly in your inbox.
+      <div class="bg-[#F4F3F0] border border-[#EBEBEA] rounded-xl p-8 sm:p-12 text-center max-w-3xl mx-auto">
+        <span class="text-[11px] tracking-[0.2em] uppercase font-semibold text-[#8C6D53] mb-2 block">Weekly Dispatch</span>
+        <h3 class="font-serif text-3xl font-bold text-[#1C1C1C] mb-3">Quiet Interiors, Delivered Weekly</h3>
+        <p class="text-xs sm:text-sm text-[#686866] max-w-md mx-auto mb-6">
+          Subscribe to our Sunday email dispatch featuring curated house tours, minimal floor plans, and material palettes.
         </p>
-        <div class="flex flex-col sm:flex-row items-center justify-center gap-3 max-w-md mx-auto">
-          <input type="email" placeholder="Your email address..." class="w-full px-4 py-2.5 bg-white border border-[#EBEBEA] rounded-full text-xs focus:outline-none focus:border-[#8C6D53] shadow-xs">
-          <button class="w-full sm:w-auto px-6 py-2.5 bg-[#1C1C1C] hover:bg-stone-800 text-white rounded-full text-xs font-semibold tracking-wider uppercase whitespace-nowrap shadow-xs transition-colors">
+        <form class="flex flex-col sm:flex-row items-center justify-center gap-2 max-w-md mx-auto" onsubmit="event.preventDefault(); alert('Subscribed to dispatch!');">
+          <input type="email" placeholder="Your email address" required class="px-4 py-2.5 rounded text-xs border border-[#EBEBEA] focus:outline-none focus:border-[#8C6D53] w-full sm:w-72">
+          <button type="submit" class="px-6 py-2.5 bg-[#1C1C1C] hover:bg-[#8C6D53] text-white text-xs uppercase tracking-widest font-semibold rounded w-full sm:w-auto transition-colors">
             Subscribe
           </button>
-        </div>
+        </form>
       </div>
     </section>
 
   </main>
 
-  <!-- THE NORDROOM 4-COLUMN FOOTER -->
+  <!-- 4-COLUMN FOOTER (DYNAMIC CATEGORIES) -->
   <footer class="w-full bg-[#1C1C1C] text-stone-300 pt-14 pb-8 border-t border-stone-800">
     <div class="max-w-[1200px] mx-auto px-4 sm:px-8 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-10 mb-12">
       <div>
         <h4 class="font-serif text-2xl font-bold text-white mb-3 uppercase tracking-wider">{html_lib.escape(brand_clean)}</h4>
         <p class="text-xs text-stone-400 leading-relaxed mb-4">
-          An internationally acclaimed interior design and Scandinavian living publication showcasing serene house tours, room layout solutions, and organic material palettes.
+          An independent design and curated living publication showcasing serene room solutions, articles, and organic material palettes.
         </p>
         <span class="text-[11px] text-[#8C6D53] font-semibold uppercase tracking-widest block">Founded by {html_lib.escape(author_name)}</span>
       </div>
       <div>
         <h5 class="text-xs font-semibold tracking-widest uppercase text-white mb-4">Room Inspiration</h5>
         <ul class="space-y-2 text-xs text-stone-400">
-          <li><button onclick="filterArticles('living')" class="hover:text-white transition-colors">Living Room Ideas</button></li>
-          <li><button onclick="filterArticles('bedroom')" class="hover:text-white transition-colors">Scandinavian Bedrooms</button></li>
-          <li><button onclick="filterArticles('kitchen')" class="hover:text-white transition-colors">Kitchens & Pantries</button></li>
-          <li><button onclick="filterArticles('garden')" class="hover:text-white transition-colors">Garden & Outdoor Living</button></li>
-          <li><button onclick="filterArticles('small')" class="hover:text-white transition-colors">Small Space Living</button></li>
+          {footer_cats_html}
         </ul>
       </div>
       <div>
-        <h5 class="text-xs font-semibold tracking-widest uppercase text-white mb-4">Design Styles</h5>
+        <h5 class="text-xs font-semibold tracking-widest uppercase text-white mb-4">Editorial & Trust</h5>
         <ul class="space-y-2 text-xs text-stone-400">
-          <li><a href="{home_link}" class="hover:text-white transition-colors">Nordic Warm Minimalism</a></li>
-          <li><a href="{home_link}" class="hover:text-white transition-colors">Japandi Aesthetics</a></li>
-          <li><a href="{home_link}" class="hover:text-white transition-colors">Mid-Century Modern</a></li>
-          <li><a href="{home_link}" class="hover:text-white transition-colors">Earth & Lime Wash Finishes</a></li>
-          <li><a href="{home_link}" class="hover:text-white transition-colors">Small Apartment Hacks</a></li>
+          <li><a href="{path_prefix}/about/" class="hover:text-white transition-colors">About Us</a></li>
+          <li><a href="{path_prefix}/contact/" class="hover:text-white transition-colors">Contact</a></li>
+          <li><a href="{path_prefix}/editorial-policy/" class="hover:text-white transition-colors">Editorial Policy</a></li>
+          <li><a href="{path_prefix}/privacy-policy/" class="hover:text-white transition-colors">Privacy Policy</a></li>
+          <li><a href="{path_prefix}/terms/" class="hover:text-white transition-colors">Terms of Service</a></li>
         </ul>
       </div>
       <div>
         <h5 class="text-xs font-semibold tracking-widest uppercase text-white mb-4">Curate & Connect</h5>
-        <p class="text-xs text-stone-400 mb-3">Join our community of 85,000+ design enthusiasts.</p>
+        <p class="text-xs text-stone-400 mb-3">Join our community of design enthusiasts.</p>
         <div class="flex items-center gap-3 mb-4">
-          <a href="https://pinterest.com" target="_blank" rel="noopener noreferrer" class="px-3 py-1.5 bg-[#E60023] hover:bg-[#AD081B] text-white rounded text-xs font-semibold">Pinterest</a>
+          <a href="{nordic_pin}" target="_blank" rel="noopener noreferrer" class="px-3 py-1.5 bg-[#E60023] hover:bg-[#AD081B] text-white rounded text-xs font-semibold">Pinterest</a>
           <a href="#newsletter" class="px-3 py-1.5 bg-stone-800 hover:bg-stone-700 text-stone-200 rounded text-xs">Newsletter</a>
         </div>
         <span class="text-[11px] text-stone-500 block">&copy; 2026 {html_lib.escape(brand_clean)}. All Rights Reserved.</span>
       </div>
     </div>
     <div class="max-w-[1200px] mx-auto px-4 text-center text-[11px] text-stone-500 pt-6 border-t border-stone-800/80">
-      Designed with pure Scandinavian minimalism • Zero robotic filler • Hand-crafted editorial curation.
+      Hand-crafted editorial curation • Zero robotic filler • Sourced from real data.
     </div>
   </footer>
 
@@ -4775,91 +5387,56 @@ def render_nordic_studio_hub(
       const showingText = document.getElementById('showing-text');
       if (showingText) {{
         if (totalItems === 0) {{
-          showingText.textContent = 'Showing 0 published guides';
+          showingText.textContent = 'Showing 0 published articles';
         }} else {{
-          showingText.textContent = 'Showing ' + (startIndex + 1) + '–' + endIndex + ' of ' + totalItems + ' published guides';
+          showingText.textContent = 'Showing ' + (startIndex + 1) + '–' + endIndex + ' of ' + totalItems + ' published articles';
         }}
       }}
 
-      const badge = document.getElementById('article-count-badge');
-      if (badge) {{
-        badge.textContent = totalItems + ' Guides';
-      }}
-
-      renderPaginationButtons(totalPages);
+      const prevBtn = document.getElementById('prev-btn');
+      const nextBtn = document.getElementById('next-btn');
+      if (prevBtn) prevBtn.disabled = (currentPage <= 1);
+      if (nextBtn) nextBtn.disabled = (currentPage >= totalPages);
 
       if (scrollToGrid) {{
-        const target = document.getElementById('guides-feed');
-        if (target) {{
-          target.scrollIntoView({{ behavior: 'smooth', block: 'start' }});
-        }}
+        const gridElem = document.getElementById('guides-feed');
+        if (gridElem) gridElem.scrollIntoView({{ behavior: 'smooth' }});
       }}
     }}
 
-    function renderPaginationButtons(totalPages) {{
-      const container = document.getElementById('pagination-controls');
-      if (!container) return;
+    function filterArticles(category, btnElem) {{
+      currentCategory = category ? category.toLowerCase() : 'all';
+      currentPage = 1;
 
-      if (totalPages <= 1) {{
-        container.innerHTML = '<span class="px-3 py-1 text-stone-400 text-xs">Page 1 of 1</span>';
-        return;
+      document.querySelectorAll('.cat-pill').forEach(btn => {{
+        btn.classList.remove('bg-[#1C1C1C]', 'text-white', 'shadow-xs');
+        btn.classList.add('bg-white', 'text-[#1C1C1C]', 'border', 'border-[#EBEBEA]');
+      }});
+
+      if (btnElem && btnElem.classList.contains('cat-pill')) {{
+        btnElem.classList.remove('bg-white', 'text-[#1C1C1C]', 'border', 'border-[#EBEBEA]');
+        btnElem.classList.add('bg-[#1C1C1C]', 'text-white', 'shadow-xs');
       }}
 
-      let html = '';
+      updateDisplay(false);
+    }}
 
+    function handleSearch(val) {{
+      currentSearch = (val || '').trim().toLowerCase();
+      currentPage = 1;
+      updateDisplay(false);
+    }}
+
+    function prevPage() {{
       if (currentPage > 1) {{
-        html += '<button onclick="goToPage(' + (currentPage - 1) + ')" class="px-3 py-1.5 bg-white hover:bg-stone-100 text-stone-800 border border-[#EBEBEA] rounded-full text-xs font-medium uppercase tracking-wider transition-colors inline-flex items-center gap-1">&larr; Prev</button>';
-      }} else {{
-        html += '<button disabled class="px-3 py-1.5 bg-stone-100 text-stone-400 border border-[#EBEBEA] rounded-full text-xs font-medium uppercase tracking-wider cursor-not-allowed inline-flex items-center gap-1">&larr; Prev</button>';
+        currentPage--;
+        updateDisplay(true);
       }}
-
-      for (let i = 1; i <= totalPages; i++) {{
-        if (i === 1 || i === totalPages || (i >= currentPage - 1 && i <= currentPage + 1)) {{
-          if (i === currentPage) {{
-            html += '<button class="px-3.5 py-1.5 bg-[#1C1C1C] text-white rounded-full text-xs font-bold shadow-xs">' + i + '</button>';
-          }} else {{
-            html += '<button onclick="goToPage(' + i + ')" class="px-3.5 py-1.5 bg-white hover:bg-stone-100 text-stone-800 border border-[#EBEBEA] rounded-full text-xs font-medium transition-colors">' + i + '</button>';
-          }}
-        }} else if (i === currentPage - 2 || i === currentPage + 2) {{
-          html += '<span class="px-1 text-stone-400">...</span>';
-        }}
-      }}
-
-      if (currentPage < totalPages) {{
-        html += '<button onclick="goToPage(' + (currentPage + 1) + ')" class="px-3 py-1.5 bg-white hover:bg-stone-100 text-stone-800 border border-[#EBEBEA] rounded-full text-xs font-medium uppercase tracking-wider transition-colors inline-flex items-center gap-1">Next &rarr;</button>';
-      }} else {{
-        html += '<button disabled class="px-3 py-1.5 bg-stone-100 text-stone-400 border border-[#EBEBEA] rounded-full text-xs font-medium uppercase tracking-wider cursor-not-allowed inline-flex items-center gap-1">Next &rarr;</button>';
-      }}
-
-      container.innerHTML = html;
     }}
 
-    function goToPage(page) {{
-      currentPage = page;
+    function nextPage() {{
+      currentPage++;
       updateDisplay(true);
-    }}
-
-    function filterArticles(category, element) {{
-      currentCategory = category;
-      currentPage = 1;
-
-      const pills = document.querySelectorAll('.cat-pill');
-      if (element) {{
-        pills.forEach(p => {{
-          p.classList.remove('bg-[#1C1C1C]', 'text-white', 'font-semibold', 'shadow-xs');
-          p.classList.add('bg-white', 'text-[#1C1C1C]', 'border', 'border-[#EBEBEA]');
-        }});
-        element.classList.remove('bg-white', 'text-[#1C1C1C]', 'border', 'border-[#EBEBEA]');
-        element.classList.add('bg-[#1C1C1C]', 'text-white', 'font-semibold', 'shadow-xs');
-      }}
-
-      updateDisplay(false);
-    }}
-
-    function handleSearch(query) {{
-      currentSearch = query.toLowerCase().trim();
-      currentPage = 1;
-      updateDisplay(false);
     }}
 
     document.addEventListener('DOMContentLoaded', function() {{
@@ -4868,7 +5445,6 @@ def render_nordic_studio_hub(
   </script>
 </body>
 </html>'''
-
 
 
 def render_hub(
@@ -4889,12 +5465,12 @@ def render_hub(
     path_prefix = _extract_path_prefix(base_url)
     theme_tokens = get_theme_tokens(theme)
     clean_domain = _clean_source_domain(source_domain)
-    brand_clean = getattr(branding, "brand_name", "") or (clean_domain.split('.')[0].title() if clean_domain else "AnnaDeco")
+    brand_clean = getattr(branding, "brand_name", "") or (clean_domain.split('.')[0].title() if clean_domain else "Styleire")
     canonical_base = base_url.rstrip("/") if (base_url and "://" in base_url) else f"https://{clean_domain}"
     fallback_css = get_embedded_fallback_css(theme_tokens)
 
     hub_title = title or f"{brand_clean} Editorial Hub"
-    hub_subtitle = subtitle or "Curated Home Decor, Room Styling Guides, and Modern Living Guides." 
+    hub_subtitle = subtitle or "Curated Home Decor, Room Styling Inspiration, and Modern Living Articles." 
 
     if theme == "nordic-studio":
         return render_nordic_studio_hub(
@@ -4943,7 +5519,7 @@ def render_hub(
         slug = getattr(p, "slug", None) or (p.get("slug") if isinstance(p, dict) else "")
         title_val = getattr(p, "title", None) or (p.get("title") if isinstance(p, dict) else slug.replace("-", " ").title())
         excerpt_val = getattr(p, "excerpt", None) or (p.get("excerpt") if isinstance(p, dict) else (p.get("description", "") if isinstance(p, dict) else ""))
-        category_val = getattr(p, "category", None) or (p.get("category") if isinstance(p, dict) else "Guide")
+        category_val = getattr(p, "category", None) or (p.get("category") if isinstance(p, dict) else "Articles")
         web_path_val = getattr(p, "web_path", None) or (p.get("web_path") if isinstance(p, dict) else f"/{slug}/")
         local_img = getattr(p, "local_image_path", None) or (p.get("local_image_path") if isinstance(p, dict) else (p.get("local_image", "") if isinstance(p, dict) else ""))
         link = f"{path_prefix}{web_path_val}" if path_prefix else web_path_val
@@ -4974,7 +5550,7 @@ def render_hub(
               </p>
             </div>
             <div style="padding: 0.75rem 1.25rem; background-color: #FAFAFA; border-top: 1px solid var(--pseo-card-border); display: flex; align-items: center; justify-content: space-between; font-size: 0.75rem; font-weight: 500; color: #78716C;">
-              <span>Read Guide</span>
+              <span>Read Article</span>
               <span style="color: {theme_tokens['accent']}; font-weight: 700;">→</span>
             </div>
           </a>
@@ -5026,8 +5602,7 @@ def render_hub(
 
   <main class="pseo-container pseo-main">
     <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem;">
-      <h2 class="font-serif-editorial text-xl font-bold text-stone-900">All Published Guides ({len(posts)})</h2>
-      <span class="text-xs text-stone-500 font-medium">Updated Regularly</span>
+      <h2 class="font-serif-editorial text-xl font-bold text-stone-900">All Published Articles ({len(posts)})</h2>
     </div>
 
     <div class="pseo-related-grid">

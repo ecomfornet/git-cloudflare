@@ -1,0 +1,1 @@
+import{n as e,v as t}from"./SiteLayout-CWdm9qNZ.js";var n=t(),r=()=>(0,n.jsx)(e,{children:(0,n.jsx)(`div`,{className:`mx-auto max-w-3xl px-4 py-24 text-center`,children:(0,n.jsx)(`h1`,{className:`font-serif text-3xl font-semibold`,children:`Author not found`})})});export{r as notFoundComponent};

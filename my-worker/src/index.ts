@@ -1,26 +1,30 @@
 /**
- * Welcome to Cloudflare Workers! This is your first worker.
- *
- * - Run `npm run dev` in your terminal to start a development server
- * - Open a browser tab at http://localhost:8787/ to see your worker in action
- * - Run `npm run deploy` to publish your worker
- *
- * Bind resources to your worker in `wrangler.jsonc`. After adding bindings, a type definition for the
- * `Env` object can be regenerated with `npm run cf-typegen`.
- *
- * Learn more at https://developers.cloudflare.com/workers/
+ * Cloudflare Workers Static Assets Gateway
+ * Automatically routes all incoming edge traffic to static site assets in ./public.
  */
 
+interface Env {
+	ASSETS: {
+		fetch: (request: Request | string) => Promise<Response>;
+	};
+}
+
 export default {
-	async fetch(request, env, ctx): Promise<Response> {
+	async fetch(request: Request, env: Env): Promise<Response> {
 		const url = new URL(request.url);
-		switch (url.pathname) {
-			case '/message':
-				return new Response('Hello, World!');
-			case '/random':
-				return new Response(crypto.randomUUID());
-			default:
-				return new Response('Not Found', { status: 404 });
+
+		// Optional edge health check endpoint
+		if (url.pathname === '/api/health') {
+			return new Response(JSON.stringify({ status: 'ok', worker: 'pSEO Static Edge' }), {
+				status: 200,
+				headers: {
+					'Content-Type': 'application/json',
+					'Cache-Control': 'no-store',
+				},
+			});
 		}
+
+		// Delegate all other requests to Cloudflare Workers Static Assets binding
+		return env.ASSETS.fetch(request);
 	},
-} satisfies ExportedHandler<Env>;
+};
